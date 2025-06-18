@@ -1110,7 +1110,7 @@
     },
     "fflag_feat_all_fit_29_org_settings_page": {
       "key": "fflag_feat_all_fit_29_org_settings_page",
-      "on": false,
+      "on": true,
       "prerequisites": [],
       "targets": [],
       "contextTargets": [],
@@ -2393,7 +2393,7 @@
     },
     "fflag_feat_front_fit_183_email_notifications_short": {
       "key": "fflag_feat_front_fit_183_email_notifications_short",
-      "on": false,
+      "on": true,
       "prerequisites": [],
       "targets": [],
       "contextTargets": [],
@@ -2528,7 +2528,7 @@
     },
     "fflag_feat_front_leap_2036_annotations_summary": {
       "key": "fflag_feat_front_leap_2036_annotations_summary",
-      "on": false,
+      "on": true,
       "prerequisites": [],
       "targets": [],
       "contextTargets": [],
@@ -3149,7 +3149,7 @@
     },
     "fflag_feat_optic_2123_audio_spectrograms": {
       "key": "fflag_feat_optic_2123_audio_spectrograms",
-      "on": false,
+      "on": true,
       "prerequisites": [],
       "targets": [],
       "contextTargets": [],
@@ -3338,7 +3338,7 @@
     },
     "fflag_feat_utc_46_session_timeout_policy": {
       "key": "fflag_feat_utc_46_session_timeout_policy",
-      "on": false,
+      "on": true,
       "prerequisites": [],
       "targets": [],
       "contextTargets": [],
@@ -4594,7 +4594,7 @@
     },
     "fflag_root_13_annotation_results_filtering": {
       "key": "fflag_root_13_annotation_results_filtering",
-      "on": false,
+      "on": true,
       "prerequisites": [],
       "targets": [],
       "contextTargets": [],
