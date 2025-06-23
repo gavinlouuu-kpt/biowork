@@ -180,6 +180,7 @@ Scenario("Checking regions grouped by label", async ({ I, LabelStudio }) => {
   I.click('[data-testid="grouping-manual"]');
   I.waitForElement(".lsf-menu", 2);
 
+  I.waitForElement(".lsf-dropdown.lsf-visible");
   // Click on the "Group by Label" option in the dropdown
   I.click('//div[contains(@class, "lsf-view-controls__label") and contains(text(), "Group by Label")]');
 
