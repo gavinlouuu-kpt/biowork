@@ -203,6 +203,35 @@ class ExportAPI(generics.RetrieveAPIView):
             ).data
         logger.debug('Prepare export files')
 
+        # Special handling for MASK_STATS via easy export button
+        if export_type == 'MASK_STATS':
+            # Generate a temporary snapshot Export object to reuse convert_file implementation
+            from .models import Export as ExportModel
+            from django.core.files import temp as tempfile
+            import io
+            import json as _json
+            from .mixins import SerializableGenerator
+
+            # Serialize tasks into JSON like snapshot export does
+            iter_json = _json.JSONEncoder(ensure_ascii=False).iterencode(SerializableGenerator(tasks))
+            with tempfile.NamedTemporaryFile(suffix='.export.json', dir=settings.FILE_UPLOAD_TEMP_DIR) as file:
+                for chunk in iter_json:
+                    file.write(chunk.encode('utf-8'))
+                file.seek(0)
+
+                # Create a transient Export model (not saved) to call convert_file
+                export_tmp = ExportModel(project=project, created_by=request.user)
+                export_tmp.file = File(file, name='tmp/export.json')
+                converted = export_tmp.convert_file('MASK_STATS', download_resources=download_resources, hostname=request.build_absolute_uri('/'))
+                if converted is None:
+                    return HttpResponse("Can't generate MASK_STATS", status=500)
+                # Stream response
+                ext = converted.name.split('.')[-1]
+                r = RangedFileResponse(request, converted, content_type=f'application/{ext}')
+                r['Content-Disposition'] = f'attachment; filename="{converted.name}"'
+                r['filename'] = converted.name
+                return r
+
         export_file, content_type, filename = DataExport.generate_export_file(
             project, tasks, export_type, download_resources, request.GET, hostname=request.build_absolute_uri('/')
         )

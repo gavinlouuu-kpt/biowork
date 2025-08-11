@@ -327,22 +327,32 @@ class ExportMixin:
             out_dir = pathlib.Path(tmp_dir) / OUT
             out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
 
-            converter = Converter(
-                config=self.project.get_parsed_config(),
-                project_dir=None,
-                upload_dir=out_dir,
-                download_resources=download_resources,
-                # for downloading resource we need access to the API
-                access_token=self.project.organization.created_by.auth_token.key,
-                hostname=hostname,
-            )
             input_name = pathlib.Path(self.file.name).name
             input_file_path = pathlib.Path(tmp_dir) / input_name
 
+            # Write snapshot JSON to local temp path
             with open(input_file_path, 'wb') as file_:
                 file_.write(self.file.open().read())
 
-            converter.convert(input_file_path, out_dir, to_format, is_dir=False)
+            # Custom converter for mask statistics and crops
+            if to_format == 'MASK_STATS':
+                try:
+                    self._convert_to_mask_stats(input_file_path, out_dir)
+                except Exception as exc:
+                    logger.exception('Failed to generate MASK_STATS: %s', exc)
+                    return None
+            else:
+                # Fallback to standard converter
+                converter = Converter(
+                    config=self.project.get_parsed_config(),
+                    project_dir=None,
+                    upload_dir=out_dir,
+                    download_resources=download_resources,
+                    # for downloading resource we need access to the API
+                    access_token=self.project.organization.created_by.auth_token.key,
+                    hostname=hostname,
+                )
+                converter.convert(input_file_path, out_dir, to_format, is_dir=False)
 
             files = get_all_files_from_dir(out_dir)
             dirs = get_all_dirs_from_dir(out_dir)
@@ -357,12 +367,149 @@ class ExportMixin:
                 output_file = pathlib.Path(tmp_dir) / (str(out_dir.stem) + '.zip')
                 filename = pathlib.Path(input_name).stem + '.zip'
 
-            # TODO(jo): can we avoid the `f.read()` here?
             with open(output_file, mode='rb') as f:
                 return File(
                     io.BytesIO(f.read()),
                     name=filename,
                 )
+
+    def _convert_to_mask_stats(self, input_file_path: pathlib.Path, out_dir: pathlib.Path) -> None:
+        """Generate per-mask statistics and cropped images.
+
+        Creates a text file mask_stats.txt alongside cropped PNGs in out_dir.
+        """
+        from PIL import Image, ImageDraw, ImageStat
+
+        # Load tasks from snapshot JSON
+        with open(input_file_path, 'r', encoding='utf-8') as fh:
+            tasks_data = json.load(fh)
+
+        stats_lines = [
+            'task_id,annotation_id,mask_index,area_px,mean_intensity,bbox_width,bbox_height,crop_filename'
+        ]
+
+        for task_entry in tasks_data:
+            task_id = task_entry.get('id')
+            annotations = task_entry.get('annotations') or []
+
+            # Resolve the task from DB to access the original uploaded file
+            task_obj = Task.objects.filter(id=task_id).select_related('file_upload').first()
+            if task_obj is None or getattr(task_obj, 'file_upload', None) is None:
+                logger.warning('MASK_STATS: Skip task %s because original file is unavailable', task_id)
+                continue
+
+            try:
+                file_field = task_obj.file_upload.file
+                with file_field.open('rb') as image_fh:
+                    image_bytes = image_fh.read()
+                image = Image.open(io.BytesIO(image_bytes))
+                # Preserve color information for crops; grayscale will be derived per-stat later
+                if image.mode not in ('RGB', 'RGBA'):
+                    image = image.convert('RGBA')
+            except Exception as exc:
+                logger.warning('MASK_STATS: Failed to open image for task %s: %s', task_id, exc)
+                continue
+
+            image_width, image_height = image.size
+
+            mask_counter = 0
+            for annotation in annotations:
+                annotation_id = annotation.get('id')
+                results = annotation.get('result') or []
+                for result in results:
+                    result_type = result.get('type')
+                    value = result.get('value') or {}
+
+                    # Build a binary mask aligned to the image size
+                    mask = Image.new('L', (image_width, image_height), 0)
+                    draw = ImageDraw.Draw(mask)
+
+                    created_mask = False
+
+                    if result_type == 'polygonlabels' and 'points' in value:
+                        points = value.get('points') or []
+                        if isinstance(points, list) and len(points) >= 3:
+                            poly = []
+                            for x, y in points:
+                                # points can be either 0..100 or 0..1
+                                if x <= 1.0 and y <= 1.0:
+                                    px = x * image_width
+                                    py = y * image_height
+                                else:
+                                    px = x / 100.0 * image_width
+                                    py = y / 100.0 * image_height
+                                poly.append((px, py))
+                            draw.polygon(poly, fill=255)
+                            created_mask = True
+
+                    elif result_type == 'rectanglelabels' and all(k in value for k in ('x', 'y', 'width', 'height')):
+                        # rectangle values are in percents 0..100
+                        rx = value['x'] / 100.0 * image_width
+                        ry = value['y'] / 100.0 * image_height
+                        rw = value['width'] / 100.0 * image_width
+                        rh = value['height'] / 100.0 * image_height
+                        draw.rectangle([(rx, ry), (rx + rw, ry + rh)], fill=255)
+                        created_mask = True
+
+                    elif result_type == 'brushlabels' and 'rle' in value:
+                        # Attempt to decode simple RLE provided as counts list with width/height
+                        rle_counts = value.get('rle')
+                        rle_height = value.get('height') or (value.get('size') or [None, None])[0]
+                        rle_width = value.get('width') or (value.get('size') or [None, None])[1]
+                        if isinstance(rle_counts, list) and rle_height and rle_width:
+                            total = rle_height * rle_width
+                            flat = []
+                            current = 0
+                            for idx, count in enumerate(rle_counts):
+                                pixel_value = 255 if (idx % 2 == 1) else 0
+                                flat.extend([pixel_value] * int(count))
+                                current += int(count)
+                                if current >= total:
+                                    break
+                            if len(flat) < total:
+                                flat.extend([0] * (total - len(flat)))
+                            # Build mask from flat list and resize to image size if needed
+                            rle_mask = Image.frombytes('L', (rle_width, rle_height), bytes(flat))
+                            if (rle_width, rle_height) != (image_width, image_height):
+                                rle_mask = rle_mask.resize((image_width, image_height), resample=Image.NEAREST)
+                            mask = rle_mask
+                            created_mask = True
+
+                    if not created_mask:
+                        continue
+
+                    bbox = mask.getbbox()
+                    if not bbox:
+                        continue
+
+                    # Compute statistics
+                    gray = image.convert('L')
+                    stat = ImageStat.Stat(gray, mask=mask)
+                    mean_intensity = stat.mean[0] if stat.count[0] > 0 else 0.0
+                    area_px = int(ImageStat.Stat(mask).sum[0] / 255)
+
+                    # Prepare crop with transparency outside the mask
+                    x0, y0, x1, y1 = bbox
+                    crop_image = image.crop(bbox).convert('RGBA')
+                    crop_mask = mask.crop(bbox)
+                    # Apply mask as alpha
+                    crop_image.putalpha(crop_mask)
+
+                    mask_counter += 1
+                    crop_filename = f'task-{task_id}_ann-{annotation_id}_mask-{mask_counter}.png'
+                    crop_path = out_dir / crop_filename
+                    crop_image.save(crop_path, format='PNG')
+
+                    bbox_width = x1 - x0
+                    bbox_height = y1 - y0
+                    stats_lines.append(
+                        f'{task_id},{annotation_id},{mask_counter},{area_px},{mean_intensity:.4f},{bbox_width},{bbox_height},{crop_filename}'
+                    )
+
+        # Write the stats summary
+        stats_path = out_dir / 'mask_stats.txt'
+        with open(stats_path, 'w', encoding='utf-8') as sf:
+            sf.write('\n'.join(stats_lines))
 
 
 def export_background(
