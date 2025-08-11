@@ -1,3 +1,10 @@
+# local python settings
+.python-version
+
+# cache
+cache.db
+
+# Byte-compiled / optimized / DLL files
 node_modules
 *.pyc
 *.ipynb
