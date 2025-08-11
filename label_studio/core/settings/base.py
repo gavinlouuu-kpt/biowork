@@ -496,6 +496,8 @@ SUPPORTED_EXTENSIONS = set(
         '.webm',
         '.webp',
         '.pdf',
+        '.tif',
+        '.tiff',
     ]
 )
 

@@ -27,7 +27,7 @@ const supportedExtensions = {
   text: ["txt"],
   audio: ["wav", "mp3", "flac", "m4a", "ogg"],
   video: ["mp4", "webm"],
-  image: ["bmp", "gif", "jpg", "jpeg", "png", "svg", "webp"],
+  image: ["bmp", "gif", "jpg", "jpeg", "png", "svg", "webp", "tif", "tiff"],
   html: ["html", "htm", "xml"],
   pdf: ["pdf"],
   structuredData: ["csv", "tsv", "json"],
