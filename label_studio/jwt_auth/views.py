@@ -3,7 +3,7 @@ from datetime import datetime
 
 from core.permissions import all_permissions
 from django.utils.decorators import method_decorator
-from drf_yasg.utils import swagger_auto_schema
+from drf_spectacular.utils import extend_schema
 from jwt_auth.auth import TokenAuthenticationPhaseout
 from jwt_auth.models import JWTSettings, LSAPIToken, TruncatedLSAPIToken
 from jwt_auth.serializers import (
@@ -35,18 +35,28 @@ class TokenExistsError(APIException):
 
 @method_decorator(
     name='get',
-    decorator=swagger_auto_schema(
+    decorator=extend_schema(
         tags=['JWT'],
-        operation_summary='Retrieve JWT Settings',
-        operation_description='Retrieve JWT settings for the currently active organization.',
+        summary='Retrieve JWT Settings',
+        description='Retrieve JWT settings for the currently active organization.',
+        extensions={
+            'x-fern-sdk-group-name': 'jwt_settings',
+            'x-fern-sdk-method-name': 'get',
+            'x-fern-audiences': ['public'],
+        },
     ),
 )
 @method_decorator(
     name='post',
-    decorator=swagger_auto_schema(
+    decorator=extend_schema(
         tags=['JWT'],
-        operation_summary='Update JWT Settings',
-        operation_description='Update JWT settings for the currently active organization.',
+        summary='Update JWT Settings',
+        description='Update JWT settings for the currently active organization.',
+        extensions={
+            'x-fern-sdk-group-name': 'jwt_settings',
+            'x-fern-sdk-method-name': 'update',
+            'x-fern-audiences': ['public'],
+        },
     ),
 )
 class JWTSettingsAPI(CreateAPIView):
@@ -76,13 +86,18 @@ class JWTSettingsAPI(CreateAPIView):
         return Response(serializer.data)
 
 
-# Recommended implementation from JWT to support drf-yasg:
-# https://django-rest-framework-simplejwt.readthedocs.io/en/latest/drf_yasg_integration.html
 class DecoratedTokenRefreshView(TokenRefreshView):
-    @swagger_auto_schema(
+    @extend_schema(
         tags=['JWT'],
+        summary='Refresh JWT token',
+        description='Get a new access token, using a refresh token.',
         responses={
             status.HTTP_200_OK: TokenRefreshResponseSerializer,
+        },
+        extensions={
+            'x-fern-sdk-group-name': 'tokens',
+            'x-fern-sdk-method-name': 'refresh',
+            'x-fern-audiences': ['public'],
         },
     )
     def post(self, request, *args, **kwargs):
@@ -91,18 +106,34 @@ class DecoratedTokenRefreshView(TokenRefreshView):
 
 @method_decorator(
     name='get',
-    decorator=swagger_auto_schema(
+    decorator=extend_schema(
         tags=['JWT'],
-        operation_summary='List API tokens',
-        operation_description='List all API tokens for the current user.',
+        summary='List API tokens',
+        description='List all API tokens for the current user.',
+        responses={
+            status.HTTP_200_OK: LSAPITokenListSerializer,
+        },
+        extensions={
+            'x-fern-sdk-group-name': 'tokens',
+            'x-fern-sdk-method-name': 'list',
+            'x-fern-audiences': ['public'],
+        },
     ),
 )
 @method_decorator(
     name='post',
-    decorator=swagger_auto_schema(
+    decorator=extend_schema(
         tags=['JWT'],
-        operation_summary='Create API token',
-        operation_description='Create a new API token for the current user.',
+        summary='Create API token',
+        description='Create a new API token for the current user.',
+        responses={
+            status.HTTP_201_CREATED: LSAPITokenCreateSerializer,
+        },
+        extensions={
+            'x-fern-sdk-group-name': 'tokens',
+            'x-fern-sdk-method-name': 'create',
+            'x-fern-audiences': ['public'],
+        },
     ),
 )
 class LSAPITokenView(generics.ListCreateAPIView):
@@ -164,13 +195,18 @@ class LSAPITokenView(generics.ListCreateAPIView):
 class LSTokenBlacklistView(TokenViewBase):
     _serializer_class = 'jwt_auth.serializers.LSAPITokenBlacklistSerializer'
 
-    @swagger_auto_schema(
+    @extend_schema(
         tags=['JWT'],
-        operation_summary='Blacklist a JWT refresh token',
-        operation_description='Adds a JWT refresh token to the blacklist, preventing it from being used to obtain new access tokens.',
+        summary='Blacklist a JWT refresh token',
+        description='Adds a JWT refresh token to the blacklist, preventing it from being used to obtain new access tokens.',
         responses={
             status.HTTP_204_NO_CONTENT: 'Token was successfully blacklisted',
             status.HTTP_404_NOT_FOUND: 'Token is already blacklisted',
+        },
+        extensions={
+            'x-fern-sdk-group-name': 'tokens',
+            'x-fern-sdk-method-name': 'blacklist',
+            'x-fern-audiences': ['public'],
         },
     )
     def post(self, request, *args, **kwargs):
@@ -194,13 +230,18 @@ class LSAPITokenRotateView(TokenViewBase):
     _serializer_class = 'jwt_auth.serializers.LSAPITokenRotateSerializer'
     token_class = LSAPIToken
 
-    @swagger_auto_schema(
+    @extend_schema(
         tags=['JWT'],
-        operation_summary='Rotate JWT refresh token',
-        operation_description='Creates a new JWT refresh token and blacklists the current one.',
+        summary='Rotate JWT refresh token',
+        description='Creates a new JWT refresh token and blacklists the current one.',
         responses={
             status.HTTP_200_OK: TokenRotateResponseSerializer,
             status.HTTP_400_BAD_REQUEST: 'Invalid token or token already blacklisted',
+        },
+        extensions={
+            'x-fern-sdk-group-name': 'tokens',
+            'x-fern-sdk-method-name': 'rotate',
+            'x-fern-audiences': ['public'],
         },
     )
     def post(self, request, *args, **kwargs):

@@ -75,13 +75,16 @@ export const TabColumn = types
     target: types.enumeration(["tasks", "annotations"]),
     orderable: types.optional(types.boolean, true),
     help: types.maybeNull(types.string),
+    // Column alias whose filter should be joined automatically when a filter is created for this column
+    child_filter: types.maybeNull(types.string),
+    disabled: types.optional(types.boolean, false),
   })
   .views((self) => ({
     get hidden() {
       if (self.children) {
         return all(self.children, (c) => c.hidden);
       }
-      return self.parentView?.hiddenColumns.hasColumn(self) ?? (self.parent.hidden || false);
+      return self.disabled || (self.parentView?.hiddenColumns.hasColumn(self) ?? (self.parent.hidden || false));
     },
 
     get parentView() {

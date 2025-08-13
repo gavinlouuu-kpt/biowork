@@ -1,3 +1,10 @@
+# local python settings
+.python-version
+
+# cache
+cache.db
+
+# Byte-compiled / optimized / DLL files
 node_modules
 *.pyc
 *.ipynb
@@ -82,3 +89,5 @@ docker-compose.override.yml
 .netlify
 
 CLAUDE.local.md
+web/libs/editor/tests/coverage
+.cache

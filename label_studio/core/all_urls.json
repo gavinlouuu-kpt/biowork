@@ -348,6 +348,12 @@
         "decorators": ""
     },
     {
+        "url": "/api/dm/actions/<str:action_id>/form/",
+        "module": "data_manager.api.ProjectActionsFormAPI",
+        "name": "data_manager:dm-actions-form",
+        "decorators": ""
+    },
+    {
         "url": "/projects/<int:pk>/",
         "module": "data_manager.views.task_page",
         "name": "data_manager:project-data",
@@ -486,6 +492,12 @@
         "decorators": ""
     },
     {
+        "url": "/user/account/<sub_path>",
+        "module": "users.views.user_account",
+        "name": "user-account-anything",
+        "decorators": ""
+    },
+    {
         "url": "/logout/",
         "module": "users.views.logout",
         "name": "logout",
@@ -513,6 +525,12 @@
         "url": "/api/current-user/product-tour",
         "module": "users.product_tours.api.ProductTourAPI",
         "name": "product-tour",
+        "decorators": ""
+    },
+    {
+        "url": "/api/current-user/hotkeys/",
+        "module": "users.api.UserHotkeysAPI",
+        "name": "current-user-hotkeys",
         "decorators": ""
     },
     {
@@ -660,6 +678,12 @@
         "decorators": ""
     },
     {
+        "url": "/api/storages/s3/files",
+        "module": "io_storages.api.ImportStorageListFilesAPI",
+        "name": "storages:api:storage-s3-list-files",
+        "decorators": ""
+    },
+    {
         "url": "/api/storages/export/s3",
         "module": "io_storages.s3.api.S3ExportStorageListAPI",
         "name": "storages:api:export-storage-s3-list",
@@ -717,6 +741,12 @@
         "url": "/api/storages/azure/form",
         "module": "io_storages.azure_blob.api.AzureBlobImportStorageFormLayoutAPI",
         "name": "storages:api:storage-azure-form",
+        "decorators": ""
+    },
+    {
+        "url": "/api/storages/azure/files",
+        "module": "io_storages.api.ImportStorageListFilesAPI",
+        "name": "storages:api:storage-azure-list-files",
         "decorators": ""
     },
     {
@@ -780,6 +810,12 @@
         "decorators": ""
     },
     {
+        "url": "/api/storages/gcs/files",
+        "module": "io_storages.api.ImportStorageListFilesAPI",
+        "name": "storages:api:storage-gcs-list-files",
+        "decorators": ""
+    },
+    {
         "url": "/api/storages/export/gcs",
         "module": "io_storages.gcs.api.GCSExportStorageListAPI",
         "name": "storages:api:export-storage-gcs-list",
@@ -840,6 +876,12 @@
         "decorators": ""
     },
     {
+        "url": "/api/storages/redis/files",
+        "module": "io_storages.api.ImportStorageListFilesAPI",
+        "name": "storages:api:storage-redis-list-files",
+        "decorators": ""
+    },
+    {
         "url": "/api/storages/export/redis",
         "module": "io_storages.redis.api.RedisExportStorageListAPI",
         "name": "storages:api:export-storage-redis-list",
@@ -897,6 +939,12 @@
         "url": "/api/storages/localfiles/form",
         "module": "io_storages.localfiles.api.LocalFilesImportStorageFormLayoutAPI",
         "name": "storages:api:storage-localfiles-form",
+        "decorators": ""
+    },
+    {
+        "url": "/api/storages/localfiles/files",
+        "module": "io_storages.api.ImportStorageListFilesAPI",
+        "name": "storages:api:storage-localfiles-list-files",
         "decorators": ""
     },
     {
@@ -1122,21 +1170,27 @@
         "decorators": ""
     },
     {
-        "url": "/swagger<format>",
-        "module": "drf_yasg.views.SchemaView",
+        "url": "/swagger\\.json",
+        "module": "core.urls.<lambda>",
         "name": "schema-json",
         "decorators": ""
     },
     {
+        "url": "/swagger\\.yaml",
+        "module": "core.urls.<lambda>",
+        "name": "schema-yaml",
+        "decorators": ""
+    },
+    {
         "url": "/swagger/",
-        "module": "drf_yasg.views.SchemaView",
+        "module": "core.urls.<lambda>",
         "name": "schema-swagger-ui",
         "decorators": ""
     },
     {
         "url": "/docs/api/",
-        "module": "drf_yasg.views.SchemaView",
-        "name": "schema-redoc",
+        "module": "core.urls.<lambda>",
+        "name": "docs-api",
         "decorators": ""
     },
     {
@@ -1977,6 +2031,36 @@
         "url": "/api/session-policy/",
         "module": "session_policy.api.SessionTimeoutPolicyView",
         "name": "session_policy:session-policy",
+        "decorators": ""
+    },
+    {
+        "url": "/docs/api/schema/",
+        "module": "drf_spectacular.views.SpectacularAPIView",
+        "name": "schema",
+        "decorators": ""
+    },
+    {
+        "url": "/docs/api/schema/swagger-ui/",
+        "module": "drf_spectacular.views.SpectacularSwaggerView",
+        "name": "swagger-ui",
+        "decorators": ""
+    },
+    {
+        "url": "/docs/api/schema/redoc/",
+        "module": "drf_spectacular.views.SpectacularRedocView",
+        "name": "redoc",
+        "decorators": ""
+    },
+    {
+        "url": "/docs/api/schema/json/",
+        "module": "drf_spectacular.views.SpectacularJSONAPIView",
+        "name": "schema-json",
+        "decorators": ""
+    },
+    {
+        "url": "/docs/api/schema/yaml/",
+        "module": "drf_spectacular.views.SpectacularYAMLAPIView",
+        "name": "schema-yaml",
         "decorators": ""
     }
 ]

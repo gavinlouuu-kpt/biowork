@@ -139,7 +139,21 @@ class DataExport(object):
             if format.name not in supported_formats:
                 format_info['disabled'] = True
             formats.append(format_info)
-        return sorted(formats, key=lambda f: f.get('disabled', False))
+
+        # Inject custom export format for mask statistics and crops
+        custom_mask_stats = {
+            'name': 'MASK_STATS',
+            'title': 'Mask statistics + crops',
+            'description': 'mask_stats.txt with per-mask mean intensity and area, plus PNG crops.',
+            'disabled': False,
+        }
+        # Ensure our custom format is listed first
+        formats = [custom_mask_stats] + formats
+
+        # Keep custom first, but push disabled ones after enabled
+        enabled = [f for f in formats if not f.get('disabled', False)]
+        disabled = [f for f in formats if f.get('disabled', False)]
+        return enabled + disabled
 
     @staticmethod
     def generate_export_file(project, tasks, output_format, download_resources, get_args, hostname=None):

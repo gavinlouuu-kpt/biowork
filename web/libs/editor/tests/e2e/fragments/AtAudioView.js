@@ -22,12 +22,9 @@ module.exports = {
   _hideTimelineButtonSelector: ".lsf-audio-config__buttons > .lsf-audio-config__menu-button:nth-child(1)",
   _hideWaveformButtonSelector: ".lsf-audio-config__buttons > .lsf-audio-config__menu-button:nth-child(2)",
   _audioElementSelector: '[data-testid="waveform-audio"]',
-  _seekBackwardButtonSelector:
-    ".lsf-audio-tag .lsf-timeline-controls__main-controls > .lsf-timeline-controls__group:nth-child(2) > button:nth-child(1)",
-  _playButtonSelector:
-    ".lsf-audio-tag .lsf-timeline-controls__main-controls > .lsf-timeline-controls__group:nth-child(2) > button:nth-child(2)",
-  _seekForwardButtonSelector:
-    ".lsf-audio-tag .lsf-timeline-controls__main-controls > .lsf-timeline-controls__group:nth-child(2) > button:nth-child(3)",
+  _seekBackwardButtonSelector: "button[aria-label='Seek backward']",
+  _playButtonSelector: "button[aria-label='Play']",
+  _seekForwardButtonSelector: "button[aria-label='Seek forward']",
   _errorSelector: '[data-testid="error:audio"]',
   _httpErrorSelector: '[data-testid="error:http"]',
 
@@ -126,24 +123,6 @@ module.exports = {
   },
 
   async moveRegion(regionId, offset = 30) {
-    const regionPosition = await I.executeScript((regionId) => {
-      const region = Htx.annotationStore.selected.regions.find((r) => r.cleanId === regionId);
-      const element = region.getRegionElement();
-      const rect = element.getBoundingClientRect();
-
-      return {
-        x: rect.x + rect.width / 2,
-        y: rect.y + rect.height / 2,
-      };
-    }, regionId);
-
-    return I.dragAndDropMouse(regionPosition, {
-      x: regionPosition.x + offset,
-      y: regionPosition.y,
-    });
-  },
-
-  async moveRegionV3(regionId, offset = 30) {
     const regionPosition = await I.executeScript(
       ({ regionId, stageBbox }) => {
         const region = Htx.annotationStore.selected.regions.find((r) => r.cleanId === regionId);

@@ -27,9 +27,11 @@ from core.utils.common import (
 )
 from core.utils.db import batch_update_with_retry, fast_first
 from django.conf import settings
+from django.contrib.postgres.search import SearchVectorField
 from django.core.validators import MaxLengthValidator, MinLengthValidator
-from django.db import models, transaction
-from django.db.models import Avg, BooleanField, Case, Count, JSONField, Max, Q, Sum, Value, When
+from django.db import connection, models, transaction
+from django.db.models import Avg, BooleanField, Case, Count, GeneratedField, JSONField, Max, Q, Sum, Value, When
+from django.db.models.expressions import RawSQL
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from label_studio_sdk._extensions.label_studio_tools.core.label_config import parse_config
@@ -89,12 +91,15 @@ class ProjectManager(models.Manager):
         return self.with_counts_annotate(self, fields=fields)
 
     @staticmethod
-    def with_counts_annotate(queryset, fields=None):
+    def with_counts_annotate(queryset, fields=None, exclude=None):
         available_fields = ProjectManager.ANNOTATED_FIELDS
         if fields is None:
             to_annotate = available_fields
         else:
             to_annotate = {field: available_fields[field] for field in fields if field in available_fields}
+
+        if exclude:
+            to_annotate = {field: func for field, func in to_annotate.items() if field not in exclude}
 
         for _, annotate_func in to_annotate.items():  # noqa: F402
             queryset = annotate_func(queryset)
@@ -1085,7 +1090,7 @@ class Project(ProjectMixin, models.Model):
         recalculate_stats_counts: Optional[Mapping[str, int]] = None,
     ):
         """
-        Update tasks counters and update tasks states (rearrange and\or is_labeled)
+        Update tasks counters and update tasks states (rearrange and/or is_labeled)
         :param queryset: Tasks to update queryset
         :param from_scratch: Skip calculated tasks
         :return: Count of updated tasks
@@ -1101,14 +1106,68 @@ class Project(ProjectMixin, models.Model):
 
         return objs
 
+    def get_task_batch_size(self):
+        """Calculate optimal batch size based on task data size"""
+        # For SQLite, use default MAX_TASK_BATCH_SIZE
+        if settings.DJANGO_DB == settings.DJANGO_DB_SQLITE:
+            return settings.MAX_TASK_BATCH_SIZE
+
+        # Using raw SQL to ensure we use the specific index task_proj_octlen_idx
+        # which is optimized for this query pattern (project_id, octet_length DESC)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id,
+                       octet_length(data::text) AS bytes
+                FROM   task
+                WHERE  project_id = %s
+                ORDER  BY octet_length(data::text) DESC
+                LIMIT  1
+            """,
+                [self.id],
+            )
+
+            row = cursor.fetchone()
+            if not row or not row[1]:
+                return settings.MAX_TASK_BATCH_SIZE
+
+            max_data_size = row[1]
+
+        batch_size = settings.TASK_DATA_PER_BATCH // max_data_size
+
+        if batch_size > settings.MAX_TASK_BATCH_SIZE:
+            batch_size = settings.MAX_TASK_BATCH_SIZE
+        elif batch_size < 1:
+            batch_size = 1
+
+        logger.info(f'Project {self.id}: max task data size {max_data_size} bytes, calculated batch size {batch_size}')
+        return batch_size
+
     def __str__(self):
         return f'{self.title} (id={self.id})' or _('Business number %d') % self.pk
+
+    if connection.vendor == 'postgresql':
+        search_vector = GeneratedField(
+            expression=RawSQL(
+                "setweight(to_tsvector('english', COALESCE(CAST(id AS TEXT), '')), 'A') || "
+                "setweight(to_tsvector('english', COALESCE(title, '')), 'B') || "
+                "setweight(to_tsvector('english', COALESCE(SUBSTRING(description, 1, 250000), '')), 'C')",
+                params=[],
+                output_field=SearchVectorField(),
+            ),
+            output_field=SearchVectorField(),
+            db_persist=True,
+        )
+    else:
+        search_vector = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = 'project'
         indexes = [
             models.Index(fields=['pinned_at', 'created_at']),
         ]
+        # This index is added with an async migration
+        #     indexes.append(GinIndex(fields=['search_vector'], name='project_search_vector_idx'))
 
 
 class ProjectOnboardingSteps(models.Model):

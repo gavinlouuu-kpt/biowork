@@ -10,7 +10,7 @@ import traceback as tb
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from datetime import datetime
-from typing import Union
+from typing import Any, Iterator, Union
 from urllib.parse import urljoin
 
 import django_rq
@@ -34,6 +34,8 @@ from tasks.models import Annotation, Task
 from tasks.serializers import AnnotationSerializer, PredictionSerializer
 from webhooks.models import WebhookAction
 from webhooks.utils import emit_webhooks_for_instance
+
+from .exceptions import UnsupportedFileFormatError
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +76,7 @@ class StorageInfo(models.Model):
         self.last_sync_job = job_id
         self.save(update_fields=['last_sync_job'])
 
-    def info_set_queued(self):
+    def _update_queued_status(self):
         self.last_sync = None
         self.last_sync_count = None
         self.last_sync_job = None
@@ -84,6 +86,32 @@ class StorageInfo(models.Model):
         self.meta = {'attempts': self.meta.get('attempts', 0) + 1, 'time_queued': str(timezone.now())}
 
         self.save(update_fields=['last_sync_job', 'last_sync', 'last_sync_count', 'status', 'meta'])
+
+    def info_set_queued(self):
+        if settings.DJANGO_DB == settings.DJANGO_DB_SQLITE:
+            self._update_queued_status()
+            return True
+
+        with transaction.atomic():
+            try:
+                locked_storage = self.__class__.objects.select_for_update().get(pk=self.pk)
+            except self.__class__.DoesNotExist:
+                logger.error(f'Storage {self.__class__.__name__} with pk={self.pk} does not exist')
+                return False
+
+            if locked_storage.status in [self.Status.QUEUED, self.Status.IN_PROGRESS]:
+                logger.error(
+                    f'Storage {locked_storage} (id={locked_storage.id}) is already in status '
+                    f'"{locked_storage.status}". Cannot set to QUEUED. '
+                    f'Last sync job: {locked_storage.last_sync_job}, '
+                    f'Meta: {locked_storage.meta}'
+                )
+                return False
+
+            locked_storage._update_queued_status()
+
+            self.refresh_from_db()
+            return True
 
     def info_set_in_progress(self):
         # only QUEUED => IN_PROGRESS transition is possible, because in QUEUED we reset states
@@ -99,7 +127,10 @@ class StorageInfo(models.Model):
 
     @property
     def time_in_progress(self):
-        return datetime.fromisoformat(self.meta['time_in_progress'])
+        if 'time_failure' not in self.meta:
+            return datetime.fromisoformat(self.meta['time_in_progress'])
+        else:
+            return datetime.fromisoformat(self.meta['time_failure'])
 
     def info_set_completed(self, last_sync_count, **kwargs):
         self.status = self.Status.COMPLETED
@@ -228,8 +259,29 @@ class Storage(StorageInfo):
 
 
 class ImportStorage(Storage):
-    def iterkeys(self):
-        return iter(())
+    def iter_objects(self) -> Iterator[Any]:
+        """
+        Returns:
+            Iterator[Any]: An iterator for objects in the storage.
+        """
+        raise NotImplementedError
+
+    def iter_keys(self) -> Iterator[str]:
+        """
+        Returns:
+            Iterator[str]: An iterator of keys for each object in the storage.
+        """
+        raise NotImplementedError
+
+    def get_unified_metadata(self, obj: Any) -> dict:
+        """
+        Args:
+            obj: The storage object to get metadata for
+        Returns:
+            dict: A dictionary of metadata for the object with keys:
+            'key', 'last_modified', 'size'.
+        """
+        raise NotImplementedError
 
     def get_data(self, key) -> list[StorageObject]:
         raise NotImplementedError
@@ -422,8 +474,13 @@ class ImportStorage(Storage):
         task = self.project.tasks.order_by('-inner_id').first()
         max_inner_id = (task.inner_id + 1) if task else 1
 
+        # Check feature flag once for the entire sync process
+        check_file_extension = flag_set(
+            'fflag_fix_back_plt_804_check_file_extension_11072025_short', user=self.project.organization.created_by
+        )
+
         tasks_for_webhook = []
-        for key in self.iterkeys():
+        for key in self.iter_keys():
             # w/o Dataflow
             # pubsub.push(topic, key)
             # -> GF.pull(topic, key) + env -> add_task()
@@ -437,6 +494,21 @@ class ImportStorage(Storage):
                 continue
 
             logger.debug(f'{self}: found new key {key}')
+
+            # Check if file should be processed as JSON based on extension
+            # Skip non-JSON files if use_blob_urls is False
+            if check_file_extension and not self.use_blob_urls:
+                _, ext = os.path.splitext(key.lower())
+                # Only process files with JSON/JSONL/PARQUET extensions
+                json_extensions = {'.json', '.jsonl', '.parquet'}
+
+                if ext and ext not in json_extensions:
+                    raise UnsupportedFileFormatError(
+                        f'File "{key}" is not a JSON/JSONL/Parquet file. Only .json, .jsonl, and .parquet files can be processed.\n'
+                        f"If you're trying to import non-JSON data (images, audio, text, etc.), "
+                        f'edit storage settings and enable "Tasks" import method'
+                    )
+
             try:
                 link_objects = self.get_data(key)
             except (UnicodeDecodeError, json.decoder.JSONDecodeError) as exc:
@@ -444,7 +516,7 @@ class ImportStorage(Storage):
                 raise ValueError(
                     f'Error loading JSON from file "{key}".\nIf you\'re trying to import non-JSON data '
                     f'(images, audio, text, etc.), edit storage settings and enable '
-                    f'"Treat every bucket object as a source file"'
+                    f'"Tasks" import method'
                 )
 
             if not flag_set('fflag_feat_dia_2092_multitasks_per_storage_link'):
@@ -467,7 +539,7 @@ class ImportStorage(Storage):
                 tasks_created += 1
 
                 # add task to webhook list
-                tasks_for_webhook.append(task)
+                tasks_for_webhook.append(task.id)
 
                 # settings.WEBHOOK_BATCH_SIZE
                 # `WEBHOOK_BATCH_SIZE` sets the maximum number of tasks sent in a single webhook call, ensuring manageable payload sizes.
@@ -503,7 +575,8 @@ class ImportStorage(Storage):
             if not is_job_in_queue(queue, 'import_sync_background', meta=meta) and not is_job_on_worker(
                 job_id=self.last_sync_job, queue_name='low'
             ):
-                self.info_set_queued()
+                if not self.info_set_queued():
+                    return
                 sync_job = queue.enqueue(
                     import_sync_background,
                     self.__class__,
@@ -519,7 +592,8 @@ class ImportStorage(Storage):
         else:
             try:
                 logger.info(f'Start syncing storage {self}')
-                self.info_set_queued()
+                if not self.info_set_queued():
+                    return
                 import_sync_background(self.__class__, self.id)
             except Exception:
                 # needed to facilitate debugging storage-related testcases, since otherwise no exception is logged
@@ -551,7 +625,14 @@ class ProjectStorageMixin(models.Model):
 @job('low')
 def import_sync_background(storage_class, storage_id, timeout=settings.RQ_LONG_JOB_TIMEOUT, **kwargs):
     storage = storage_class.objects.get(id=storage_id)
-    storage.scan_and_create_links()
+    try:
+        storage.scan_and_create_links()
+    except UnsupportedFileFormatError:
+        # This is an expected error when user tries to import non-JSON files without enabling blob URLs
+        # We don't want to fail the job in this case, just mark the storage as failed with a clear message
+        storage.info_set_failed()
+        # Exit gracefully without raising exception to avoid job failure
+        return
 
 
 @job('low', timeout=settings.RQ_LONG_JOB_TIMEOUT)
@@ -677,7 +758,8 @@ class ExportStorage(Storage, ProjectStorageMixin):
 
         if redis_connected():
             queue = django_rq.get_queue('low')
-            self.info_set_queued()
+            if not self.info_set_queued():
+                return
             sync_job = queue.enqueue(
                 export_sync_fn,
                 self.__class__,
@@ -692,7 +774,8 @@ class ExportStorage(Storage, ProjectStorageMixin):
         else:
             try:
                 logger.info(f'Start syncing storage {self}')
-                self.info_set_queued()
+                if not self.info_set_queued():
+                    return
                 export_sync_fn(self.__class__, self.id)
             except Exception:
                 storage_background_failure(self)

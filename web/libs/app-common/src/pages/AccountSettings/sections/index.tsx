@@ -2,13 +2,15 @@ import { PersonalInfo } from "./PersonalInfo";
 import { EmailPreferences } from "./EmailPreferences";
 import { PersonalAccessToken, PersonalAccessTokenDescription } from "./PersonalAccessToken";
 import { MembershipInfo } from "./MembershipInfo";
+import { HotkeysManager } from "./Hotkeys";
 import type React from "react";
 import { PersonalJWTToken } from "./PersonalJWTToken";
 import type { AuthTokenSettings } from "../types";
 import { ff } from "@humansignal/core";
+import { Badge } from "@humansignal/ui";
 
-type SectionType = {
-  title: string;
+export type SectionType = {
+  title: string | React.ReactNode;
   id: string;
   component: React.FC;
   description?: React.FC;
@@ -20,6 +22,18 @@ export const accountSettingsSections = (settings: AuthTokenSettings): SectionTyp
       title: "Personal Info",
       id: "personal-info",
       component: PersonalInfo,
+    },
+    {
+      title: (
+        <div className="flex items-center gap-tight">
+          <span>Hotkeys</span>
+          <Badge variant="beta">Beta</Badge>
+        </div>
+      ),
+      id: "hotkeys",
+      component: HotkeysManager,
+      description: () =>
+        "Customize your keyboard shortcuts to speed up your workflow. Click on any hotkey below to assign a new key combination that works best for you.",
     },
     {
       title: "Email Preferences",

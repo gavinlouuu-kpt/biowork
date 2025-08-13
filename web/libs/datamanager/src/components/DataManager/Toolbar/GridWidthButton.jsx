@@ -1,9 +1,10 @@
 import { inject } from "mobx-react";
 import { useCallback, useState } from "react";
-import { Button } from "../../Common/Button/Button";
+import { Button, ButtonGroup } from "@humansignal/ui";
 import { Dropdown } from "../../Common/Dropdown/DropdownComponent";
 import { Toggle } from "../../Common/Form";
 import { IconSettings, IconMinus, IconPlus } from "@humansignal/icons";
+import debounce from "lodash.debounce";
 
 const injector = inject(({ store }) => {
   const view = store?.currentView;
@@ -23,12 +24,16 @@ const injector = inject(({ store }) => {
 export const GridWidthButton = injector(({ view, isGrid, gridWidth, fitImagesToWidth, hasImage, size }) => {
   const [width, setWidth] = useState(gridWidth);
 
+  const setGridWidthStore = debounce((value) => {
+    view.setGridWidth(value);
+  }, 200);
+
   const setGridWidth = useCallback(
     (width) => {
       const newWidth = Math.max(1, Math.min(width, 10));
 
       setWidth(newWidth);
-      view.setGridWidth(newWidth);
+      setGridWidthStore(newWidth);
     },
     [view],
   );
@@ -46,22 +51,26 @@ export const GridWidthButton = injector(({ view, isGrid, gridWidth, fitImagesToW
         <div className="p-tight min-w-wide space-y-base">
           <div className="grid grid-cols-[1fr_min-content] gap-base items-center">
             <span>Columns: {width}</span>
-            <Button.Group>
+            <ButtonGroup collapsed={false}>
               <Button
                 onClick={() => setGridWidth(width - 1)}
                 disabled={width === 1}
-                rawClassName="aspect-square h-6 !p-0"
-              >
-                <IconMinus />
-              </Button>
+                variant="neutral"
+                look="outlined"
+                leading={<IconMinus />}
+                size="small"
+                aria-label="Decrease columns number"
+              />
               <Button
                 onClick={() => setGridWidth(width + 1)}
                 disabled={width === 10}
-                rawClassName="aspect-square h-6 !p-0"
-              >
-                <IconPlus />
-              </Button>
-            </Button.Group>
+                variant="neutral"
+                look="outlined"
+                leading={<IconPlus />}
+                size="small"
+                aria-label="Increase columns number"
+              />
+            </ButtonGroup>
           </div>
           {hasImage && (
             <div className="grid grid-cols-[1fr_min-content] gap-base items-center">
@@ -72,7 +81,7 @@ export const GridWidthButton = injector(({ view, isGrid, gridWidth, fitImagesToW
         </div>
       }
     >
-      <Button size={size}>
+      <Button size={size} variant="neutral" look="outlined" aria-label="Grid settings">
         <IconSettings />
       </Button>
     </Dropdown.Trigger>

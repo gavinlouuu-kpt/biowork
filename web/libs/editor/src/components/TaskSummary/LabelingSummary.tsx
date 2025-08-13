@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { cnm, IconSparks, Userpic } from "@humansignal/ui";
 import { flexRender, getCoreRowModel, useReactTable, createColumnHelper } from "@tanstack/react-table";
 import type { ColumnDef, Row } from "@tanstack/react-table";
-import type { MSTAnnotation, MSTResult } from "../../stores/types";
+import type { MSTAnnotation, MSTResult, RawResult } from "../../stores/types";
 import { renderers } from "./labelings";
 import { ResizeHandler } from "./ResizeHandler";
 import { SummaryBadge } from "./SummaryBadge";
@@ -12,6 +12,7 @@ type Props = {
   annotations: MSTAnnotation[];
   controls: ControlTag[];
   onSelect: (entity: AnnotationSummary) => void;
+  hideInfo: boolean;
 };
 
 const cellFn = (control: ControlTag, render: RendererType) => (props: { row: Row<AnnotationSummary> }) => {
@@ -24,7 +25,7 @@ const cellFn = (control: ControlTag, render: RendererType) => (props: { row: Row
 };
 
 const convertPredictionResult = (result: MSTResult) => {
-  const json = result.toJSON();
+  const json = result.toJSON() as RawResult;
   return {
     ...json,
     // those are real results, so they have full names with @annotation-id postfix
@@ -34,19 +35,27 @@ const convertPredictionResult = (result: MSTResult) => {
 
 const columnHelper = createColumnHelper<AnnotationSummary>();
 
-export const LabelingSummary = ({ annotations: all, controls, onSelect }: Props) => {
+export const LabelingSummary = ({ hideInfo, annotations: all, controls, onSelect }: Props) => {
+  const currentUser = window.APP_SETTINGS?.user;
   const annotations: AnnotationSummary[] = all.map((annotation) => ({
     id: annotation.pk,
     type: annotation.type,
-    user: annotation.user,
-    createdBy: annotation.user?.displayName ?? annotation.createdBy,
+    user: hideInfo ? { email: currentUser?.id === annotation.user?.id ? "Me" : "User" } : annotation.user,
+    createdBy:
+      annotation.type === "prediction"
+        ? annotation.createdBy
+        : hideInfo
+          ? currentUser?.id === annotation.user?.id
+            ? "Me"
+            : "User"
+          : (annotation.user?.displayName ?? "User"),
     results:
       annotation.type === "prediction"
         ? (annotation.results?.map(convertPredictionResult) ?? [])
         : (annotation.versions.result ?? []),
   }));
   const columns = useMemo(() => {
-    const columns: ColumnDef<AnnotationSummary, any>[] = controls.map((control) =>
+    const columns: ColumnDef<AnnotationSummary, unknown>[] = controls.map((control) =>
       columnHelper.display({
         id: control.name,
         header: () => (
@@ -71,16 +80,20 @@ export const LabelingSummary = ({ annotations: all, controls, onSelect }: Props)
         const annotation = row.original;
 
         return (
-          <div className="flex gap-tight items-center cursor-pointer" onClick={() => onSelect(annotation)}>
+          <button
+            type="button"
+            className="flex gap-tight items-center cursor-pointer"
+            onClick={() => onSelect(annotation)}
+          >
             <Userpic
               user={annotation.user}
               className={annotation.type === "prediction" ? "!bg-accent-plum-subtle text-accent-plum-bold" : ""}
             >
               {annotation.type === "prediction" && <IconSparks size={18} />}
             </Userpic>
-            <span>{annotation.user?.displayName ?? annotation.createdBy}</span>
-            <span>#{annotation.id}</span>
-          </div>
+            <span>{annotation.createdBy}</span>
+            {!hideInfo && <span>#{annotation.id}</span>}
+          </button>
         );
       },
     });

@@ -1,11 +1,16 @@
+networks:
+  label-studio-network:
+    name: label-studio-network
+    driver: bridge
+
 services:
   nginx:
     build: .
-    image: heartexlabs/label-studio:latest
+    image: myregistry.local/label-studio:custom
     restart: unless-stopped
     ports:
-      - "8080:8085"
-      - "8081:8086"
+      - "0.0.0.0:8080:8085"
+      - "0.0.0.0:8081:8086"
     depends_on:
       - app
     environment:
@@ -19,13 +24,15 @@ services:
       - ./deploy/nginx/certs:/certs:ro
     #   Optional: Override nginx default conf
     #      - ./deploy/my.conf:/etc/nginx/nginx.conf
+    networks:
+      - label-studio-network
     command: nginx
 
   app:
     stdin_open: true
     tty: true
     build: .
-    image: heartexlabs/label-studio:latest
+    image: myregistry.local/label-studio:custom
     restart: unless-stopped
     expose:
       - "8000"
@@ -43,6 +50,8 @@ services:
     #      - LOG_LEVEL=DEBUG
     volumes:
       - ./mydata:/label-studio/data:rw
+    networks:
+      - label-studio-network
     command: label-studio-uwsgi
 
   db:
@@ -62,3 +71,5 @@ services:
     volumes:
       - ${POSTGRES_DATA_DIR:-./postgres-data}:/var/lib/postgresql/data
       - ./deploy/pgsql/certs:/var/lib/postgresql/certs:ro
+    networks:
+      - label-studio-network

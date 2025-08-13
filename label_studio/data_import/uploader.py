@@ -70,6 +70,45 @@ def check_request_files_size(files):
 
 
 def create_file_upload(user, project, file):
+    # Convert unsupported-but-accepted formats to browser-friendly ones
+    try:
+        name_lower = (file.name or '').lower()
+        if name_lower.endswith(('.tif', '.tiff')):
+            try:
+                from PIL import Image, ImageSequence
+            except Exception as pil_exc:  # noqa: BLE001
+                raise ValidationError(f'Pillow is required to process TIFF images: {pil_exc}')
+
+            # Read file content into Pillow
+            original_bytes = file.read()
+            file.seek(0)
+            image_stream = io.BytesIO(original_bytes)
+            with Image.open(image_stream) as img:
+                # If multi-page TIFF, take the first frame for labeling
+                # to keep behavior predictable. Further enhancement could split pages.
+                try:
+                    frame = next(ImageSequence.Iterator(img))
+                except StopIteration:
+                    frame = img
+
+                # Ensure a web-friendly mode
+                if frame.mode not in ('RGB', 'RGBA', 'L', 'LA'):
+                    # Preserve alpha if possible
+                    frame = frame.convert('RGBA' if 'A' in frame.getbands() else 'RGB')
+
+                output = io.BytesIO()
+                # Save losslessly as PNG
+                frame.save(output, format='PNG', optimize=True)
+                output.seek(0)
+                # Replace incoming file with PNG version
+                new_name = name_lower.rsplit('.', 1)[0] + '.png'
+                file = SimpleUploadedFile(new_name, output.read(), content_type='image/png')
+    except ValidationError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        # Fall back to original file if conversion fails for any reason
+        logger.warning('Failed to convert TIFF to PNG: %s', exc, exc_info=True)
+
     instance = FileUpload(user=user, project=project, file=file)
     if settings.SVG_SECURITY_CLEANUP:
         content_type, encoding = mimetypes.guess_type(str(instance.file.name))

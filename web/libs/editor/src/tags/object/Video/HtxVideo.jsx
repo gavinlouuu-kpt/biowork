@@ -1,11 +1,13 @@
+import { observer } from "mobx-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { IconZoomIn } from "@humansignal/icons";
-import { Button } from "../../../common/Button/Button";
+import { Button } from "@humansignal/ui";
 import { Dropdown } from "../../../common/Dropdown/Dropdown";
 import { Menu } from "../../../common/Menu/Menu";
 import { ErrorMessage } from "../../../components/ErrorMessage/ErrorMessage";
 import ObjectTag from "../../../components/Tags/Object";
+import { VideoConfigControl } from "../../../components/Timeline/Controls/VideoConfigControl";
 import { Timeline } from "../../../components/Timeline/Timeline";
 import { clampZoom, VideoCanvas } from "../../../components/VideoCanvas/VideoCanvas";
 import {
@@ -18,13 +20,10 @@ import { defaultStyle } from "../../../core/Constants";
 import { useFullscreen } from "../../../hooks/useFullscreen";
 import { useToggle } from "../../../hooks/useToggle";
 import { Block, Elem } from "../../../utils/bem";
-import { FF_DEV_2715, isFF } from "../../../utils/feature-flags";
 import ResizeObserver from "../../../utils/resize-observer";
 import { clamp, isDefined } from "../../../utils/utilities";
 import "./Video.scss";
 import { VideoRegions } from "./VideoRegions";
-
-const isFFDev2715 = isFF(FF_DEV_2715);
 
 function useZoom(videoDimensions, canvasDimentions, shouldClampPan) {
   const [zoomState, setZoomState] = useState({ zoom: 1, pan: { x: 0, y: 0 } });
@@ -111,6 +110,21 @@ function useZoom(videoDimensions, canvasDimentions, shouldClampPan) {
 
   return [zoomState, { setZoomAndPan, setZoom, setPan }];
 }
+
+const VideoConfig = observer(({ item }) => {
+  const [isConfigModalActive, setIsConfigModalActive] = useState(false);
+
+  return (
+    <VideoConfigControl
+      configModal={isConfigModalActive}
+      onSetModal={setIsConfigModalActive}
+      speed={item.speed}
+      onSpeedChange={item.handleSpeed}
+      loopTimelineRegion={item.loopTimelineRegion}
+      onLoopTimelineRegionChange={item.setLoopTimelineRegion}
+    />
+  );
+});
 
 const HtxVideoView = ({ item, store }) => {
   if (!item._value) return null;
@@ -353,44 +367,22 @@ const HtxVideoView = ({ item, store }) => {
   // TIMELINE EVENT HANDLERS
   const handlePlay = useCallback(() => {
     setPlaying((_playing) => {
-      // Audio v3 & Syncable
-      if (isFFDev2715) {
-        if (!item.ref.current.playing) {
-          // @todo item.ref.current.playing? could be buffering and other states
-          item.ref.current.play();
-          item.triggerSyncPlay();
-        }
-        return true;
-      }
-      // Audio v1,v2
-
-      if (_playing === false) {
+      if (!item.ref.current.playing) {
+        // @todo item.ref.current.playing? could be buffering and other states
         item.ref.current.play();
         item.triggerSyncPlay();
-        return true;
       }
-      return _playing;
+      return true;
     });
-  }, []);
+  }, [item]);
 
   const handlePause = useCallback(() => {
     setPlaying((_playing) => {
-      // Audio v3 & Syncable
-      if (isFFDev2715) {
-        if (item.ref.current.playing) {
-          item.ref.current.pause();
-          item.triggerSyncPause();
-        }
-        return false;
-      }
-      // Audio v1,v2
-
-      if (_playing === true) {
+      if (item.ref.current.playing) {
         item.ref.current.pause();
         item.triggerSyncPause();
-        return false;
       }
-      return _playing;
+      return false;
     });
   }, []);
 
@@ -534,6 +526,8 @@ const HtxVideoView = ({ item, store }) => {
                   onPlay={handlePlay}
                   onPause={handlePause}
                   onSeeked={item.handleSeek}
+                  loopFrameRange={item.loopTimelineRegion}
+                  selectedFrameRange={item.selectedFrameRange}
                 />
               </>
             )}
@@ -556,27 +550,31 @@ const HtxVideoView = ({ item, store }) => {
             disableView={!supportsTimelineRegions && !supportsRegions}
             framerate={item.framerate}
             controls={{ FramesControl: true }}
+            readonly={item.annotation?.isReadOnly()}
             customControls={[
               {
                 position: "left",
                 component: () => {
                   return (
-                    <Dropdown.Trigger
-                      key="dd"
-                      inline={isFullScreen}
-                      content={
-                        <Menu size="auto" closeDropdownOnItemClick={false}>
-                          <Menu.Item onClick={zoomIn}>Zoom In</Menu.Item>
-                          <Menu.Item onClick={zoomOut}>Zoom Out</Menu.Item>
-                          <Menu.Item onClick={zoomToFit}>Zoom To Fit</Menu.Item>
-                          <Menu.Item onClick={zoomReset}>Zoom 100%</Menu.Item>
-                        </Menu>
-                      }
-                    >
-                      <Button size="small" nopadding>
-                        <IconZoomIn />
-                      </Button>
-                    </Dropdown.Trigger>
+                    <>
+                      <VideoConfig item={item} />
+                      <Dropdown.Trigger
+                        key="dd"
+                        inline={isFullScreen}
+                        content={
+                          <Menu size="auto" closeDropdownOnItemClick={false}>
+                            <Menu.Item onClick={zoomIn}>Zoom In</Menu.Item>
+                            <Menu.Item onClick={zoomOut}>Zoom Out</Menu.Item>
+                            <Menu.Item onClick={zoomToFit}>Zoom To Fit</Menu.Item>
+                            <Menu.Item onClick={zoomReset}>Zoom 100%</Menu.Item>
+                          </Menu>
+                        }
+                      >
+                        <Button size="small" variant="neutral" look="string">
+                          <IconZoomIn />
+                        </Button>
+                      </Dropdown.Trigger>
+                    </>
                   );
                 },
               },

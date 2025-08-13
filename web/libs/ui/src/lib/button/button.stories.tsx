@@ -5,7 +5,6 @@ import { IconAnnotationGroundTruth, IconCrossAlt } from "@humansignal/icons";
 const meta: Meta<typeof Button> = {
   component: Button,
   title: "UI/Button",
-  tags: ["autodocs"],
   argTypes: {
     disabled: { control: "boolean" },
     waiting: { control: "boolean" },
@@ -205,6 +204,18 @@ export const WithSecondaryAction = {
       >
         <span className="flex-1 px-tight">{children}</span>
       </Button>
+    );
+  },
+};
+
+export const WithTooltipAndDisabledState: Story = {
+  render: ({ children, ...props }) => {
+    return (
+      <div className="flex items-center gap-tight">
+        <Button {...props} className="w-48" leading={<IconAnnotationGroundTruth />} disabled tooltip="Tooltip text">
+          With Tooltip
+        </Button>
+      </div>
     );
   },
 };

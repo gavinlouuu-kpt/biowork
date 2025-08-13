@@ -1,6 +1,7 @@
 import TriggerOptions = Cypress.TriggerOptions;
 import ObjectLike = Cypress.ObjectLike;
 import ClickOptions = Cypress.ClickOptions;
+import { SINGLE_FRAME_TIMEOUT } from "../../../../editor/tests/integration/e2e/utils/constants";
 
 type MouseInteractionOptions = Partial<TriggerOptions & ObjectLike & MouseEvent>;
 
@@ -27,11 +28,40 @@ export const VideoView = {
   get timelineToolbar() {
     return this.root.get(".lsf-timeline__topbar");
   },
+  get frameCounter() {
+    return this.timelineToolbar.get(".lsf-frames-control");
+  },
+  get frameCounterInput() {
+    return this.frameCounter.get("input[type='text']");
+  },
   get timeLineLabels() {
     return this.root.get(".lsf-timeline-frames__labels-bg");
   },
   get timeframesArea() {
     return this.root.get(".lsf-timeline-frames__scroll");
+  },
+  get configButton() {
+    return this.timelineToolbar.get('[aria-label="Video settings"]');
+  },
+
+  get configModal() {
+    return this.timelineToolbar.get('[class*="modal--"]');
+  },
+
+  get loopTimelineRegionToggle() {
+    return this.configModal.find('[class*="toggle--"]').find("label");
+  },
+
+  get loopTimelineRegionCheckbox() {
+    return this.configModal.find('[class*="toggle--"] input[type="checkbox"]');
+  },
+
+  get playButton() {
+    return cy.get('[data-testid="playback-button:play"]');
+  },
+
+  get pauseButton() {
+    return cy.get('[data-testid="playback-button:pause"]');
   },
   /**
    * Clicks at the coordinates on the drawing area
@@ -122,20 +152,23 @@ export const VideoView = {
    * Captures a new screenshot and compares it to already taken one
    * Fails if screenshots are identical
    * @param name name of the screenshot
-   * @param treshold to compare image. It's a relation between original number of pixels vs changed number of pixels
+   * @param threshold to compare image. It's a relation between original number of pixels vs changed number of pixels
    */
-  canvasShouldChange(name: string, treshold = 0.1) {
-    return this.drawingArea.compareScreenshot(name, "shouldChange", { withHidden: [".lsf-video-canvas"], treshold });
+  canvasShouldChange(name: string, threshold = 0.1) {
+    return this.drawingArea.compareScreenshot(name, "shouldChange", { withHidden: [".lsf-video-canvas"], threshold });
   },
 
   /**
    * Captures a new screenshot and compares it to already taken one
    * Fails if screenshots are different
    * @param name name of the screenshot
-   * @param treshold to compare image. It's a relation between original number of pixels vs changed number of pixels
+   * @param threshold to compare image. It's a relation between original number of pixels vs changed number of pixels
    */
-  canvasShouldNotChange(name: string, treshold = 0.1) {
-    return this.drawingArea.compareScreenshot(name, "shouldNotChange", { withHidden: [".lsf-video-canvas"], treshold });
+  canvasShouldNotChange(name: string, threshold = 0.1) {
+    return this.drawingArea.compareScreenshot(name, "shouldNotChange", {
+      withHidden: [".lsf-video-canvas"],
+      threshold,
+    });
   },
 
   /**
@@ -150,19 +183,122 @@ export const VideoView = {
    * Captures a new screenshot of the video canvas and compares it to already taken one
    * Fails if screenshots are identical
    * @param name name of the screenshot
-   * @param treshold to compare image. It's a relation between original number of pixels vs changed number of pixels
+   * @param threshold to compare image. It's a relation between original number of pixels vs changed number of pixels
    */
-  videoCanvasShouldChange(name: string, treshold = 0.1) {
-    return this.videoCanvas.compareScreenshot(name, "shouldChange", { withHidden: [".konvajs-content"], treshold });
+  videoCanvasShouldChange(name: string, threshold = 0.1) {
+    return this.videoCanvas.compareScreenshot(name, "shouldChange", { withHidden: [".konvajs-content"], threshold });
   },
 
   /**
    * Captures a new screenshot of the video canvas and compares it to already taken one
    * Fails if screenshots are different
    * @param name name of the screenshot
-   * @param treshold to compare image. It's a relation between original number of pixels vs changed number of pixels
+   * @param threshold to compare image. It's a relation between original number of pixels vs changed number of pixels
    */
-  videoCanvasShouldNotChange(name: string, treshold = 0.1) {
-    return this.videoCanvas.compareScreenshot(name, "shouldNotChange", { withHidden: [".konvajs-content"], treshold });
+  videoCanvasShouldNotChange(name: string, threshold = 0.1) {
+    return this.videoCanvas.compareScreenshot(name, "shouldNotChange", { withHidden: [".konvajs-content"], threshold });
+  },
+
+  toggleConfigModal() {
+    cy.log("Toggle video config modal");
+    this.configButton.click();
+    // Wait for modal animation
+    cy.wait(100);
+  },
+
+  enableLoopTimelineRegion() {
+    cy.log("Enable Loop Timeline Region");
+    this.loopTimelineRegionCheckbox.then(($checkbox) => {
+      if (!$checkbox.prop("checked")) {
+        this.loopTimelineRegionToggle.click();
+      }
+    });
+  },
+
+  disableLoopTimelineRegion() {
+    cy.log("Disable Loop Timeline Region");
+    this.loopTimelineRegionCheckbox.then(($checkbox) => {
+      if ($checkbox.prop("checked")) {
+        this.loopTimelineRegionToggle.click();
+      }
+    });
+  },
+
+  setLoopTimelineRegion(enabled: boolean) {
+    cy.log(`Set Loop Timeline Region to: ${enabled}`);
+    if (enabled) {
+      this.enableLoopTimelineRegion();
+    } else {
+      this.disableLoopTimelineRegion();
+    }
+  },
+
+  // State verification
+  isLoopTimelineRegionEnabled() {
+    return this.loopTimelineRegionCheckbox.should("be.checked");
+  },
+
+  isLoopTimelineRegionDisabled() {
+    return this.loopTimelineRegionCheckbox.should("not.be.checked");
+  },
+
+  // Playback controls
+  play() {
+    cy.log("Start video playback");
+    this.playButton.click();
+  },
+
+  pause() {
+    cy.log("Pause video playback");
+    this.pauseButton.click();
+  },
+
+  // Wait for video to be at specific frame
+  waitForFrame(frameNumber: number) {
+    cy.log(`Wait for video to be at frame ${frameNumber}`);
+    // Wait for frame counter to show the expected frame
+    this.frameCounter.should("contain.text", `${frameNumber.toString()} of`);
+  },
+
+  // Get current frame number from timeline controls
+  getCurrentFrame() {
+    return this.frameCounter.invoke("text").then((text) => {
+      const match = text.match(/(\d+) of/);
+      return match ? Number.parseInt(match[1]) : null;
+    });
+  },
+
+  setCurrentFrame(frameNumber: number) {
+    cy.log(`Set current frame to ${frameNumber}`);
+    this.frameCounter.click();
+    // select all to replace the current frame number
+    this.frameCounterInput.clear();
+    this.frameCounterInput.type(`${frameNumber}{enter}`);
+  },
+
+  verifyPlayingRange(startPositionMax: number, endPosition: number, withoutStopping = false) {
+    const checkFrame = (lastFrame, rewind = false, waitTimes = 10) => {
+      VideoView.getCurrentFrame().then((frame) => {
+        if (withoutStopping ? frame > endPosition : frame === endPosition) {
+          // Sequence of frames is the same as expected
+          return;
+        }
+        if (rewind) {
+          // If rewinding, we expect to see frames going back
+          expect(frame).to.be.lessThan(lastFrame);
+        } else {
+          if (frame === lastFrame && waitTimes--) {
+            // If we hit the same frame, wait a bit and check again
+            cy.wait(SINGLE_FRAME_TIMEOUT);
+            checkFrame(lastFrame, rewind, waitTimes);
+            return;
+          }
+          expect(frame).to.be.greaterThan(lastFrame);
+        }
+        cy.wait(SINGLE_FRAME_TIMEOUT);
+        checkFrame(frame);
+      });
+    };
+    checkFrame(startPositionMax, true);
   },
 };

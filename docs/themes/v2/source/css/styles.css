@@ -572,7 +572,11 @@ main {
   cursor: pointer;
 }
 
-.page-sidebar-list li:has(.page-sidebar-children-link[aria-current="page"]) .page-sidebar-toggle-children-list svg {
+.page-tier-enterprise .page-header nav button.page-sidebar-toggle-children-list {
+  color: var(--color-gray-900);
+}
+
+.page-sidebar .page-sidebar-list li:has(.page-sidebar-children-link[aria-current="page"]) > .page-sidebar-toggle-children-list svg {
   transform: rotate(180deg);
 }
 
@@ -960,7 +964,7 @@ h6 {
 }
 
 .content-markdown h1+img {
-    margin-top: 2em;
+  margin-top: 2em;
 }
 
 /****************************
@@ -1548,8 +1552,10 @@ h1+.admonition {
   content: url(../images/design/enterprise-icon.svg);
 }
 
-.admonition + .admonition, .admonition + div.opensource-only, .admonition + div.enterprise-only {
-    margin-top: 1.5em
+.admonition+.admonition,
+.admonition+div.opensource-only,
+.admonition+div.enterprise-only {
+  margin-top: 1.5em
 }
 
 .content-markdown iframe {
@@ -2136,6 +2142,14 @@ pre {
   white-space: normal;
 }
 
+pre:has(.mermaid) .code-block-copy-button {
+  display: none;
+}
+
+pre:has(.mermaid) code.hljs {
+  background: transparent;
+}
+
 pre code.hljs {
   font-family: var(--font-family-monospace);
   font-size: 0.9rem;
@@ -2612,7 +2626,7 @@ code.hljs {
 }
 
 .page-tier-enterprise .page-header nav>button+ul ul {
-  background-color: var(--color-gray-700);
+  background-color: var(--color-gray-000);
 }
 
 .page-tier-enterprise #docsearch-input {

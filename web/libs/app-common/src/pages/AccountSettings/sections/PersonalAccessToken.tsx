@@ -1,15 +1,13 @@
-import { IconLaunch, IconFileCopy, Label } from "@humansignal/ui";
-import styles from "./PersonalAccessToken.module.scss";
-import { atomWithMutation, atomWithQuery } from "jotai-tanstack-query";
-import { atom, useAtomValue } from "jotai";
 import { useCopyText } from "@humansignal/core/lib/hooks/useCopyText";
-
+import { Button, IconFileCopy, IconLaunch, Label, Typography } from "@humansignal/ui";
 /**
  * FIXME: This is legacy imports. We're not supposed to use such statements
  * each one of these eventually has to be migrated to core/ui
  */
 import { Input, TextArea } from "apps/labelstudio/src/components/Form";
-import { Button } from "apps/labelstudio/src/components/Button/Button";
+import { atom, useAtomValue } from "jotai";
+import { atomWithMutation, atomWithQuery } from "jotai-tanstack-query";
+import styles from "./PersonalAccessToken.module.scss";
 
 const tokenAtom = atomWithQuery(() => ({
   queryKey: ["access-token"],
@@ -56,10 +54,17 @@ export const PersonalAccessToken = () => {
           <Label text="Access Token" className={styles.label} />
           <div className="flex gap-2 w-full justify-between">
             <Input name="token" className={styles.input} readOnly value={token} />
-            <Button icon={<IconFileCopy />} onClick={copyToken} disabled={tokenCopied}>
+            <Button
+              leading={<IconFileCopy />}
+              onClick={copyToken}
+              disabled={tokenCopied}
+              variant="primary"
+              look="outlined"
+              className="w-[116px]"
+            >
               {tokenCopied ? "Copied!" : "Copy"}
             </Button>
-            <Button look="danger" onClick={reset.mutate}>
+            <Button variant="negative" look="outlined" onClick={() => reset.mutate()}>
               Reset
             </Button>
           </div>
@@ -74,7 +79,14 @@ export const PersonalAccessToken = () => {
               rawClassName={styles.textarea}
               value={curl}
             />
-            <Button icon={<IconFileCopy />} onClick={copyCurl} disabled={curlCopied}>
+            <Button
+              leading={<IconFileCopy />}
+              onClick={copyCurl}
+              disabled={curlCopied}
+              variant="primary"
+              look="outlined"
+              className="w-[116px]"
+            >
               {curlCopied ? "Copied!" : "Copy"}
             </Button>
           </div>
@@ -86,7 +98,7 @@ export const PersonalAccessToken = () => {
 
 export function PersonalAccessTokenDescription() {
   return (
-    <p className="m-0">
+    <Typography>
       Authenticate with our API using your personal access token.
       {!window.APP_SETTINGS?.whitelabel_is_active && (
         <>
@@ -100,6 +112,6 @@ export function PersonalAccessTokenDescription() {
           </a>
         </>
       )}
-    </p>
+    </Typography>
   );
 }

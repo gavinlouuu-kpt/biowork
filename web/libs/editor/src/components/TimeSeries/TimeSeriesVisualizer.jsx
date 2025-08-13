@@ -97,7 +97,7 @@ class TimeSeriesVisualizerD3 extends React.Component {
     } = this.props;
 
     const activeStates = parent?.activeStates();
-    const statesSelected = activeStates && activeStates.length;
+    const statesSelected = activeStates?.length;
     const readonly = parent?.annotation?.isReadOnly();
 
     // skip if event fired by .move() - prevent recursion and bugs
@@ -108,10 +108,13 @@ class TimeSeriesVisualizerD3 extends React.Component {
       const x = d3.mouse(d3.event.sourceEvent.target)[0];
       const newRegion = this.newRegion;
 
+      // double click handler to create instant region
       // when 2nd click happens during 300ms after 1st click and in the same place
       if (newRegion && Math.abs(newRegion.x - x) < 4) {
         clearTimeout(this.newRegionTimer);
-        parent?.regionChanged(newRegion.range, ranges.length, newRegion.states);
+        if (!readonly) {
+          parent?.regionChanged(newRegion.range, ranges.length, newRegion.states);
+        }
         this.newRegion = null;
         this.newRegionTimer = null;
       } else if (statesSelected) {
@@ -642,9 +645,12 @@ class TimeSeriesVisualizerD3 extends React.Component {
       .domain(d3.extent(values))
       .range([height - margin.max, margin.min]);
 
+    // active domain-range mappers
     this.x = x;
     this.y = y;
-    this.plotX = this.x.copy();
+    // static max scale domain-range mappers
+    this.plotX = x.copy();
+    this.plotY = y.copy();
 
     this.main = d3
       .select(this.ref.current)
@@ -738,12 +744,15 @@ class TimeSeriesVisualizerD3 extends React.Component {
     channel.x = this.x.copy();
     channel.plotX = this.x.copy();
     channel.y = y;
+    channel.plotY = y.copy();
 
+    // max scale line
     channel.line = d3
       .line()
-      .y((d) => channel.y(d[column]))
+      .y((d) => channel.plotY(d[column]))
       .x((d) => channel.plotX(d[time]));
 
+    // line that has representation only on the current range
     channel.lineSlice = d3
       .line()
       .defined((d) => d[time] >= range[0] && d[time] <= range[1])
@@ -847,12 +856,14 @@ class TimeSeriesVisualizerD3 extends React.Component {
       }
 
       // calc scale and shift
-      const diffY = d3.extent(values).reduce((a, b) => b - a); // max - min
+      const [globalMin, globalMax] = d3.extent(values);
+      const diffY = globalMax - globalMin;
 
       scaleY = diffY / (max - min);
-      translateY = min / diffY;
 
       channel.y.domain([min, max]);
+      // `translateY` relies on the current `y`'s domain so it should be calculated after it
+      translateY = channel.y(globalMin) - channel.y(min);
     }
 
     // zoomStep - zoom level when we need to switch between optimized and original data
@@ -909,7 +920,18 @@ class TimeSeriesVisualizerD3 extends React.Component {
       const svg = d3.select(this.ref.current).selectAll("svg");
 
       svg.attr("viewBox", [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom]);
+      // all width based scales should be updated
       this.x.range([0, width]);
+      this.plotX.range([0, width]);
+      for (const channel of Object.values(this.channels)) {
+        channel.x.range([0, width]);
+        channel.plotX.range([0, width]);
+        // Channels' charts will be successfully updated in `setRangeWithScaling` in all cases except for optimized data
+        // as in that case they are designed to be more static, so we have to do it right now
+        if (channel.useOptimizedData) {
+          channel.path.attr("d", channel.line);
+        }
+      }
       this.renderBrushCreator();
       svg.selectAll("clipPath rect").attr("width", width);
 

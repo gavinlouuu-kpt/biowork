@@ -1,20 +1,10 @@
 //// LEGACY FLAGS ////
 // Consider all pre-XFN flags legacy. Should be revised and removed.
-/**
- * Aync import for task data
- * @deprecated
- */
-export const FF_LSDV_4915 = "fflag_feat_all_lsdv_4915_async_task_import_13042023_short";
 
 /**
  * Fix displaying of created_at in the review mode
  */
 export const FF_DEV_1480 = "ff_front_dev_1480_created_on_in_review_180122_short";
-
-/**
- * Notifications
- */
-export const FF_DEV_1658 = "ff_front_dev_1658_notification_center_170222_short";
 
 /**
  * Model version selector per model backend
@@ -97,3 +87,21 @@ export const FF_MULTICHANNEL_TS = "fflag_feat_front_bros58_timeseries_multichann
  * Enables enterprise email notifications
  */
 export const FF_ENTERPRISE_EMAIL_NOTIFICATIONS = "fflag_feat_front_fit_183_email_notifications_short";
+
+/**
+ * Bitmask is a new image segmentation tool for masking that allows pixel-perfect editing
+ *
+ * @link https://app.launchdarkly.com/projects/default/flags/fflag_front_feat_bros_87_pixel_wise_16062025_short
+ */
+export const FF_BITMASK = "fflag_front_feat_bros_87_pixel_wise_16062025_short";
+
+/**
+ * New storage providers experience
+ * @link https://app.launchdarkly.com/projects/default/flags/fflag_feat_bros_193_new_cloud_storage_providers_short/targeting?env=production&selected-env=production
+ */
+export const FF_NEW_STORAGES = "fflag_feat_bros_193_new_cloud_storage_providers_short";
+
+/**
+ * Datamanager filter members
+ */
+export const FF_DM_FILTER_MEMBERS = "fflag_feat_fit_449_datamanager_filter_members_short";

@@ -3,6 +3,7 @@ import React from "react";
 
 import { AnnotationMixin } from "../../../mixins/AnnotationMixin";
 import IsReadyMixin from "../../../mixins/IsReadyMixin";
+import PersistentStateMixin from "../../../mixins/PersistentState";
 import ProcessAttrsMixin from "../../../mixins/ProcessAttrs";
 import { SyncableMixin } from "../../../mixins/Syncable";
 import { parseValue } from "../../../utils/data";
@@ -101,6 +102,7 @@ const Model = types
     frame: 1,
     length: 1,
     drawingRegion: null,
+    loopTimelineRegion: false,
   }))
   .views((self) => ({
     get store() {
@@ -134,13 +136,48 @@ const Model = types
 
       return states && states.length > 0;
     },
+
+    get fullFrameRange() {
+      return { start: 1, end: self.length };
+    },
+
+    get timelineRegions() {
+      return self.annotation.regionStore.selection.list.filter((reg) => reg.type === "timelineregion");
+    },
+
+    get hasSelectedRange() {
+      return self.timelineRegions.length > 0;
+    },
+
+    get selectedFrameRange() {
+      const regions = self.timelineRegions;
+      if (regions.length === 0) return null;
+      let start = regions[0].ranges[0].start;
+      let end = regions[0].ranges[0].end;
+      regions.forEach((reg) => {
+        reg.ranges.forEach((range) => {
+          if (range.start < start) start = range.start;
+          if (range.end > end) end = range.end;
+        });
+      });
+      return { start, end };
+    },
+
+    get persistentValuesKey() {
+      return "ls:video-tag:settings";
+    },
+    get persistentValues() {
+      return {
+        loopTimelineRegion: self.loopTimelineRegion,
+      };
+    },
   }))
   .actions((self) => ({
     afterCreate() {
       // normalize framerate — should be string with number of frames per second
       const framerate = Number(parseValue(self.framerate, self.store.task?.dataObj));
 
-      if (!framerate || isNaN(framerate)) self.framerate = "24";
+      if (!framerate || Number.isNaN(framerate)) self.framerate = "24";
       else if (framerate < 1) self.framerate = String(1 / framerate);
       else self.framerate = String(framerate);
     },
@@ -178,9 +215,9 @@ const Model = types
     ////// Incoming
 
     registerSyncHandlers() {
-      ["play", "pause", "seek"].forEach((event) => {
+      for (const event of ["play", "pause", "seek"]) {
         self.syncHandlers.set(event, self.handleSync);
-      });
+      }
       self.syncHandlers.set("speed", self.handleSyncSpeed);
     },
 
@@ -208,6 +245,11 @@ const Model = types
       }
     },
 
+    handleSpeed(speed) {
+      self.speed = speed;
+      self.triggerSync("speed", { speed });
+    },
+
     handleSeek() {
       self.triggerSync("seek");
     },
@@ -218,6 +260,10 @@ const Model = types
   }))
   .actions((self) => {
     return {
+      setLoopTimelineRegion(loop) {
+        self.loopTimelineRegion = loop;
+      },
+
       setLength(length) {
         self.length = length;
       },
@@ -241,7 +287,6 @@ const Model = types
 
       addVideoRegion(data) {
         const control = self.videoControl;
-        const value = {};
 
         if (!control) {
           console.error("No video control is found");
@@ -260,9 +305,9 @@ const Model = types
         const area = self.annotation.createResult({ sequence }, {}, control, self);
 
         // add labels
-        self.activeStates().forEach((tag) => {
+        for (const tag of self.activeStates()) {
           area.setValue(tag);
-        });
+        }
 
         return area;
       },
@@ -304,6 +349,9 @@ const Model = types
        * @returns {Object} created region
        */
       startDrawing({ frame, region: id }) {
+        // don't create or edit regions in read-only mode
+        if (self.annotation.isReadOnly()) return null;
+
         if (id) {
           const region = self.annotation.regions.find((r) => r.cleanId === id);
           const range = region?.ranges?.[0];
@@ -338,6 +386,7 @@ export const VideoModel = types.compose(
   TagAttrs,
   ProcessAttrsMixin,
   ObjectBase,
+  PersistentStateMixin,
   AnnotationMixin,
   Model,
   IsReadyMixin,

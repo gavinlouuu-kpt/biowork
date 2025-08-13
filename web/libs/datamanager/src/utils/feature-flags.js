@@ -9,12 +9,6 @@ export const FF_DEV_2186 = "ff_front_dev_2186_comments_for_update";
 
 export const FF_DEV_2536 = "fflag_feat_front_dev-2536_comment_notifications_short";
 
-/**
- * Support for loading media files only a single time. Part of the Audio v3 epic.
- * @link https://app.launchdarkly.com/default/production/features/ff_front_dev_2715_audio_3_280722_short
- */
-export const FF_DEV_2715 = "ff_front_dev_2715_audio_3_280722_short";
-
 // Comments for annotation editor
 export const FF_DEV_2887 = "fflag-feat-dev-2887-comments-ui-editor-short";
 
@@ -65,6 +59,19 @@ export const FF_AVERAGE_AGREEMENT_SCORE_POPOVER = "fflag_feat_all_leap_2042_aver
  * @link https://app.launchdarkly.com/projects/default/flags/fflag_root_13_annotation_results_filtering
  */
 export const FF_ANNOTATION_RESULTS_FILTERING = "fflag_root_13_annotation_results_filtering";
+
+/**
+ * Allow to filter tasks in Data Manager by annotation results and user annotated on the same annotation
+ * @link https://app.launchdarkly.com/projects/default/flags/fflag_root_45_better_user_filter
+ */
+export const FF_BETTER_USER_FILTER = "fflag_root_45_better_user_filter";
+
+/**
+ * Disable global user fetching for large-scale deployments
+ * @link https://app.launchdarkly.com/projects/default/flags/fflag_all_feat_utc_204_users_performance_improvements_in_dm_for_large_orgs
+ */
+export const FF_DISABLE_GLOBAL_USER_FETCHING =
+  "fflag_all_feat_utc_204_users_performance_improvements_in_dm_for_large_orgs";
 
 // Customize flags
 const flags = {};

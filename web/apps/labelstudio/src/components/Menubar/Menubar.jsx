@@ -4,6 +4,7 @@ import {
   IconBook,
   IconFolder,
   IconHome,
+  IconHotkeys,
   IconPersonInCircle,
   IconPin,
   IconTerminal,
@@ -13,7 +14,7 @@ import {
   IconSlack,
 } from "@humansignal/icons";
 import { LSLogo } from "../../assets/images";
-import { Userpic, ThemeToggle } from "@humansignal/ui";
+import { Button, Userpic, ThemeToggle } from "@humansignal/ui";
 import { useConfig } from "../../providers/ConfigProvider";
 import { useContextComponent, useFixedLocation } from "../../providers/RoutesProvider";
 import { useCurrentUser } from "../../providers/CurrentUser";
@@ -31,6 +32,7 @@ import { FF_HOMEPAGE } from "../../utils/feature-flags";
 import { pages } from "@humansignal/app-common";
 import { isFF } from "../../utils/feature-flags";
 import { ff } from "@humansignal/core";
+import { openHotkeyHelp } from "@humansignal/app-common/pages/AccountSettings/sections/Hotkeys/Help";
 
 export const MenubarContext = createContext();
 
@@ -144,11 +146,33 @@ export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSid
 
           <div className={menubarContext}>
             <LeftContextMenu className={contextItem.mod({ left: true })} />
-
             <RightContextMenu className={contextItem.mod({ right: true })} />
           </div>
 
-          <div className={menubarClass.elem("spacer").toString()} />
+          <div className={menubarClass.elem("hotkeys")}>
+            <div className={menubarClass.elem("hotkeys-button")}>
+              <Button
+                variant="neutral"
+                look="outlined"
+                tooltip="Keyboard Shortcuts"
+                data-testid="hotkeys-button"
+                size="small"
+                onClick={() => {
+                  openHotkeyHelp([
+                    "annotation",
+                    "data_manager",
+                    "regions",
+                    "tools",
+                    "audio",
+                    "video",
+                    "timeseries",
+                    "image_gallery",
+                  ]);
+                }}
+                icon={<IconHotkeys />}
+              />
+            </div>
+          </div>
 
           {ff.isActive(ff.FF_THEME_TOGGLE) && <ThemeToggle />}
 

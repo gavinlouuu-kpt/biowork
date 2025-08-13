@@ -23,7 +23,7 @@ from core.utils.common import (
     string_is_url,
     temporary_disconnect_list_signal,
 )
-from core.utils.db import fast_first
+from core.utils.db import batch_delete, fast_first
 from core.utils.params import get_env
 from data_import.models import FileUpload
 from data_manager.managers import PreparedTaskManager, TaskManager
@@ -535,7 +535,7 @@ class Task(TaskMixin, models.Model):
     @staticmethod
     def delete_tasks_without_signals(queryset):
         """
-        Delete Tasks queryset with switched off signals
+        Delete Tasks queryset with switched off signals in batches to minimize memory usage
         :param queryset: Tasks queryset
         """
         signals = [
@@ -543,7 +543,7 @@ class Task(TaskMixin, models.Model):
             (pre_delete, remove_data_columns, Task),
         ]
         with temporary_disconnect_list_signal(signals):
-            queryset.delete()
+            return batch_delete(queryset, batch_size=500)
 
     @staticmethod
     def delete_tasks_without_signals_from_task_ids(task_ids):
@@ -1376,7 +1376,7 @@ def update_task_stats(task, stats=('is_labeled',), save=True):
         task.save()
 
 
-def bulk_update_stats_project_tasks(tasks, project=None):
+def deprecated_bulk_update_stats_project_tasks(tasks, project=None):
     """bulk Task update accuracy
        ex: after change settings
        apply several update queries size of batch
@@ -1424,6 +1424,27 @@ def bulk_update_stats_project_tasks(tasks, project=None):
                     update_fields=['is_labeled'],
                     batch_size=settings.BATCH_SIZE,
                 )
+
+
+def bulk_update_stats_project_tasks(tasks, project=None):
+    # Avoid circular import
+    from projects.functions.utils import get_unique_ids_list
+
+    bulk_update_is_labeled = load_func(settings.BULK_UPDATE_IS_LABELED)
+
+    if flag_set('fflag_fix_back_plt_802_update_is_labeled_20062025_short', user='auto'):
+        task_ids = get_unique_ids_list(tasks)
+
+        if not task_ids:
+            return
+
+        if project is None:
+            first_task = Task.objects.get(id=task_ids[0])
+            project = first_task.project
+
+        bulk_update_is_labeled(task_ids, project)
+    else:
+        return deprecated_bulk_update_stats_project_tasks(tasks, project)
 
 
 Q_finished_annotations = Q(was_cancelled=False) & Q(result__isnull=False)

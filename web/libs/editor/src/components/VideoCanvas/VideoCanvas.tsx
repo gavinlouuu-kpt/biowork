@@ -3,6 +3,7 @@ import { Block, Elem } from "../../utils/bem";
 import { FF_LSDV_4711, FF_VIDEO_FRAME_SEEK_PRECISION, isFF } from "../../utils/feature-flags";
 import { clamp, isDefined } from "../../utils/utilities";
 import "./VideoCanvas.scss";
+import { useLoopRange } from "./hooks/useLoopRange";
 import { MAX_ZOOM, MIN_ZOOM } from "./VideoConstants";
 import { VirtualCanvas } from "./VirtualCanvas";
 import { VirtualVideo } from "./VirtualVideo";
@@ -37,6 +38,12 @@ type VideoProps = {
   onEnded?: () => void;
   onResize?: (dimensions: VideoDimentions) => void;
   onError?: (error: any) => void;
+
+  loopFrameRange?: boolean;
+  selectedFrameRange?: {
+    start: number;
+    end: number;
+  };
 };
 
 type PanOptions = {
@@ -257,11 +264,13 @@ export const VideoCanvas = memo(
       updateFrame();
 
       if (playing) {
-        raf.current = requestAnimationFrame(handleAnimationFrame);
+        raf.current = requestAnimationFrame(handleAnimationFrameRef.current);
       } else {
         cancelAnimationFrame(raf.current!);
       }
     };
+    const handleAnimationFrameRef = useRef(handleAnimationFrame);
+    handleAnimationFrameRef.current = handleAnimationFrame;
 
     useEffect(() => {
       if (!playing) {
@@ -270,7 +279,7 @@ export const VideoCanvas = memo(
     }, [drawVideo, playing]);
 
     useEffect(() => {
-      if (playing) raf.current = requestAnimationFrame(handleAnimationFrame);
+      if (playing) raf.current = requestAnimationFrame(handleAnimationFrameRef.current);
 
       return () => {
         cancelAnimationFrame(raf.current!);
@@ -410,6 +419,7 @@ export const VideoCanvas = memo(
         setSaturation(value);
       },
       play() {
+        prepareLoop();
         videoRef.current?.play();
       },
       pause() {
@@ -451,6 +461,17 @@ export const VideoCanvas = memo(
     } else if (ref) {
       ref.current = refSource;
     }
+
+    const { prepareLoop } = useLoopRange({
+      loopFrameRange: props.loopFrameRange,
+      selectedFrameRange: props.selectedFrameRange,
+      videoRef,
+      refSource,
+      framerate,
+      onRedrawRequest: () => {
+        updateFrame(true);
+      },
+    });
 
     useEffect(() => {
       const { width, height } = videoDimensions;
