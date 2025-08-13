@@ -1,3 +1,8 @@
+networks:
+  label-studio-network:
+    name: label-studio-network
+    driver: bridge
+
 services:
   nginx:
     build: .
@@ -9,7 +14,7 @@ services:
     depends_on:
       - app
     environment:
-      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-172.16.233.109}
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-}
     #   Optional: Specify SSL termination certificate & key
     #   Just drop your cert.pem and cert.key into folder 'deploy/nginx/certs'
     #      - NGINX_SSL_CERT=/certs/cert.pem
@@ -19,6 +24,8 @@ services:
       - ./deploy/nginx/certs:/certs:ro
     #   Optional: Override nginx default conf
     #      - ./deploy/my.conf:/etc/nginx/nginx.conf
+    networks:
+      - label-studio-network
     command: nginx
 
   app:
@@ -38,11 +45,13 @@ services:
       - POSTGRE_PASSWORD=
       - POSTGRE_PORT=5432
       - POSTGRE_HOST=db
-      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-172.16.233.109}
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-}
       - JSON_LOG=1
     #      - LOG_LEVEL=DEBUG
     volumes:
       - ./mydata:/label-studio/data:rw
+    networks:
+      - label-studio-network
     command: label-studio-uwsgi
 
   db:
@@ -62,3 +71,5 @@ services:
     volumes:
       - ${POSTGRES_DATA_DIR:-./postgres-data}:/var/lib/postgresql/data
       - ./deploy/pgsql/certs:/var/lib/postgresql/certs:ro
+    networks:
+      - label-studio-network
