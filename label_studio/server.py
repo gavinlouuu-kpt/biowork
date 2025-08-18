@@ -169,13 +169,10 @@ def _create_user(input_args, config):
         print('User {} already exists'.format(username))
 
     user = User.objects.get(email=username)
-    org = Organization.objects.first()
-    if not org:
-        org = Organization.create_organization(
-            created_by=user, title='Label Studio', legacy_api_tokens_enabled=input_args.enable_legacy_api_token
-        )
-    else:
-        org.add_user(user)
+    # Create individual organization for the admin user
+    org = Organization.create_organization(
+        created_by=user, title=f"{user.email}'s Organization", legacy_api_tokens_enabled=input_args.enable_legacy_api_token
+    )
     user.active_organization = org
     user.save(update_fields=['active_organization'])
 

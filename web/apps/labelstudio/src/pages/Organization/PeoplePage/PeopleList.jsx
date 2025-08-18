@@ -4,6 +4,7 @@ import { Userpic } from "@humansignal/ui";
 import { Pagination, Spinner } from "../../../components";
 import { usePage, usePageSize } from "../../../components/Pagination/Pagination";
 import { useAPI } from "../../../providers/ApiProvider";
+import { useCurrentUser } from "../../../providers/CurrentUser";
 import { Block, Elem } from "../../../utils/bem";
 import { isDefined } from "../../../utils/helpers";
 import "./PeopleList.scss";
@@ -11,6 +12,7 @@ import { CopyableTooltip } from "../../../components/CopyableTooltip/CopyableToo
 
 export const PeopleList = ({ onSelect, selectedUser, defaultSelected }) => {
   const api = useAPI();
+  const { user } = useCurrentUser();
   const [usersList, setUsersList] = useState();
   const [currentPage] = usePage("page", 1);
   const [currentPageSize] = usePageSize("page_size", 30);
@@ -19,9 +21,14 @@ export const PeopleList = ({ onSelect, selectedUser, defaultSelected }) => {
   console.log({ currentPage, currentPageSize });
 
   const fetchUsers = useCallback(async (page, pageSize) => {
+    // Don't make API call if user data isn't loaded yet
+    if (!user || !user.active_organization) {
+      return;
+    }
+
     const response = await api.callApi("memberships", {
       params: {
-        pk: 1,
+        pk: user.active_organization,
         contributed_to_projects: 1,
         page,
         page_size: pageSize,
@@ -32,7 +39,7 @@ export const PeopleList = ({ onSelect, selectedUser, defaultSelected }) => {
       setUsersList(response.results);
       setTotalItems(response.count);
     }
-  }, []);
+  }, [api, user]);
 
   const selectUser = useCallback(
     (user) => {
@@ -47,7 +54,7 @@ export const PeopleList = ({ onSelect, selectedUser, defaultSelected }) => {
 
   useEffect(() => {
     fetchUsers(currentPage, currentPageSize);
-  }, []);
+  }, [fetchUsers, currentPage, currentPageSize]);
 
   useEffect(() => {
     if (isDefined(defaultSelected) && usersList) {

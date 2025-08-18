@@ -38,6 +38,11 @@ class OrganizationMember(OrganizationMemberMixin, models.Model):
         'If NULL, the member is not considered deleted.',
     )
 
+    joined_via_invitation = models.BooleanField(
+        default=False,
+        help_text='Whether this user joined via an invitation link'
+    )
+
     # objects = OrganizationMemberQuerySet.as_manager()
 
     @classmethod
@@ -54,6 +59,11 @@ class OrganizationMember(OrganizationMemberMixin, models.Model):
     @cached_property
     def is_owner(self):
         return self.user.id == self.organization.created_by.id
+
+    @cached_property
+    def can_leave(self):
+        """Users who joined via invitation cannot leave the organization"""
+        return not self.joined_via_invitation
 
     class Meta:
         ordering = ['pk']
@@ -134,13 +144,13 @@ class Organization(OrganizationMixin, models.Model):
     def has_permission(self, user):
         return OrganizationMember.objects.filter(user=user, organization=self, deleted_at__isnull=True).exists()
 
-    def add_user(self, user):
+    def add_user(self, user, joined_via_invitation=False):
         if self.users.filter(pk=user.pk).exists():
             logger.debug('User already exists in organization.')
             return
 
         with transaction.atomic():
-            om = OrganizationMember(user=user, organization=self)
+            om = OrganizationMember(user=user, organization=self, joined_via_invitation=joined_via_invitation)
             om.save()
 
             return om

@@ -274,6 +274,9 @@ class OrganizationMemberDetailAPI(GetParentObjectMixin, generics.RetrieveDestroy
             raise NotFound('Member not found')
 
         if member.user_id == request.user.id:
+            # Check if the user is trying to leave and they joined via invitation
+            if member.joined_via_invitation:
+                return Response({'detail': 'Users who joined via invitation cannot leave the organization'}, status=status.HTTP_403_FORBIDDEN)
             return Response({'detail': 'User cannot soft delete self'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
         member.soft_delete()
