@@ -885,6 +885,9 @@ USER_ACTIVITY_BATCH_SIZE = int(get_env('USER_ACTIVITY_BATCH_SIZE', '100'))
 USER_ACTIVITY_SYNC_THRESHOLD = int(get_env('USER_ACTIVITY_SYNC_THRESHOLD', '500'))
 USER_ACTIVITY_REDIS_TTL = int(get_env('USER_ACTIVITY_REDIS_TTL', '86400'))  # 24 hours
 
+# QuerySet iterator settings
+QS_ITERATOR_DEFAULT_CHUNK_SIZE = int(get_env('QS_ITERATOR_DEFAULT_CHUNK_SIZE', 1000))
+
 # Data Manager
 # Max number of users to display in the Data Manager in Annotators/Reviewers/Comment Authors, etc
 DM_MAX_USERS_TO_DISPLAY = int(get_env('DM_MAX_USERS_TO_DISPLAY', 10))
