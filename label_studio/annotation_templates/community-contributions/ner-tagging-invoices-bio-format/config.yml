@@ -5,8 +5,9 @@ image: /static/templates/community-contributions/ner-tagging-invoices-bio-format
 details: <h1>NER Tagging for Invoices (BIO Format)</h1>
 source_repo: https://github.com/humanSignal/awesome-label-studio-config/tree/main/label-configs/ner-tagging-invoices-bio-format
 config: |
-  <!-- Template sourced from awesome-label-studio-config repository: https://github.com/humanSignal/awesome-label-studio-config/tree/main/label-configs/ner-tagging-invoices-bio-format -->
   <View style="display: flex; align-items: flex-start; gap: 1em;">
+  <!-- Template sourced from awesome-label-studio-config repository: https://github.com/humanSignal/awesome-label-studio-config/tree/main/label-configs/ner-tagging-invoices-bio-format -->
+  
     <!-- Left panel: labels + filter -->
     <View style="min-width: 250px; padding: 0.5em; background: #f7f7f7; border-radius: 4px;">
       <Header value="NER Tags" />

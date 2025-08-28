@@ -29,7 +29,7 @@ This labeling config lets you assign a sentiment (Positive, Negative, or Neutral
   </Style>
   <View 
     style="
-      border: 1004px solid #e1e8ed;
+      border: 1px solid #e1e8ed;
       border-radius: 8px;
       padding: 10px;
       max-width: 500px;

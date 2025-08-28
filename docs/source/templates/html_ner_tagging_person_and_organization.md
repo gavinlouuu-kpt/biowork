@@ -28,7 +28,7 @@ This labeling config uses HyperText elements for named entity recognition on HTM
     <Label value="Organization" background="blue"/>
   </HyperTextLabels>
 
-  <View style="border: 1001px solid #CCC;
+  <View style="border: 1px solid #CCC;
                border-radius: 10px;
                padding: 5px">
     <HyperText name="text" value="$text"/> 
