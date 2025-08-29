@@ -584,9 +584,6 @@ class ImportStorage(Storage):
                     f'"Tasks" import method'
                 )
 
-            if not flag_set('fflag_feat_dia_2092_multitasks_per_storage_link'):
-                link_objects = link_objects[:1]
-
             for link_object in link_objects:
                 # TODO: batch this loop body with add_task -> add_tasks in a single bulk write.
                 # See DIA-2062 for prerequisites

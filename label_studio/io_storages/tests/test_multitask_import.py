@@ -18,19 +18,6 @@ from rest_framework.test import APIClient
 from tests.utils import azure_client_mock, gcs_client_mock, mock_feature_flag, redis_client_mock
 
 
-@pytest.fixture(name='fflag_feat_dia_2092_multitasks_per_storage_link_on', autouse=True)
-def fflag_feat_dia_2092_multitasks_per_storage_link_on():
-    from core.feature_flags import flag_set
-
-    def fake_flag_set(*args, **kwargs):
-        if args[0] == 'fflag_feat_dia_2092_multitasks_per_storage_link':
-            return True
-        return flag_set(*args, **kwargs)
-
-    with mock.patch('io_storages.base_models.flag_set', wraps=fake_flag_set):
-        yield
-
-
 @pytest.fixture(name='fflag_feat_root_11_support_jsonl_cloud_storage_on')
 def fflag_feat_root_11_support_jsonl_cloud_storage_on():
     from core.feature_flags import flag_set
@@ -106,7 +93,6 @@ def _test_storage_import(project, storage_class, task_data, **storage_kwargs):
         assert task['data'] == expected_data['data']
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_import_multiple_tasks_s3(project, common_task_data):
     with mock_s3():
         # Setup S3 bucket and test data
@@ -128,7 +114,6 @@ def test_import_multiple_tasks_s3(project, common_task_data):
         )
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_import_multiple_tasks_gcs(project, common_task_data):
     # initialize mock with sample data
     with gcs_client_mock():
@@ -142,7 +127,6 @@ def test_import_multiple_tasks_gcs(project, common_task_data):
         )
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_import_multiple_tasks_azure(project, common_task_data):
     # initialize mock with sample data
     with azure_client_mock(sample_json_contents=common_task_data, sample_blob_names=['test.json']):
@@ -154,7 +138,6 @@ def test_import_multiple_tasks_azure(project, common_task_data):
         )
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_import_multiple_tasks_redis(project, common_task_data):
     with redis_client_mock() as redis:
         redis.set('test.json', json.dumps(common_task_data))
@@ -168,7 +151,6 @@ def test_import_multiple_tasks_redis(project, common_task_data):
         )
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_storagelink_fields(project, common_task_data):
     # use an actual storage and storagelink to test this, since factories aren't connected properly
     with mock_s3():
