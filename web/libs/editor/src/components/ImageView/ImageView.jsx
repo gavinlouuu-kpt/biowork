@@ -47,6 +47,7 @@ const splitRegions = (regions) => {
   const brushRegions = [];
   const shapeRegions = [];
   const bitmaskRegions = [];
+  const vectorRegions = [];
 
   for (const region of regions) {
     switch (region.type) {
@@ -65,6 +66,7 @@ const splitRegions = (regions) => {
   return {
     brushRegions,
     bitmaskRegions,
+    vectorRegions,
     shapeRegions,
   };
 };
@@ -74,7 +76,9 @@ const Region = memo(({ region, showSelected = false }) => {
 });
 
 const RegionsLayer = memo(({ regions, name, useLayers, showSelected = false, smoothing = true }) => {
-  const content = regions.map((el) => <Region key={`region-${el.id}`} region={el} showSelected={showSelected} />);
+  const content = regions.map((el) => {
+    return <Region key={`region-${el.id}`} region={el} showSelected={showSelected} />;
+  });
 
   return useLayers === false ? (
     content
@@ -1434,7 +1438,7 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
       {isFF(FF_LSDV_4930) ? <TransformerBack item={item} /> : null}
 
       {renderableRegions.map(([groupName, list]) => {
-        const isBrush = groupName.match(/brush/i) !== null;
+        const useLayers = groupName.match(/brush/i) === null;
         const isSuggestion = groupName.match("suggested") !== null;
 
         return list.length > 0 ? (
@@ -1442,7 +1446,7 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
             key={groupName}
             name={groupName}
             regions={list}
-            useLayers={isBrush === false}
+            useLayers={useLayers}
             suggestion={isSuggestion}
             smoothing={item.smoothing}
           />

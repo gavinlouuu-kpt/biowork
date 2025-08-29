@@ -8,6 +8,7 @@ import { RectRegionModel } from "./RectRegion";
 import { KeyPointRegionModel } from "./KeyPointRegion";
 import { AudioRegionModel } from "./AudioRegion";
 import { PolygonRegionModel } from "./PolygonRegion";
+import { VectorRegionModel } from "./VectorRegion";
 import { EllipseRegionModel } from "./EllipseRegion";
 import { RichTextRegionModel } from "./RichTextRegion";
 import { BrushRegionModel } from "./BrushRegion";
@@ -55,6 +56,7 @@ const Area = types.union(
 
       if (
         !sn.points && // dirty hack to make it work with polygons, but may be the whole condition is not necessary at all
+        !sn.shape && // same for vector
         // `sequence` and `ranges` are used for video regions
         !sn.sequence &&
         !sn.ranges &&
@@ -90,6 +92,7 @@ const Area = types.union(
   KeyPointRegionModel,
   EllipseRegionModel,
   PolygonRegionModel,
+  VectorRegionModel,
   BrushRegionModel,
   BitmaskRegionModel,
   VideoRectangleRegionModel,
