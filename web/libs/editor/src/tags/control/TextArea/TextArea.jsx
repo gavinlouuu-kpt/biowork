@@ -1,7 +1,6 @@
 import { createRef, useCallback } from "react";
 import { Button } from "@humansignal/ui";
-import Form from "antd/lib/form/index";
-import Input from "antd/lib/input/index";
+import { Form, Input } from "antd";
 import { observer } from "mobx-react";
 import { destroy, isAlive, types } from "mobx-state-tree";
 
