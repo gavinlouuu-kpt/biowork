@@ -271,9 +271,9 @@ def test_bare_task(storage):
     blob = json.dumps(task_data).encode()
     output = load_tasks_json(blob, 'test.json')
     expected_output = [StorageObject(key='test.json', task_data=task_data)]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_data_key(storage):
@@ -282,9 +282,9 @@ def test_data_key(storage):
     blob = json.dumps(task_data).encode()
     output = load_tasks_json(blob, 'test.json')
     expected_output = [StorageObject(key='test.json', task_data=task_data)]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_1elem_list(storage):
@@ -295,9 +295,9 @@ def test_1elem_list(storage):
     expected_output = [
         StorageObject(key='test.json', task_data=task_data[0], row_index=0),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_2elem_list(storage):
@@ -309,9 +309,9 @@ def test_2elem_list(storage):
         StorageObject(key='test.json', task_data=task_data[0], row_index=0),
         StorageObject(key='test.json', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_preds_and_annots_list(storage):
@@ -324,9 +324,9 @@ def test_preds_and_annots_list(storage):
         StorageObject(key='test.json', task_data=task_data[0], row_index=0),
         StorageObject(key='test.json', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_mixed_formats(storage):
@@ -339,9 +339,9 @@ def test_mixed_formats(storage):
         StorageObject(key='test.json', task_data=task_data[0], row_index=0),
         StorageObject(key='test.json', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 @mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', True, 'io_storages.utils')
@@ -354,9 +354,9 @@ def test_list_jsonl(storage):
         StorageObject(key='test.jsonl', task_data=task_data[0], row_index=0),
         StorageObject(key='test.jsonl', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 @mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', True, 'io_storages.utils')
@@ -370,15 +370,15 @@ def test_list_jsonl_with_preds_and_annots(storage):
         StorageObject(key='test.jsonl', task_data=task_data[0], row_index=0),
         StorageObject(key='test.jsonl', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 @mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', False, 'io_storages.utils')
 def test_ff_blocks_jsonl():
     with pytest.raises(ValueError):
-        load_tasks_json(b'{"text": "Test task 1"}\n{"text": "Test task 2"}', 'test.jsonl')
+        list(load_tasks_json(b'{"text": "Test task 1"}\n{"text": "Test task 2"}', 'test.jsonl'))
 
 
 @mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', True, 'io_storages.utils')
@@ -392,9 +392,9 @@ def test_mixed_formats_jsonl(storage):
         StorageObject(key='test.jsonl', task_data=task_data[0], row_index=0),
         StorageObject(key='test.jsonl', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 @mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', True, 'io_storages.utils')
@@ -410,6 +410,6 @@ def test_list_jsonl_with_datetimes(storage):
         StorageObject(key='test.jsonl', task_data=task_data[0], row_index=0),
         StorageObject(key='test.jsonl', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
