@@ -111,7 +111,7 @@
     "shadcn": "^2.1.8",
     "simplify-js": "^1.2.4",
     "storybook": "^9.0.13",
-    "strman": "^2.0.1",
+
     "tailwind-merge": "^2.6.0",
     "webfft": "^1.0.3",
     "xpath-range": "^1.1.1",
@@ -171,7 +171,7 @@
     "@types/react-window-infinite-loader": "^1.0.9",
     "@types/sanitize-html": "^2.13.0",
     "@types/sinon": "^17.0.3",
-    "@types/strman": "^2.0.0",
+
     "autoprefixer": "^10.4.20",
     "babel-jest": "29.7.0",
     "babel-loader": "^8.2.2",

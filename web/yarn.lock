@@ -5719,11 +5719,6 @@
   resolved "https://registry.yarnpkg.com/@types/stack-utils/-/stack-utils-2.0.3.tgz#6209321eb2c1712a7e7466422b8cb1fc0d9dd5d8"
   integrity sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==
 
-"@types/strman@^2.0.0":
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/@types/strman/-/strman-2.0.3.tgz#2cc5d3106b9cdc3f0e2681f2350b6af0ebf988ae"
-  integrity sha512-CnGRn6OdRB6j5aR6724bZYzMQsPBYCIW4TuRNdSHqwDKXgDbR1H6O0rtT7T5MRisyiBM/kNWxkEM++AWcRT+qQ==
-
 "@types/tough-cookie@*":
   version "4.0.5"
   resolved "https://registry.yarnpkg.com/@types/tough-cookie/-/tough-cookie-4.0.5.tgz#cb6e2a691b70cb177c6e3ae9c1d2e8b2ea8cd304"
@@ -17453,11 +17448,6 @@ strip-json-comments@^3.1.0, strip-json-comments@^3.1.1:
   version "3.1.1"
   resolved "https://registry.yarnpkg.com/strip-json-comments/-/strip-json-comments-3.1.1.tgz#31f1281b3832630434831c310c01cccda8cbe006"
   integrity sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==
-
-strman@^2.0.1:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/strman/-/strman-2.0.1.tgz#d43bb91c91e100609f336fd4a6539fd8e980e1de"
-  integrity sha512-00kB9pulmzaQUBl8DJQ4255QXnQn/MHnJzYqKz4a/W5KqCMSaqmv0VReOzkSg2u4FYkKpNhxpp6bs6aEMZeLPw==
 
 strtok3@^9.0.1:
   version "9.1.1"

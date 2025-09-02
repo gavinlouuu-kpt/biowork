@@ -1,12 +1,12 @@
 import { getEnv, getSnapshot, getType, types } from "mobx-state-tree";
 import { observer } from "mobx-react";
 import { Tool } from "../components/Toolbar/Tool";
-import { toKebabCase } from "strman";
+import kebabCase from "lodash/kebabCase";
 
 const ToolView = observer(({ item }) => {
   return (
     <Tool
-      ariaLabel={toKebabCase(getType(item).name)}
+      ariaLabel={kebabCase(getType(item).name)}
       active={item.selected}
       icon={item.iconClass}
       label={item.viewTooltip}
