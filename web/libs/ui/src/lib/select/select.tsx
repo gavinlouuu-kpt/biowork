@@ -521,7 +521,7 @@ const Option = ({
         data-disabled={disabled}
       >
         {multiple && <Checkbox tabIndex={-1} checked={isOptionSelected} indeterminate={isIndeterminate} readOnly />}
-        <div data-testid="select-option-label" className="w-full">
+        <div data-testid="select-option-label" className="w-full min-w-0 truncate">
           {label}
         </div>
       </div>
