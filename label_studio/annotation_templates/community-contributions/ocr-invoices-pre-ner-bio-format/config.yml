@@ -1,7 +1,7 @@
 title: OCR Invoices Pre-NER BIO Format
 type: community
 group: Community Contributions
-image: /static/templates/community-contributions/ocr-invoices-pre-ner-bio-format.gif
+image: /static/templates/community-contributions/ocr-invoices-pre-ner-bio-format.jpg
 details: <h1>OCR Invoices Pre-NER BIO Format</h1>
 source_repo: https://github.com/humanSignal/awesome-label-studio-config/tree/main/label-configs/ocr-invoices-pre-ner-bio-format
 config: |

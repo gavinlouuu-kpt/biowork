@@ -3,7 +3,7 @@ title: Two-Level Sentiment Analysis of X / Twitter posts
 type: templates
 category: Community Contributions
 cat: community
-order: 1004
+order: 1003
 meta_title: Two-Level Sentiment Analysis of X / Twitter posts Data Labeling Template
 meta_description: Template for two-level sentiment analysis of x / twitter posts with Label Studio
 community: true
@@ -15,7 +15,7 @@ repo_url: https://github.com/HumanSignal/awesome-label-studio-config/tree/main/l
 ---
 
 
-<img src="/images/templates/two-level-sentiment-analysis-of-x-twitter-posts.gif" alt="" class="gif-border" width="552px" height="408px" />
+<img src="/images/templates/two-level-sentiment-analysis-of-x-twitter-posts.jpg" alt="" class="gif-border" width="552px" height="408px" />
 
 This labeling config lets you assign a sentiment (Positive, Negative, or Neutral) to X / Twitter post. After picking a sentiment, a second-level classification appears to categorize the text as Descriptive, Emotional, Mixed, Ambigous, or Sarcams. The labeling interface is styled to look like a X / Twitter post.
 

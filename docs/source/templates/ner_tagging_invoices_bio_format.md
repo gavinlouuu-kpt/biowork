@@ -3,7 +3,7 @@ title: NER Tagging for Invoices (BIO Format)
 type: templates
 category: Community Contributions
 cat: community
-order: 1002
+order: 1001
 meta_title: NER Tagging for Invoices (BIO Format) Data Labeling Template
 meta_description: Template for ner tagging for invoices (bio format) with Label Studio
 community: true
@@ -15,7 +15,7 @@ repo_url: https://github.com/HumanSignal/awesome-label-studio-config/tree/main/l
 ---
 
 
-<img src="/images/templates/ner-tagging-invoices-bio-format.png" alt="" class="gif-border" width="552px" height="408px" />
+<img src="/images/templates/ner-tagging-invoices-bio-format.jpg" alt="" class="gif-border" width="552px" height="408px" />
 
 This labeling config enables Named Entity Recognition (NER) on invoice documents using the BIO (Beginning, Inside, Outside) format. It combines OCR text recognition with entity tagging for key invoice elements.
 

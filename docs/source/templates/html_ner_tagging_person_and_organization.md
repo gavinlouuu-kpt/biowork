@@ -3,7 +3,7 @@ title: HTML NER Tagging
 type: templates
 category: Community Contributions
 cat: community
-order: 1001
+order: 1000
 meta_title: HTML NER Tagging Data Labeling Template
 meta_description: Template for html ner tagging with Label Studio
 community: true
@@ -15,7 +15,7 @@ repo_url: https://github.com/HumanSignal/awesome-label-studio-config/tree/main/l
 ---
 
 
-<img src="/images/templates/html-ner-tagging-person-and-organization.gif" alt="" class="gif-border" width="552px" height="408px" />
+<img src="/images/templates/html-ner-tagging-person-and-organization.jpg" alt="" class="gif-border" width="552px" height="408px" />
 
 This labeling config uses HyperText elements for named entity recognition on HTML content. It highlights recognized entities (Person, Organization) within styled HTML text.
 

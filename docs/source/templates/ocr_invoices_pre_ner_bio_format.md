@@ -3,7 +3,7 @@ title: OCR Invoices Pre-NER BIO Format
 type: templates
 category: Community Contributions
 cat: community
-order: 1003
+order: 1002
 meta_title: OCR Invoices Pre-NER BIO Format Data Labeling Template
 meta_description: Template for ocr invoices pre-ner bio format with Label Studio
 community: true
@@ -15,7 +15,7 @@ repo_url: https://github.com/HumanSignal/awesome-label-studio-config/tree/main/l
 ---
 
 
-<img src="/images/templates/ocr-invoices-pre-ner-bio-format.gif" alt="" class="gif-border" width="552px" height="408px" />
+<img src="/images/templates/ocr-invoices-pre-ner-bio-format.jpg" alt="" class="gif-border" width="552px" height="408px" />
 
 OCR text extraction and tokenization with BIO format for invoice documents. All tokens are initially tagged as 'O' (Outside) for subsequent NER tagging.
 

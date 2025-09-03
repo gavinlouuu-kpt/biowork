@@ -1,7 +1,7 @@
 title: NER Tagging for Invoices (BIO Format)
 type: community
 group: Community Contributions
-image: /static/templates/community-contributions/ner-tagging-invoices-bio-format.png
+image: /static/templates/community-contributions/ner-tagging-invoices-bio-format.jpg
 details: <h1>NER Tagging for Invoices (BIO Format)</h1>
 source_repo: https://github.com/humanSignal/awesome-label-studio-config/tree/main/label-configs/ner-tagging-invoices-bio-format
 config: |
