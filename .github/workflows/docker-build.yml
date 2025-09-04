@@ -1,6 +1,16 @@
 name: "Docker build & push"
 
 on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'The commit SHA to build'
+        type: string
+        required: true
+      branch_name:
+        description: 'The branch name to build'
+        type: string
+        required: true
   workflow_call:
     inputs:
       sha:
