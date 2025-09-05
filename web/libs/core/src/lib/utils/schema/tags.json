@@ -2318,19 +2318,19 @@
       },
       "maxWidth": {
         "name": "maxWidth",
-        "description": "Maximum width for dropdown",
+        "description": "Maximum width for dropdown with units (eg: \"500px\")",
         "type": "number",
         "required": false
       },
       "minWidth": {
         "name": "minWidth",
-        "description": "Minimum width for dropdown",
+        "description": "Minimum width for dropdown with units (eg: \"300px\")",
         "type": "number",
         "required": false
       },
       "required": {
         "name": "required",
-        "description": "Whether taxonomy validation is required",
+        "description": "Whether it is required to have selected at least one option",
         "type": ["true", "false"],
         "required": false,
         "default": false

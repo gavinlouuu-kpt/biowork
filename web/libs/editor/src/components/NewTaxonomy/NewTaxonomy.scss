@@ -8,3 +8,16 @@
   // Create Project popup has 2000
   z-index: 3000;
 }
+
+// wrap long labels for selected items
+// we need to increase specificity this way to override the default styles
+:global(.htx-taxonomy.ant-select-multiple) {
+  :global(.ant-select-selection-item) {
+    height: auto;
+  }
+
+  :global(.ant-select-selection-item-content) {
+    white-space: normal;
+    word-break: break-word;
+  }
+}
