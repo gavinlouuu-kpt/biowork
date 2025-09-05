@@ -232,6 +232,7 @@ INSTALLED_APPS = [
     'ml_model_providers',
     'jwt_auth',
     'session_policy',
+    'fsm',
 ]
 
 MIDDLEWARE = [
@@ -891,3 +892,6 @@ QS_ITERATOR_DEFAULT_CHUNK_SIZE = int(get_env('QS_ITERATOR_DEFAULT_CHUNK_SIZE', 1
 # Data Manager
 # Max number of users to display in the Data Manager in Annotators/Reviewers/Comment Authors, etc
 DM_MAX_USERS_TO_DISPLAY = int(get_env('DM_MAX_USERS_TO_DISPLAY', 10))
+
+# Base FSM (Finite State Machine) Configuration for Label Studio
+FSM_CACHE_TTL = 300  # Cache TTL in seconds (5 minutes)
