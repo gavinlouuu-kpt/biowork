@@ -80,8 +80,7 @@ def version_page(request):
                 if not key.startswith('_') and not hasattr(getattr(settings, key), '__call__')
             }
 
-        result = json.dumps(result, indent=2)
-        result = result.replace('},', '},\n').replace('\\n', ' ').replace('\\r', '')
+        result = json.dumps(result, indent=2, ensure_ascii=False)
         return HttpResponse('<pre>' + result + '</pre>')
     else:
         return JsonResponse(result)
