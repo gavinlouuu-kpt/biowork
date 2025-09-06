@@ -63,7 +63,7 @@ Use the [`Choice`](/tags/choice.html) tag to specify the taxonomy. Nest choices 
 ```
 
 
-## Taxonomies defined using a remote source - Beta 🧪
+## Taxonomies defined using a remote source
 
 You can modify the template to call an external taxonomy. There are two types of external taxonomies:
 
@@ -175,7 +175,7 @@ In this example, you are using `children` to specify child nodes. All values are
 ```
 
 
-### API taxonomies 
+### API taxonomies - Beta 🧪
 
 When using this format, child nodes are only loaded when requested. Parent nodes are specified using `"isLeaf": false` and child nodes are called through the `path` parameter.
 
