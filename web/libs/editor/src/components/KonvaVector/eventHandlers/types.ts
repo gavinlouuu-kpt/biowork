@@ -80,6 +80,7 @@ export interface EventHandlerProps {
   onPointConverted?: (point: BezierPoint, index: number, toBezier: boolean) => void;
   onPathShapeChanged?: (points: BezierPoint[]) => void;
   onPointSelected?: (pointIndex: number | null) => void;
+  onFinish?: () => void;
   onMouseDown?: (e: KonvaEventObject<MouseEvent>) => void;
   onMouseMove?: (e: KonvaEventObject<MouseEvent>) => void;
   onMouseUp?: (e?: KonvaEventObject<MouseEvent>) => void;
@@ -135,5 +136,4 @@ export interface EventHandlers {
   handleLayerClick: (e: KonvaEventObject<MouseEvent>) => void;
   handleLayerMouseMove: (e: KonvaEventObject<MouseEvent>) => void;
   handleLayerMouseUp: () => void;
-  handleLayerDblClick: (e: KonvaEventObject<MouseEvent>) => void;
 }

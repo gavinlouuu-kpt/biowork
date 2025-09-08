@@ -171,7 +171,6 @@ const _Tool = types
       mouseupEv(_, [x, y]) {
         const { x: rx, y: ry } = self.realCoordsFromCursor(x, y);
         self.currentArea?.commitPoint?.(rx, ry);
-        self.mode = "viewing";
         down = false;
 
         // skipping a frame to let KonvaVector render and update properly
@@ -226,6 +225,10 @@ const _Tool = types
         if (self.currentArea?.finished) {
           self._finishDrawing();
         }
+      },
+
+      complete() {
+        self._finishDrawing();
       },
 
       // Clean up uncloseable shape

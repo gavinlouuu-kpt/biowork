@@ -808,7 +808,13 @@ export function createMouseUpHandler(props: EventHandlerProps) {
           y: ghostPoint.y,
           segmentIndex: props.initialPoints.findIndex((p) => p.id === ghostPoint.nextPointId),
         };
-        addPointFromGhostDrag(props, ghostPointWithSegmentIndex, dragDistance);
+        const success = addPointFromGhostDrag(props, ghostPointWithSegmentIndex, dragDistance);
+        if (success) {
+          // Update timing when point is successfully added
+          if (props.lastCallbackTime?.current !== undefined) {
+            props.lastCallbackTime.current = Date.now();
+          }
+        }
       }
     }
 
@@ -943,6 +949,11 @@ export function createClickHandler(props: EventHandlerProps, handledSelectionInM
         const distance = Math.sqrt((imagePos.x - point.x) ** 2 + (imagePos.y - point.y) ** 2);
 
         if (distance <= hitRadius) {
+          // Check if this is the last added point and trigger onFinish
+          if (props.lastAddedPointId && point.id === props.lastAddedPointId) {
+            props.onFinish?.();
+          }
+
           // We clicked on an existing point, don't create new points
           return;
         }
@@ -969,12 +980,6 @@ export function createClickHandler(props: EventHandlerProps, handledSelectionInM
       handledSelectionInMouseDown.current = false;
       return;
     }
-  };
-}
-
-export function createDblClickHandler(props: EventHandlerProps) {
-  return (e: KonvaEventObject<MouseEvent>) => {
-    // Double-click functionality removed - now handled by cmd-click in click handler
   };
 }
 

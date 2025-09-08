@@ -14,6 +14,7 @@ import { observer } from "mobx-react";
 import Constants from "../core/Constants";
 import { RegionWrapper } from "./RegionWrapper";
 import { LabelOnRect } from "../components/ImageView/LabelOnRegion";
+import ToolsManager from "../tools/Manager";
 
 /**
  * VectorRegion - Vector graphics region with coordinate system conversion
@@ -135,11 +136,11 @@ const Model = types
 
     /// Visuals
     get pointEnabledSize() {
-      const customEnabledSize = self.control?.pointnsizeenabled;
+      const customEnabledSize = self.control?.pointsizeenabled;
       return customEnabledSize ? Number.parseInt(customEnabledSize) : 5;
     },
     get pointDisabledSize() {
-      const customDisabledSize = self.control?.pointnsizedisabled;
+      const customDisabledSize = self.control?.pointsizedisabled;
       return customDisabledSize ? Number.parseInt(customDisabledSize) : 3;
     },
     // Helper function to convert pointSize to radius values
@@ -488,6 +489,11 @@ const HtxVectorView = observer(({ item, suggestion }) => {
       <KonvaVector
         ref={(kv) => item.setKonvaVectorRef(kv)}
         initialPoints={Array.from(item.vertices)}
+        onFinish={() => {
+          const tm = ToolsManager.allInstances();
+          const tools = tm.map((t) => t.findSelectedTool()).filter((t) => t.isDrawing);
+          tools.forEach((t) => t.complete?.());
+        }}
         onPointsChange={(points) => {
           item.updatePointsFromKonvaVector(points);
         }}
