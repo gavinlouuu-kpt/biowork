@@ -95,19 +95,10 @@ describe("Sync buffering playback", () => {
       AudioView.playButton.click();
 
       // Wait for audio playback to complete
-      AudioView.mediaElement.should(($media) => {
-        const mediaElement = $media[0] as HTMLMediaElement;
+      AudioView.mediaElement.its(0, { timeout: 1000 * 60 * 10 }).should(($media: any) => {
+        const mediaElement = $media as HTMLMediaElement;
 
-        return new Cypress.Promise((resolve) => {
-          const checkIfEnded = () => {
-            if (mediaElement.currentTime > 41 || mediaElement.ended) {
-              resolve();
-            } else {
-              setTimeout(checkIfEnded, 1000);
-            }
-          };
-          checkIfEnded();
-        });
+        expect(mediaElement.currentTime).to.be.greaterThan(41);
       });
 
       // Check that all phrases were played

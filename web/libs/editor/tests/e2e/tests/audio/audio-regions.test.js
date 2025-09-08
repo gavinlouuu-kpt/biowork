@@ -111,7 +111,7 @@ FFlagMatrix(["fflag_feat_front_lsdv_e_278_contextual_scrolling_short"], (flags) 
   if (!flags.fflag_feat_front_lsdv_e_278_contextual_scrolling_short) {
     FFlagScenario(
       "Check if multiple regions are working changing labels",
-      async ({ I, LabelStudio, AtAudioView, AtOutliner }) => {
+      async ({ I, LabelStudio, AtAudioView, AtOutliner, AtLabels }) => {
         LabelStudio.setFeatureFlags({
           ff_front_dev_2715_audio_3_280722_short: true,
           ...flags,
@@ -126,8 +126,11 @@ FFlagMatrix(["fflag_feat_front_lsdv_e_278_contextual_scrolling_short"], (flags) 
         for (let i = 0; i < 10; i++) {
           // creating a new region
           I.pressKey("1");
+          AtLabels.seeSelectedLabel("Speech");
           AtAudioView.dragAudioElement(40 * i + 10, 30);
+          AtOutliner.dontSeeSelectedRegion();
           AtAudioView.clickAt(40 * i + 20);
+          AtOutliner.seeSelectedRegion();
           I.pressKey("2");
           I.pressKey("1");
           I.pressKey("u");
