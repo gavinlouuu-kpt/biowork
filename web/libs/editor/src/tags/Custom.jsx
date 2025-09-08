@@ -12,8 +12,6 @@ import { AnnotationMixin } from "../mixins/AnnotationMixin";
 import { CustomRegionModel } from "../regions/CustomRegion";
 import { errorBuilder } from "../core/DataValidator/ConfigValidator";
 import { parseValue, tryToParseJSON } from "../utils/data";
-import { POC_UI } from "./CustomCompiledCode";
-import { ManagementUI } from "./CustomManagement";
 // import * as Babel from '@babel/standalone';
 
 // Define the model for the custom tag
@@ -792,7 +790,14 @@ function({ React, data, item, annotation, store, getValue, setValue, getTagValue
         props: item.parsedProps,
       };
 
-      const transformedCode = POC_UI; // MANAGEMENT_V2;
+      function decodeHtmlEntities(text) {
+        const textArea = document.createElement("textarea");
+        textArea.innerHTML = text;
+        return textArea.value;
+      }
+
+      const transformedCode = decodeHtmlEntities(item.effectiveCode);
+      // const transformedCode = POC_UI;
 
       const UserComponent = () => {
         const code = `
@@ -1053,7 +1058,7 @@ function({ React, data, item, annotation, store, getValue, setValue, getTagValue
   return (
     <div className={`custom-tag-wrapper ${item.classname}`} style={wrapperStyle}>
       {item.css && <style dangerouslySetInnerHTML={{ __html: item.css }} />}
-      <ManagementUI {...context} />
+      {/* <ManagementUI {...context} /> */}
       {/* <POCUI {...context} /> */}
       <hr />
       {item.errorBoundary ? (
