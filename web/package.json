@@ -111,11 +111,10 @@
     "shadcn": "^2.1.8",
     "simplify-js": "^1.2.4",
     "storybook": "^9.0.13",
-
+    "sucrase": "^3.35.0",
     "tailwind-merge": "^2.6.0",
     "webfft": "^1.0.3",
     "xpath-range": "^1.1.1",
-    "sucrase": "^3.35.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -172,7 +171,6 @@
     "@types/react-window-infinite-loader": "^1.0.9",
     "@types/sanitize-html": "^2.13.0",
     "@types/sinon": "^17.0.3",
-
     "autoprefixer": "^10.4.20",
     "babel-jest": "29.7.0",
     "babel-loader": "^8.2.2",
@@ -197,6 +195,7 @@
     "jest-fetch-mock": "^3.0.3",
     "jsdoc-to-markdown": "8.0.1",
     "jsdom": "~22.1.0",
+    "koa": "2.16.2",
     "loader-utils": "^3.2.1",
     "mini-css-extract-plugin": "^2.7.6",
     "nx": "21.2.2",
@@ -238,6 +237,7 @@
     "diff": ">=3.5.0",
     "esbuild": ">=0.25.5",
     "jpeg-js": "0.4.4",
+    "koa": ">=2.16.2",
     "lodash": "4.17.21",
     "merge": "2.1.1",
     "ws": "8.17.1",
