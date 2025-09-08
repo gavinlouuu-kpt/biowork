@@ -211,6 +211,7 @@ include = [
 exclude = [
     { path = "label_studio/frontend", format = ["sdist", "wheel"] },
 ]
+
 requires-poetry = '>=2.0.0,<3.0.0'
 
 [tool.poetry.dependencies]
