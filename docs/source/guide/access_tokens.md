@@ -11,7 +11,7 @@ section: "Manage Your Organization"
 date: 2025-02-18 12:03:59
 ---
 
-Label Studio has personal access tokens and legacy tokens. The options available to users are set at the Organization level. Se [Access settings for orgs](#Access-token-settings-for-orgs) below. 
+Label Studio has personal access tokens and legacy tokens. The options available to users are set at the Organization level.  
 
 <table>
 <thead>
@@ -41,6 +41,34 @@ Label Studio has personal access tokens and legacy tokens. The options available
   </td>
   </tr>
 </table>
+
+## Make API keys available to users
+
+You can access your API keys ("Legacy Tokens" and "Personal Access Tokens") by clicking your user icon in the upper right and selecting **Account & Settings**. 
+
+The options that users see depend on your settings at the organization level. 
+
+From the **Organization** page, click **Access Token Settings** in the upper right. 
+
+<div class="enterprise-only">
+
+!!! note
+    The **Organization** page is only available to users in the Admin and Owner role.
+
+</div>
+
+From here you can enable and disable token types. 
+
+* When a certain token type is disabled, existing tokens will not be able to authenticate to the Label Studio platform. 
+
+* Use the Personal Access Token Time-to-Live to set an expiration date for personal access tokens. 
+  
+  Note that time-to live is only available for Label Studio Enterprise users. 
+
+
+![Screenshot of Access Token window](/images/admin/token-settings.png)
+
+
 
 ## Personal access tokens and the API
 
@@ -104,31 +132,7 @@ exp = decoded.get("exp")
 token_is_expired = (exp <= datetime.now(timezone.utc).timestamp())
 ```
 
-## Access token settings for orgs
-
-The options that are available to users depend on options selected at the organization level. 
-
-From the **Organization** page, click **Access Token Settings** in the upper right. 
-
-<div class="enterprise-only">
-
-!!! note
-    The **Organization** page is only available to users in the Admin and Owner role.
-
-</div>
-
-From here you can enable and disable token types. 
-
-* When a certain token type is disabled, existing tokens will not be able to authenticate to the Label Studio platform. 
-
-* Use the Personal Access Token Time-to-Live to set an expiration date for personal access tokens. This is only available for Label Studio Enterprise users. 
 
 
-![Screenshot of Access Token window](/images/admin/token-settings.png)
-
-
-## Finding your access token
-
-You can create/manage your access token from your [**Account & Settings** page](user_account) (click your username in the upper right in Label Studio). 
 
 
