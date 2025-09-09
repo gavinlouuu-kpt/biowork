@@ -195,6 +195,54 @@
       }
     }
   },
+  "Chat": {
+    "name": "Chat",
+    "description": "The `Chat` tag displays a conversational transcript and lets annotators\nextend it with new messages during labeling. The initial transcript is\nprovided from task data via the `value` attribute.\n\nOptionally, the tag can request automatic replies from an LLM model. To do so,\nset the `llm` attribute to a model in the format `<provider>/<model>`.\n\nMessages can be edited by clicking the edit button that appears on hover for\nuser-created messages (messages from annotation results). System messages from\ntask data cannot be edited.\n\nUse with the following data types: JSON array of message objects.\n\nMessage object format (task data):\n- `role`    — speaker identifier; supported roles: `user`, `assistant`, `system`, `tool`, `developer`\n- `content` — message text\n\nExample task data:\n```json\n{\n  \"dialog\": [\n    {\"role\": \"system\", \"content\": \"Welcome to the assistant.\"},\n    {\"role\": \"user\", \"content\": \"Hello!\"}\n  ]\n}\n```",
+    "attrs": {
+      "name": {
+        "name": "name",
+        "description": "Name of the element",
+        "type": "string",
+        "required": true
+      },
+      "value": {
+        "name": "value",
+        "description": "Data field containing an array of chat messages or empty array",
+        "type": "string",
+        "required": true
+      },
+      "messageroles": {
+        "name": "messageroles",
+        "description": "Comma-separated list of roles that the user can create and send messages on behalf of. Default is \"user\" if the `llm` parameter is set; default is \"user,assistant\" if not.",
+        "type": "string",
+        "required": false
+      },
+      "editable": {
+        "name": "editable",
+        "description": "Whether messages are editable. Use true/false, or a comma-separated list of roles that are editable",
+        "type": ["true", "false"],
+        "required": false
+      },
+      "minmessages": {
+        "name": "minmessages",
+        "description": "Minimum total number of messages required to submit",
+        "type": ["string", "number"],
+        "required": false
+      },
+      "maxmessages": {
+        "name": "maxmessages",
+        "description": "Maximum total number of messages allowed",
+        "type": ["string", "number"],
+        "required": false
+      },
+      "llm": {
+        "name": "llm",
+        "description": "Model used to enable automatic assistant replies, format: `<provider>/<model>`",
+        "type": "string",
+        "required": false
+      }
+    }
+  },
   "HyperText": {
     "name": "HyperText",
     "description": "The `HyperText` tag displays hypertext markup for labeling. Use for labeling HTML-encoded text and webpages for NER and NLP projects.\n\nUse with the following data types: HTML.",
@@ -3022,6 +3070,7 @@
     "children": [
       "Audio",
       "Channel",
+      "Chat",
       "HyperText",
       "Image",
       "List",
