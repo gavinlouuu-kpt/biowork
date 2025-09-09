@@ -766,6 +766,8 @@ class PreparedTaskManager(models.Manager):
         :return: task queryset with annotated fields
         """
         queryset = self.only_filtered(prepare_params=prepare_params)
+        # Expose view data to annotation functions for column-specific configuration
+        queryset.view_data = getattr(prepare_params, 'data', None)
         return self.annotate_queryset(
             queryset,
             fields_for_evaluation=fields_for_evaluation,
