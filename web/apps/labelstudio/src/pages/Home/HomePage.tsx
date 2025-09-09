@@ -41,9 +41,9 @@ const actions = [
     type: "createProject",
   },
   {
-    title: "Invite People",
+    title: "Invite Members",
     icon: IconUserAdd,
-    type: "invitePeople",
+    type: "inviteMembers",
   },
 ] as const;
 
@@ -68,7 +68,7 @@ export const HomePage: Page = () => {
         case "createProject":
           setCreationDialogOpen(true);
           break;
-        case "invitePeople":
+        case "inviteMembers":
           setInvitationOpen(true);
           break;
       }

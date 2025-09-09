@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@humansignal/ui/lib/card-new/card";
 import { useMemo, isValidElement } from "react";
-import { Redirect, Route, Switch, useHistory, useParams, useRouteMatch } from "react-router-dom";
+import { Redirect, Route, Switch, useParams, useRouteMatch } from "react-router-dom";
 import styles from "./AccountSettings.module.scss";
 import { accountSettingsSections } from "./sections";
 import { HotkeysHeaderButtons } from "./sections/Hotkeys";
@@ -68,7 +68,6 @@ const AccountSettingsSection = () => {
 
 const AccountSettingsPage = () => {
   const settings = useAtomValue(settingsAtom);
-  const history = useHistory();
   const match = useRouteMatch();
   const { sectionId } = useParams<{ sectionId: string }>();
 
@@ -80,12 +79,11 @@ const AccountSettingsPage = () => {
     () =>
       resolvedSections.map(({ title, id }) => ({
         title,
-        path: () => {
-          history.push(`${AccountSettingsPage.path}/${id}`);
-        },
+        path: `/${id}`,
         active: sectionId === id,
+        exact: true,
       })),
-    [resolvedSections, sectionId, history],
+    [resolvedSections, sectionId],
   );
 
   return (
