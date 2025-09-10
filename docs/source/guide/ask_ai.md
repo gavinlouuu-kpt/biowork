@@ -61,7 +61,7 @@ Only the data you provide in the chat window is used to generate responses, this
 
 ### How is my data used to train models?
 
-The model is trained on public resources like our documentation, codebase, blog, and website. We also train it on additional examples we've written specifically for the the model. 
+The model is trained on public resources like our documentation, codebase, blog, and website. We also train it on additional examples we've written specifically for the model. 
 
 We are on a Tier 5 OpenAI account, and opt out of all requests for training data.
 

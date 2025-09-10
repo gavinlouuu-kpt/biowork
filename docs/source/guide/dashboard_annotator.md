@@ -34,7 +34,7 @@ With the user selected, click **Annotator Performance Report** on the right.
 
 ## Export data
 
-You can use the **Export** drop-down to to export the following:
+You can use the **Export** drop-down to export the following:
 
 * **Report** - Download the information in the dashboard as CSV or JSON. 
 
