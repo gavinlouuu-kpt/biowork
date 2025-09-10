@@ -1,7 +1,6 @@
 ---
-title: VectorLabels
+title: VectorLabels - Beta 🧪
 type: tags
-hide_menu: true
 order: 433
 meta_title: Vector Label Tag for Labeling Vectors in Images
 meta_description: Use the VectorLabels tag and label vectors in images for semantic segmentation machine learning and data science projects.
@@ -11,53 +10,78 @@ The `VectorLabels` tag is used to create labeled vectors.
 
 Use with the following data types: image.
 
-## Key Features
+![Screenshot](/images/tags/vector.png)
 
-### Point Management
-- **Add Points**: Click on empty space, Shift+click on path segments  
-- **Edit Points**: Drag to reposition, Shift+click to convert regular ↔ bezier  
-- **Delete Points**: Alt+click on existing points  
-- **Multi-Selection**: Select multiple points for batch transformations  
-- **Break Closed Path**: Alt+click on any segment of a closed path to break it at that specific segment  
+## Path and point basics
 
-### Bezier Curves
-- **Create**: Drag while adding points or convert existing points  
-- **Edit**: Drag control points, disconnect/reconnect control handles  
-- **Control**: `curves` prop to enable/disable bezier functionality  
+| Action                      | Instruction |
+|------------------------------|-------------|
+| **Add points**               | Click on empty space. |
+| **Add points to path segments** | Press <code>Shift</code> while clicking on a segment that is between two points. |
+| **End or exit the path**     | Press <code>Esc</code> or click on the last point you added to the path. |
+| **Move points**              | <ul><li>If you are actively creating the path, simply backtrack and click a point and drag to reposition.</li><li>If you have already exited the path, first select it again and then click an existing point to drag.</li></ul> |
+| **Delete points**            | Press <code>Alt</code> or <code>Option</code> and click on an existing point. |
 
-## Keyboard Shortcuts & Hotkeys
+!!! note
+    <span id="region-note">Several options require you to complete the path and then re-select it as a region.</span> 
+    
+    To do this, you must first exit the path and then reselect it by clicking on a segment within the path or by clicking it under the **Regions** panel. 
 
-### Point Creation & Editing
-- **Click**: Add new point in drawing mode  
-- **Shift + Click** on a segment: Add point on path segment (insert between existing points)  
-- **Shift + Drag**: Create bezier point with control handles  
-- **Shift + Click** on a point: Convert point between regular ↔ bezier  
-- **Alt + Click** on a segment: Break closed path at segment (when path is closed)  
+    Selected paths are highlighted red. For this reason, you should avoid red when choosing label colors for your vector paths.
 
-### Point Selection
-- **Click**: Select single point  
-- **Cmd/Ctrl + Click**: Add point to multi-selection  
-- **Cmd/Ctrl + Click on shape**: Select all points in the path  
-- **Cmd/Ctrl + Click on point**: Toggle point selection in multi-selection  
 
-### Path Management
-- **Click on first/last point**: Close path bidirectionally (first→last or last→first)  
-- **Shift + Click**: Add point on path segment without closing  
-- **Esc** or **Click**: Exit the vector by pressing **Esc** or by clicking on the point that you added last
+## Advanced
 
-### Bezier Curve Control
-- **Drag control points**: Adjust curve shape  
-- **Alt + Drag control point**: Disconnect control handles (make asymmetric)  
-- **Shift + Drag**: Create new bezier point with control handles  
+### Multi-select
 
-### Multi-Selection & Transformation
-- **Select multiple points**: Use Cmd/Ctrl + Click to build selection  
-- **Transform selection**: Use transformer handles for rotation, scaling, and translation  
-- **Clear selection**: Click on any point  
+With multi-select, you can drag multiple points to reposition or rotate them. 
 
-## Usage Examples
+![Screenshot](/images/tags/vector-multi.png)
 
-### Basic Vector Path
+| Action                   | Instruction |
+|---------------------------|-------------|
+| **Select multiple points** | <ul><li>To select all points in the path, press <code>Cmd</code> or <code>Ctrl</code> and then click any point in the path.</li><li>To select individual points in a path, first select the path as a region (<a href="#region-note">see the note above</a>). Then press <code>Cmd</code> or <code>Ctrl</code> as you click points.</li></ul> |
+| **Transform selection**   | Use transformer handles for rotation, scaling, and translation |
+| **Clear selection**       | Click on any point or press <code>Esc</code>. | 
+
+
+### Bézier curves
+
+To use Bezier curves, you must enable them using the `curves="true"` parameter in your labeling configuration. Control points are shown when editing bezier points.
+
+![Screenshot](/images/tags/vector-bezier.png)
+
+| Action                 | Instruction                                                                 |
+|-------------------------|-----------------------------------------------------------------------------|
+| **Create a curve**      | As you click to add a point, hold while dragging your cursor.               |
+| **Create a new curve point** | Press `Shift` while dragging a control point.                          |
+| **Adjust a curve**      | First exit the path and then [re-select it as a region](#region-note). Then you can click and drag control points. |
+| **Convert a point to a curve**| Press `Shift` and click the point once. |
+| **Asymmetric curves**   | By default, the control points move in sync. To create asymmetric curves (only move one control point), press `Alt` or `Option` before clicking the control point. |
+
+### Closed paths
+
+You can create closed paths to create polygon shapes. To create closed paths, use the `closable="true"` parameter in your labeling configuration. 
+
+![Screenshot](/images/tags/vector-closed.png)
+
+| Action                 | Instruction                                                                 |
+|-------------------------|-----------------------------------------------------------------------------|
+| **Break closed path**   | Press `Alt` or `Option` and click on a segment in a closed path to reopen it.       |
+
+
+### Skeleton
+
+You can create skeleton vectors using the `skeleton="true"` parameter in your labeling configuration. 
+
+When enabled, new points connect to the active point and not the last added point. 
+
+![Screenshot](/images/tags/vector-skeleton.png)
+
+
+## Usage examples
+
+### Basic vector path
 
 ```html
 <View>
@@ -69,7 +93,7 @@ Use with the following data types: image.
 </View>
 ```
 
-### Polygon with Bezier Support
+### Polygon with Bezier support
 
 ```html
 <View>
@@ -88,7 +112,7 @@ Use with the following data types: image.
 </View>
 ```
 
-### Skeleton Mode for Branching Paths
+### Skeleton mode for branching paths
 
 ```html
 <View>
@@ -107,7 +131,7 @@ Use with the following data types: image.
 ```
 
 
-### Keypoint Annotation Tool
+### Keypoint annotation tool
 
 ```html
 <View>
@@ -127,7 +151,7 @@ Use with the following data types: image.
 </View>
 ```
 
-### Constrained Drawing
+### Constrained drawing
 
 ```html
 <View>
@@ -146,32 +170,6 @@ Use with the following data types: image.
  </VectorLabels>
 </View>
 ```
-
-## Advanced Features
-
-### Path Breaking
-
-When a path is closed, you can break it at any segment:
-* Alt + Click on any segment of a closed path
-* The path breaks at that segment
-* The breaking point becomes the first element
-* The point before breaking becomes active
-
-### Skeleton Mode
-* **Purpose:** Create branching paths instead of linear sequences
-* **Behavior:** New points connect to the active point, not the last added point
-* **Use Case:** Tree structures, network diagrams, anatomical features
-
-### Bezier Curve Management
-* **Symmetric Control:** By default, control points move symmetrically
-* **Asymmetric Control:** Hold Alt while dragging to disconnect handles
-* **Control Point Visibility:** Control points are shown when editing bezier points
-
-### Multi-Selection Workflow
-1.	**Build Selection:** Use Cmd/Ctrl + Click to add points
-2.	**Transform:** Use transformer handles for rotation, scaling, translation
-3.	**Batch Operations:** Apply transformations to all selected points
-4.	**Clear:** Click outside or use programmatic methods
 
 ## Tag parameters
 
