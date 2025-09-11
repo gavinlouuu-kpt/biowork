@@ -2175,6 +2175,33 @@
       "version": 3,
       "deleted": false
     },
+    "fflag_feat_fit_568_finite_state_management": {
+      "key": "fflag_feat_fit_568_finite_state_management",
+      "on": false,
+      "prerequisites": [],
+      "targets": [],
+      "contextTargets": [],
+      "rules": [],
+      "fallthrough": {
+        "variation": 0
+      },
+      "offVariation": 1,
+      "variations": [
+        true,
+        false
+      ],
+      "clientSideAvailability": {
+        "usingMobileKey": false,
+        "usingEnvironmentId": false
+      },
+      "clientSide": false,
+      "salt": "2ab6712d781c45ef97555e5ae0fec8a2",
+      "trackEvents": false,
+      "trackEventsFallthrough": false,
+      "debugEventsUntilDate": null,
+      "version": 2,
+      "deleted": false
+    },
     "fflag_feat_front_bros58_timeseries_multichannel_short": {
       "key": "fflag_feat_front_bros58_timeseries_multichannel_short",
       "on": true,
