@@ -1,24 +1,21 @@
 """
-Core framework tests for the declarative Pydantic-based transition system.
+Comprehensive tests for the declarative Pydantic-based transition system.
 
-This test suite covers the core transition framework functionality without
-product-specific implementations. It tests the abstract base classes,
-registration system, validation, and core utilities.
+This test suite provides extensive coverage of the new transition system,
+including usage examples, edge cases, validation scenarios, and integration
+patterns to serve as both tests and documentation.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import models
 from django.test import TestCase
-from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 from fsm.registry import register_state_transition, transition_registry
-from fsm.transition_utils import (
-    get_available_transitions,
-)
+from fsm.transition_utils import get_available_transitions
 from fsm.transitions import (
     BaseTransition,
     TransitionContext,
@@ -29,12 +26,11 @@ from pydantic import Field, ValidationError
 User = get_user_model()
 
 
-class TestStateChoices(models.TextChoices):
-    """Test state choices for mock entity"""
-
-    CREATED = 'CREATED', _('Created')
-    IN_PROGRESS = 'IN_PROGRESS', _('In Progress')
-    COMPLETED = 'COMPLETED', _('Completed')
+# Test state choices for testing
+class TestStateChoices:
+    CREATED = 'CREATED'
+    IN_PROGRESS = 'IN_PROGRESS'
+    COMPLETED = 'COMPLETED'
 
 
 class MockEntity:
@@ -47,6 +43,31 @@ class MockEntity:
         self._meta = Mock()
         self._meta.model_name = 'test_entity'
         self._meta.label_lower = 'test.testentity'
+
+
+class MockTask:
+    """Mock task model for testing"""
+
+    def __init__(self, pk=1):
+        self.pk = pk
+        self.id = pk
+        self.organization_id = 1
+        self._meta = Mock()
+        self._meta.model_name = 'task'
+        self._meta.label_lower = 'tasks.task'
+
+
+class MockAnnotation:
+    """Mock annotation model for testing"""
+
+    def __init__(self, pk=1):
+        self.pk = pk
+        self.id = pk
+        self.result = {'test': 'data'}  # Mock annotation data
+        self.organization_id = 1
+        self._meta = Mock()
+        self._meta.model_name = 'annotation'
+        self._meta.label_lower = 'tasks.annotation'
 
 
 class CoreFrameworkTests(TestCase):
@@ -88,10 +109,10 @@ class CoreFrameworkTests(TestCase):
         """Test TransitionContext functionality"""
         context = TransitionContext(
             entity=self.mock_entity,
+            current_user=self.user,
             current_state=TestStateChoices.CREATED,
             target_state=TestStateChoices.IN_PROGRESS,
-            timestamp=datetime.now(),
-            current_user=self.user,
+            organization_id=1,
         )
 
         assert context.entity == self.mock_entity
@@ -220,6 +241,16 @@ class CoreFrameworkTests(TestCase):
                 return {}
 
         transition = ValidationTestTransition()
+
+        # Test valid transition
+        valid_context = TransitionContext(
+            entity=self.mock_entity,
+            current_state=TestStateChoices.IN_PROGRESS,
+            target_state=transition.target_state,
+        )
+        assert transition.validate_transition(valid_context)
+
+        # Test invalid transition
         invalid_context = TransitionContext(
             entity=self.mock_entity,
             current_state=TestStateChoices.CREATED,
@@ -261,24 +292,8 @@ class CoreFrameworkTests(TestCase):
         assert transition.value == 'state_manager_test_value'
         assert transition.target_state == TestStateChoices.COMPLETED
 
-    def test_get_available_transitions(self):
-        """Test get_available_transitions utility"""
-
-        @register_state_transition('test_entity', 'available_test')
-        class AvailableTestTransition(BaseTransition):
-            @property
-            def target_state(self) -> str:
-                return TestStateChoices.COMPLETED
-
-            def transition(self, context: TransitionContext) -> Dict[str, Any]:
-                return {}
-
-        available = get_available_transitions(self.mock_entity)
-        assert 'available_test' in available
-        assert available['available_test'] == AvailableTestTransition
-
     def test_transition_hooks(self):
-        """Test pre and post transition hooks"""
+        """Test transition lifecycle hooks"""
 
         hook_calls = []
 
@@ -314,12 +329,13 @@ class CoreFrameworkTests(TestCase):
 
 
 class TransitionUtilsTests(TestCase):
-    """Test transition utility functions"""
+    """Test cases for transition utility functions"""
 
     def setUp(self):
-        """Set up test data"""
         self.user = User.objects.create_user(email='test@example.com', password='test123')
         self.mock_entity = MockEntity()
+
+        # Clear registry to avoid test pollution
         transition_registry.clear()
 
     def tearDown(self):
@@ -327,19 +343,10 @@ class TransitionUtilsTests(TestCase):
         transition_registry.clear()
 
     def test_get_available_transitions(self):
-        """Test getting available transitions for an entity"""
+        """Test get_available_transitions utility"""
 
-        @register_state_transition('test_entity', 'util_test_1')
-        class UtilTestTransition1(BaseTransition):
-            @property
-            def target_state(self) -> str:
-                return TestStateChoices.IN_PROGRESS
-
-            def transition(self, context: TransitionContext) -> Dict[str, Any]:
-                return {}
-
-        @register_state_transition('test_entity', 'util_test_2')
-        class UtilTestTransition2(BaseTransition):
+        @register_state_transition('test_entity', 'available_test')
+        class AvailableTestTransition(BaseTransition):
             @property
             def target_state(self) -> str:
                 return TestStateChoices.COMPLETED
@@ -348,9 +355,8 @@ class TransitionUtilsTests(TestCase):
                 return {}
 
         available = get_available_transitions(self.mock_entity)
-        assert len(available) == 2
-        assert 'util_test_1' in available
-        assert 'util_test_2' in available
+        assert 'available_test' in available
+        assert available['available_test'] == AvailableTestTransition
 
         # Test with non-existent entity
         mock_other = MockEntity()
@@ -360,8 +366,6 @@ class TransitionUtilsTests(TestCase):
 
     def test_get_available_transitions_with_validation(self):
         """Test the validation behavior of get_available_transitions"""
-        from unittest.mock import Mock, patch
-
         from fsm.state_manager import StateManager
 
         @register_state_transition('test_entity', 'validation_test_1')
@@ -429,8 +433,6 @@ class TransitionUtilsTests(TestCase):
 
     def test_get_available_transitions_with_required_fields(self):
         """Test that transitions with required fields are handled correctly during validation"""
-        from unittest.mock import Mock, patch
-
         from fsm.state_manager import StateManager
 
         @register_state_transition('test_entity', 'required_field_transition')
@@ -467,3 +469,380 @@ class TransitionUtilsTests(TestCase):
             # This avoids false negatives where valid transitions appear unavailable due to
             # validation limitations
             assert 'required_field_transition' in valid_transitions
+
+
+class ComprehensiveUsageExampleTests(TestCase):
+    """
+    Comprehensive test cases demonstrating various usage patterns.
+
+    These tests serve as both validation and documentation for how to
+    implement and use the declarative transition system.
+    """
+
+    def setUp(self):
+        self.task = MockTask()
+        self.user = Mock()
+        self.user.id = 123
+        self.user.username = 'testuser'
+
+        # Clear registry to avoid conflicts
+        transition_registry.clear()
+
+    def tearDown(self):
+        """Clean up after tests"""
+        transition_registry.clear()
+
+    def test_basic_transition_implementation(self):
+        """
+        USAGE EXAMPLE: Basic transition implementation
+
+        Shows how to implement a simple transition with validation.
+        """
+
+        class BasicTransition(BaseTransition):
+            """Example: Simple transition with required field"""
+
+            message: str = Field(..., description='Message for the transition')
+
+            @property
+            def target_state(self) -> str:
+                return 'PROCESSED'
+
+            def validate_transition(self, context: TransitionContext) -> bool:
+                # Business logic validation
+                if context.current_state == 'COMPLETED':
+                    raise TransitionValidationError('Cannot process completed items')
+                return True
+
+            def transition(self, context: TransitionContext) -> Dict[str, Any]:
+                return {
+                    'message': self.message,
+                    'processed_by': context.current_user.username if context.current_user else 'system',
+                    'processed_at': context.timestamp.isoformat(),
+                }
+
+        # Test the implementation
+        transition = BasicTransition(message='Processing task')
+        assert transition.message == 'Processing task'
+        assert transition.target_state == 'PROCESSED'
+
+        # Test validation
+        context = TransitionContext(
+            entity=self.task, current_user=self.user, current_state='CREATED', target_state=transition.target_state
+        )
+
+        assert transition.validate_transition(context)
+
+        # Test data generation
+        data = transition.transition(context)
+        assert data['message'] == 'Processing task'
+        assert data['processed_by'] == 'testuser'
+        assert 'processed_at' in data
+
+    def test_complex_validation_example(self):
+        """
+        USAGE EXAMPLE: Complex validation with multiple conditions
+
+        Shows how to implement sophisticated business logic validation.
+        """
+
+        class TaskAssignmentTransition(BaseTransition):
+            """Example: Complex validation for task assignment"""
+
+            assignee_id: int = Field(..., description='User to assign task to')
+            priority: str = Field('normal', description='Task priority')
+            deadline: datetime = Field(None, description='Task deadline')
+
+            @property
+            def target_state(self) -> str:
+                return 'ASSIGNED'
+
+            def validate_transition(self, context: TransitionContext) -> bool:
+                # Multiple validation conditions
+                if context.current_state not in ['CREATED', 'UNASSIGNED']:
+                    raise TransitionValidationError(
+                        f'Cannot assign task in state {context.current_state}',
+                        {'current_state': context.current_state, 'task_id': context.entity.pk},
+                    )
+
+                # Check deadline is in future
+                if self.deadline and self.deadline <= timezone.now():
+                    raise TransitionValidationError(
+                        'Deadline must be in the future', {'deadline': self.deadline.isoformat()}
+                    )
+
+                # Check priority is valid
+                valid_priorities = ['low', 'normal', 'high', 'urgent']
+                if self.priority not in valid_priorities:
+                    raise TransitionValidationError(
+                        f'Invalid priority: {self.priority}', {'valid_priorities': valid_priorities}
+                    )
+
+                return True
+
+            def transition(self, context: TransitionContext) -> Dict[str, Any]:
+                return {
+                    'assignee_id': self.assignee_id,
+                    'priority': self.priority,
+                    'deadline': self.deadline.isoformat() if self.deadline else None,
+                    'assigned_by': context.current_user.id if context.current_user else None,
+                    'assignment_reason': f'Task assigned to user {self.assignee_id}',
+                }
+
+        # Test valid assignment
+        future_deadline = timezone.now() + timedelta(days=7)
+        transition = TaskAssignmentTransition(assignee_id=456, priority='high', deadline=future_deadline)
+
+        context = TransitionContext(
+            entity=self.task, current_user=self.user, current_state='CREATED', target_state=transition.target_state
+        )
+
+        assert transition.validate_transition(context)
+
+        # Test invalid state
+        context.current_state = 'COMPLETED'
+        with pytest.raises(TransitionValidationError) as cm:
+            transition.validate_transition(context)
+
+        assert 'Cannot assign task in state' in str(cm.value)
+        assert 'COMPLETED' in str(cm.value)
+
+        # Test invalid deadline
+        past_deadline = timezone.now() - timedelta(days=1)
+        invalid_transition = TaskAssignmentTransition(assignee_id=456, deadline=past_deadline)
+
+        context.current_state = 'CREATED'
+        with pytest.raises(TransitionValidationError) as cm:
+            invalid_transition.validate_transition(context)
+
+        assert 'Deadline must be in the future' in str(cm.value)
+
+    def test_registry_and_decorator_usage(self):
+        """
+        USAGE EXAMPLE: Using the registry and decorator system
+
+        Shows how to register transitions and use the decorator syntax.
+        """
+
+        @register_state_transition('document', 'publish')
+        class PublishDocumentTransition(BaseTransition):
+            """Example: Using the registration decorator"""
+
+            publish_immediately: bool = Field(True, description='Publish immediately')
+            scheduled_time: datetime = Field(None, description='Scheduled publish time')
+
+            @property
+            def target_state(self) -> str:
+                return 'PUBLISHED' if self.publish_immediately else 'SCHEDULED'
+
+            def transition(self, context: TransitionContext) -> Dict[str, Any]:
+                return {
+                    'publish_immediately': self.publish_immediately,
+                    'scheduled_time': self.scheduled_time.isoformat() if self.scheduled_time else None,
+                    'published_by': context.current_user.id if context.current_user else None,
+                }
+
+        # Test registration worked
+        registered_class = transition_registry.get_transition('document', 'publish')
+        assert registered_class == PublishDocumentTransition
+
+        # Test getting transitions for entity
+        document_transitions = transition_registry.get_transitions_for_entity('document')
+        assert 'publish' in document_transitions
+
+        # Test execution through registry
+        mock_document = Mock()
+        mock_document.pk = 1
+        mock_document._meta.model_name = 'document'
+
+        # This would normally go through the full execution workflow
+        transition_data = {'publish_immediately': False, 'scheduled_time': timezone.now() + timedelta(hours=2)}
+
+        # Test transition creation and validation
+        transition = PublishDocumentTransition(**transition_data)
+        assert transition.target_state == 'SCHEDULED'
+
+
+class ValidationAndErrorHandlingTests(TestCase):
+    """
+    Tests focused on validation scenarios and error handling.
+
+    These tests demonstrate proper error handling patterns and
+    validation edge cases.
+    """
+
+    def setUp(self):
+        self.task = MockTask()
+        transition_registry.clear()
+
+    def tearDown(self):
+        """Clean up after tests"""
+        transition_registry.clear()
+
+    def test_pydantic_validation_errors(self):
+        """Test Pydantic field validation errors"""
+
+        class StrictValidationTransition(BaseTransition):
+            required_field: str = Field(..., description='Required field')
+            email_field: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$', description='Valid email')
+            number_field: int = Field(..., ge=1, le=100, description='Number between 1-100')
+
+            @property
+            def target_state(self) -> str:
+                return 'VALIDATED'
+
+            @classmethod
+            def get_target_state(cls) -> str:
+                return 'VALIDATED'
+
+            @classmethod
+            def can_transition_from_state(cls, context: TransitionContext) -> bool:
+                return True
+
+            def transition(self, context: TransitionContext) -> Dict[str, Any]:
+                return {'validated': True}
+
+        # Test missing required field
+        with pytest.raises(ValidationError):
+            StrictValidationTransition(email_field='test@example.com', number_field=50)
+
+        # Test invalid email
+        with pytest.raises(ValidationError):
+            StrictValidationTransition(required_field='test', email_field='invalid-email', number_field=50)
+
+        # Test number out of range
+        with pytest.raises(ValidationError):
+            StrictValidationTransition(required_field='test', email_field='test@example.com', number_field=150)
+
+        # Test valid data
+        valid_transition = StrictValidationTransition(
+            required_field='test', email_field='user@example.com', number_field=75
+        )
+        assert valid_transition.required_field == 'test'
+
+    def test_business_logic_validation_errors(self):
+        """Test business logic validation with detailed error context"""
+
+        class BusinessRuleTransition(BaseTransition):
+            amount: float = Field(..., description='Transaction amount')
+            currency: str = Field('USD', description='Currency code')
+
+            @property
+            def target_state(self) -> str:
+                return 'PROCESSED'
+
+            def validate_transition(self, context: TransitionContext) -> bool:
+                # Complex business rule validation
+                errors = []
+
+                if self.amount <= 0:
+                    errors.append('Amount must be positive')
+
+                if self.amount > 10000 and context.current_user is None:
+                    errors.append('Large amounts require authenticated user')
+
+                if self.currency not in ['USD', 'EUR', 'GBP']:
+                    errors.append(f'Unsupported currency: {self.currency}')
+
+                if context.current_state == 'CANCELLED':
+                    errors.append('Cannot process cancelled transactions')
+
+                if errors:
+                    raise TransitionValidationError(
+                        f"Validation failed: {'; '.join(errors)}",
+                        {
+                            'validation_errors': errors,
+                            'amount': self.amount,
+                            'currency': self.currency,
+                            'current_state': context.current_state,
+                        },
+                    )
+
+                return True
+
+            def transition(self, context: TransitionContext) -> Dict[str, Any]:
+                return {'amount': self.amount, 'currency': self.currency}
+
+        context = TransitionContext(entity=self.task, current_state='PENDING', target_state='PROCESSED')
+
+        # Test negative amount
+        negative_transition = BusinessRuleTransition(amount=-100)
+        with pytest.raises(TransitionValidationError) as cm:
+            negative_transition.validate_transition(context)
+
+        error = cm.value
+        assert 'Amount must be positive' in str(error)
+        assert 'validation_errors' in error.context
+
+        # Test large amount without user
+        large_transition = BusinessRuleTransition(amount=15000)
+        with pytest.raises(TransitionValidationError) as cm:
+            large_transition.validate_transition(context)
+
+        assert 'Large amounts require authenticated user' in str(cm.value)
+
+        # Test invalid currency
+        invalid_currency_transition = BusinessRuleTransition(amount=100, currency='XYZ')
+        with pytest.raises(TransitionValidationError) as cm:
+            invalid_currency_transition.validate_transition(context)
+
+        assert 'Unsupported currency' in str(cm.value)
+
+        # Test multiple errors
+        multi_error_transition = BusinessRuleTransition(amount=-50, currency='XYZ')
+        with pytest.raises(TransitionValidationError) as cm:
+            multi_error_transition.validate_transition(context)
+
+        error_msg = str(cm.value)
+        assert 'Amount must be positive' in error_msg
+        assert 'Unsupported currency' in error_msg
+
+
+# Pytest-style tests for compatibility
+@pytest.fixture
+def task():
+    """Pytest fixture for mock task"""
+    return MockTask()
+
+
+@pytest.fixture
+def user():
+    """Pytest fixture for mock user"""
+    user = Mock()
+    user.id = 1
+    user.username = 'testuser'
+    return user
+
+
+def test_transition_context_properties(task, user):
+    """Test TransitionContext properties using pytest"""
+    context = TransitionContext(entity=task, current_user=user, current_state='CREATED', target_state='IN_PROGRESS')
+
+    assert context.has_current_state
+    assert not context.is_initial_transition
+    assert context.current_state == 'CREATED'
+    assert context.target_state == 'IN_PROGRESS'
+
+
+def test_pydantic_validation():
+    """Test Pydantic validation in transitions"""
+
+    class SampleTransition(BaseTransition):
+        test_field: str
+        optional_field: int = 42
+
+        @property
+        def target_state(self) -> str:
+            return 'TEST_STATE'
+
+        def transition(self, context: TransitionContext) -> dict:
+            return {'test_field': self.test_field}
+
+    # Valid data
+    transition = SampleTransition(test_field='valid')
+    assert transition.test_field == 'valid'
+    assert transition.optional_field == 42
+
+    # Invalid data should raise validation error
+    with pytest.raises(ValidationError):  # Pydantic validation error
+        SampleTransition()  # Missing required field

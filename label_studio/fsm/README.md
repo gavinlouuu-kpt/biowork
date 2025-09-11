@@ -139,7 +139,7 @@ from fsm.state_manager import get_state_manager
 StateManager = get_state_manager()
 
 # Get current state
-current_state = StateManager.get_current_state(order)
+current_state = StateManager.get_current_state_value(order)
 
 # Get state history
 history = StateManager.get_state_history(order, limit=10)

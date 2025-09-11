@@ -6,8 +6,19 @@ Tests the uuid-utils library integration and UUID7 functionality.
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock, patch
 
+# Additional imports for transition_utils coverage tests
+import pytest
 from django.test import TestCase
+from fsm.registry import transition_registry
+from fsm.transition_utils import (
+    create_transition_from_dict,
+    get_available_transitions,
+    get_entity_state_flow,
+    validate_transition_data,
+)
+from fsm.transitions import BaseTransition, TransitionValidationError
 from fsm.utils import (
     UUID7Generator,
     generate_uuid7,
@@ -16,6 +27,7 @@ from fsm.utils import (
     uuid7_time_range,
     validate_uuid7,
 )
+from pydantic import Field
 
 
 class TestUUID7Utils(TestCase):
@@ -169,3 +181,190 @@ class TestUUID7Generator(TestCase):
         # Should be monotonic even with same timestamp
         assert uuid1.int < uuid2.int
         assert uuid2.int < uuid3.int
+
+
+class MockEntity:
+    """Mock entity for testing"""
+
+    def __init__(self, pk=1):
+        self.pk = pk
+        self.id = pk
+        self._meta = Mock()
+        self._meta.model_name = 'testentity'
+        self._meta.label_lower = 'tests.testentity'
+        self.organization_id = 1
+
+
+class TransitionUtilsTests(TestCase):
+    """Tests for transition_utils module edge cases and error handling"""
+
+    def setUp(self):
+        # Clear registries to ensure clean state
+        from fsm.registry import state_choices_registry, state_model_registry
+
+        state_choices_registry.clear()
+        state_model_registry.clear()
+        transition_registry.clear()
+
+        self.entity = MockEntity()
+
+    def test_transition_utils_unexpected_validation_error(self):
+        """Test unexpected error during transition validation in get_available_transitions"""
+
+        class BrokenTransition(BaseTransition):
+            """Transition that raises unexpected error"""
+
+            @property
+            def target_state(self) -> str:
+                return 'BROKEN'
+
+            def transition(self, context):
+                return {}
+
+            @classmethod
+            def can_transition_from_state(cls, context):
+                # Raise unexpected error
+                raise RuntimeError('Unexpected validation error')
+
+        # Register the broken transition
+        transition_registry.register('testentity', 'broken_transition', BrokenTransition)
+
+        # Should handle the error gracefully and log warning
+        with patch('fsm.transition_utils.logger') as mock_logger:
+            result = get_available_transitions(self.entity, validate=True)
+            # Should not include the broken transition
+            assert 'broken_transition' not in result
+            # Should have logged the warning
+            mock_logger.warning.assert_called_once()
+            assert 'Unexpected error validating transition' in mock_logger.warning.call_args[0][0]
+
+    def test_transition_utils_validation_error_handling(self):
+        """Test TransitionValidationError handling in get_available_transitions"""
+
+        class ValidatingTransition(BaseTransition):
+            """Transition that raises validation error"""
+
+            @property
+            def target_state(self) -> str:
+                return 'VALIDATED'
+
+            def transition(self, context):
+                return {}
+
+            @classmethod
+            def can_transition_from_state(cls, context):
+                raise TransitionValidationError('Not allowed from this state')
+
+        transition_registry.register('testentity', 'validating_transition', ValidatingTransition)
+
+        # Should exclude invalid transitions without logging
+        import logging
+
+        mock_logger = Mock()
+        with patch.object(logging, 'getLogger', return_value=mock_logger):
+            result = get_available_transitions(self.entity, validate=True)
+            assert 'validating_transition' not in result
+            # Should not log for expected validation errors
+            mock_logger.warning.assert_not_called()
+
+    def test_transition_utils_create_from_dict_error(self):
+        """Test create_transition_from_dict error handling"""
+
+        class StrictTransition(BaseTransition):
+            """Transition with strict validation"""
+
+            required_field: str = Field(...)
+
+            @property
+            def target_state(self) -> str:
+                return 'STRICT'
+
+            def transition(self, context):
+                return {'required_field': self.required_field}
+
+        # Should raise ValueError with helpful message
+        with pytest.raises(ValueError) as exc_info:
+            create_transition_from_dict(StrictTransition, {})
+
+        assert 'Failed to create StrictTransition' in str(exc_info.value)
+
+    def test_transition_utils_validate_transition_data_errors(self):
+        """Test validate_transition_data with various error cases"""
+
+        class ValidationTransition(BaseTransition):
+            """Transition with various field types"""
+
+            required_field: str = Field(...)
+            number_field: int = Field(default=0, ge=0)
+
+            @property
+            def target_state(self) -> str:
+                return 'VALIDATED'
+
+            def transition(self, context):
+                return {'required_field': self.required_field, 'number_field': self.number_field}
+
+        # Test with missing required field
+        errors = validate_transition_data(ValidationTransition, {})
+        assert 'required_field' in errors
+        assert any('required' in msg.lower() or 'missing' in msg.lower() for msg in errors['required_field'])
+
+        # Test with invalid type
+        errors = validate_transition_data(
+            ValidationTransition, {'required_field': 123, 'number_field': 'not_a_number'}
+        )
+        # Either required_field or number_field should have type error
+        assert len(errors) > 0
+
+        # Test with validation constraint violation
+        errors = validate_transition_data(ValidationTransition, {'required_field': 'test', 'number_field': -1})
+        assert 'number_field' in errors
+
+        # Test valid data returns empty dict
+        errors = validate_transition_data(ValidationTransition, {'required_field': 'test', 'number_field': 5})
+        assert errors == {}
+
+    def test_transition_utils_validate_with_non_pydantic_error(self):
+        """Test validate_transition_data with non-Pydantic errors"""
+
+        class CustomErrorTransition(BaseTransition):
+            """Transition that raises custom error in __init__"""
+
+            @property
+            def target_state(self) -> str:
+                return 'ERROR'
+
+            def transition(self, context):
+                return {}
+
+            def __init__(self, **data):
+                # Raise a non-ValidationError
+                if 'trigger_error' in data:
+                    raise RuntimeError('Custom initialization error')
+                super().__init__(**data)
+
+        errors = validate_transition_data(CustomErrorTransition, {'trigger_error': True})
+        assert '__root__' in errors
+        assert 'Custom initialization error' in errors['__root__'][0]
+
+    def test_transition_utils_entity_state_flow_errors(self):
+        """Test get_entity_state_flow with transitions that can't be instantiated"""
+
+        class RequiredFieldTransition(BaseTransition):
+            """Transition requiring fields to instantiate"""
+
+            required_field: str = Field(...)
+
+            @property
+            def target_state(self) -> str:
+                return 'REQUIRED'
+
+            def transition(self, context):
+                return {'required_field': self.required_field}
+
+        transition_registry.register('testentity', 'required_transition', RequiredFieldTransition)
+
+        # Should skip transitions that can't be instantiated
+        flows = get_entity_state_flow(self.entity)
+        # Should not include the transition that requires fields
+        assert not any(f['transition_name'] == 'required_transition' for f in flows)

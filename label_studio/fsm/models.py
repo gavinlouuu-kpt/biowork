@@ -8,6 +8,8 @@ from typing import Any, Dict, Optional
 from django.conf import settings
 from django.db import models
 from django.db.models import QuerySet, UUIDField
+from fsm.registry import register_state_model
+from fsm.state_choices import AnnotationStateChoices, ProjectStateChoices, TaskStateChoices
 from fsm.utils import UUID7Field, generate_uuid7, timestamp_from_uuid7
 
 
@@ -130,8 +132,14 @@ class BaseState(models.Model):
 
     @classmethod
     def get_current_state_value(cls, entity) -> Optional[str]:
-        """Get current state value as string"""
-        current_state = cls.get_current_state(entity)
+        """
+        Get current state value as string using UUID7 natural ordering.
+
+        Uses UUID7's natural time ordering to efficiently find the latest state
+        without requiring created_at indexes or complex queries.
+        """
+        entity_field = f'{cls._get_entity_field_name()}'
+        current_state = cls.objects.filter(**{entity_field: entity}).order_by('-id').first()
         return current_state.state if current_state else None
 
     @classmethod
@@ -194,3 +202,148 @@ class BaseState(models.Model):
         if model_name.endswith('State'):
             return model_name[:-5].lower()
         return 'entity'
+
+
+# Core state models for basic Label Studio entities
+
+
+@register_state_model('task')
+class TaskState(BaseState):
+    """
+    Core task state tracking for Label Studio.
+    Provides basic task state management with:
+    - Simple 3-state workflow (CREATED → IN_PROGRESS → COMPLETED)
+    - High-performance queries with UUID7 ordering
+    """
+
+    # Entity Relationship
+    task = models.ForeignKey('tasks.Task', related_name='fsm_states', on_delete=models.CASCADE)
+
+    # Override state field to add choices constraint
+    state = models.CharField(max_length=50, choices=TaskStateChoices.choices, db_index=True)
+
+    project_id = models.PositiveIntegerField(
+        db_index=True, help_text='From task.project_id - denormalized for performance'
+    )
+
+    class Meta:
+        app_label = 'fsm'
+        indexes = [
+            # Critical: Latest state lookup (current state determined by latest UUID7 id)
+            # Index with DESC order explicitly supports ORDER BY id DESC queries
+            models.Index(fields=['task_id', '-id'], name='task_current_state_idx'),
+            # Reporting and filtering
+            models.Index(fields=['project_id', 'state', '-id'], name='task_project_state_idx'),
+            models.Index(fields=['organization_id', 'state', '-id'], name='task_org_reporting_idx'),
+            # History queries
+            models.Index(fields=['task_id', 'id'], name='task_history_idx'),
+        ]
+        # No constraints needed - INSERT-only approach
+        ordering = ['-id']
+
+    @classmethod
+    def get_denormalized_fields(cls, entity):
+        """Get denormalized fields for TaskState creation"""
+        return {
+            'project_id': entity.project_id,
+        }
+
+    @property
+    def is_terminal_state(self) -> bool:
+        """Check if this is a terminal task state"""
+        return self.state == TaskStateChoices.COMPLETED
+
+
+@register_state_model('annotation')
+class AnnotationState(BaseState):
+    """
+    Core annotation state tracking for Label Studio.
+    Provides basic annotation state management with:
+    - Simple 3-state workflow (DRAFT → SUBMITTED → COMPLETED)
+    """
+
+    # Entity Relationship
+    annotation = models.ForeignKey('tasks.Annotation', on_delete=models.CASCADE, related_name='fsm_states')
+
+    # Override state field to add choices constraint
+    state = models.CharField(max_length=50, choices=AnnotationStateChoices.choices, db_index=True)
+
+    # Denormalized fields for performance (avoid JOINs in common queries)
+    task_id = models.PositiveIntegerField(
+        db_index=True, help_text='From annotation.task_id - denormalized for performance'
+    )
+    project_id = models.PositiveIntegerField(
+        db_index=True, help_text='From annotation.task.project_id - denormalized for performance'
+    )
+    completed_by_id = models.PositiveIntegerField(
+        null=True, db_index=True, help_text='From annotation.completed_by_id - denormalized for performance'
+    )
+
+    class Meta:
+        app_label = 'fsm'
+        indexes = [
+            # Critical: Latest state lookup
+            models.Index(fields=['annotation_id', '-id'], name='anno_current_state_idx'),
+            # Filtering and reporting
+            models.Index(fields=['task_id', 'state', '-id'], name='anno_task_state_idx'),
+            models.Index(fields=['completed_by_id', 'state', '-id'], name='anno_user_report_idx'),
+            models.Index(fields=['project_id', 'state', '-id'], name='anno_project_report_idx'),
+        ]
+        ordering = ['-id']
+
+    @classmethod
+    def get_denormalized_fields(cls, entity):
+        """Get denormalized fields for AnnotationState creation"""
+        return {
+            'task_id': entity.task.id,
+            'project_id': entity.task.project_id,
+            'completed_by_id': entity.completed_by_id if entity.completed_by_id else None,
+        }
+
+    @property
+    def is_terminal_state(self) -> bool:
+        """Check if this is a terminal annotation state"""
+        return self.state == AnnotationStateChoices.COMPLETED
+
+
+@register_state_model('project')
+class ProjectState(BaseState):
+    """
+    Core project state tracking for Label Studio.
+    Provides basic project state management with:
+    - Simple 3-state workflow (CREATED → IN_PROGRESS → COMPLETED)
+    - Project lifecycle tracking
+    """
+
+    # Entity Relationship
+    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, related_name='fsm_states')
+
+    # Override state field to add choices constraint
+    state = models.CharField(max_length=50, choices=ProjectStateChoices.choices, db_index=True)
+
+    created_by_id = models.PositiveIntegerField(
+        null=True, db_index=True, help_text='From project.created_by_id - denormalized for performance'
+    )
+
+    class Meta:
+        app_label = 'fsm'
+        indexes = [
+            # Critical: Latest state lookup
+            models.Index(fields=['project_id', '-id'], name='project_current_state_idx'),
+            # Filtering and reporting
+            models.Index(fields=['organization_id', 'state', '-id'], name='project_org_state_idx'),
+            models.Index(fields=['organization_id', '-id'], name='project_org_reporting_idx'),
+        ]
+        ordering = ['-id']
+
+    @classmethod
+    def get_denormalized_fields(cls, entity):
+        """Get denormalized fields for ProjectState creation"""
+        return {
+            'created_by_id': entity.created_by_id if entity.created_by_id else None,
+        }
+
+    @property
+    def is_terminal_state(self) -> bool:
+        """Check if this is a terminal project state"""
+        return self.state == ProjectStateChoices.COMPLETED

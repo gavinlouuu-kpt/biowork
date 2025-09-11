@@ -59,7 +59,7 @@ class StateManager:
         return f'{cls.CACHE_PREFIX}:{entity._meta.label_lower}:{entity.pk}'
 
     @classmethod
-    def get_current_state(cls, entity: Model) -> Optional[str]:
+    def get_current_state_value(cls, entity: Model) -> Optional[str]:
         """
         Get current state with basic caching.
 
@@ -73,7 +73,7 @@ class StateManager:
 
         Example:
             task = Task.objects.get(id=123)
-            current_state = StateManager.get_current_state(task)
+            current_state = StateManager.get_current_state_value(task)
             if current_state == 'COMPLETED':
                 # Task is finished
                 pass
@@ -100,7 +100,7 @@ class StateManager:
             raise StateManagerError(f'No state model found for {entity._meta.model_name} when getting current state')
 
         try:
-            current_state = state_model.get_current_state(entity)
+            current_state = state_model.get_current_state_value(entity)
 
             # Cache result
             if current_state is not None:
@@ -127,7 +127,7 @@ class StateManager:
                 },
                 exc_info=True,
             )
-            return None
+            raise StateManagerError(f'Error getting current state: {e}') from e
 
     @classmethod
     def get_current_state_object(cls, entity: Model) -> BaseState:
@@ -198,7 +198,7 @@ class StateManager:
         if not state_model:
             raise StateManagerError(f'No state model found for {entity._meta.model_name} when transitioning state')
 
-        current_state = cls.get_current_state(entity)
+        current_state = cls.get_current_state_value(entity)
 
         try:
             with transaction.atomic():
@@ -373,7 +373,7 @@ class StateManager:
             if organization_id is None:
                 if hasattr(entity, 'organization_id'):
                     organization_id = entity.organization_id
-            current_state = cls.get_current_state(entity)
+            current_state = cls.get_current_state_value(entity)
             if current_state:
                 cache_key = cls.get_cache_key(entity)
                 cache_updates[cache_key] = current_state
