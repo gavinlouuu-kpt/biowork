@@ -549,7 +549,12 @@ const HtxVectorView = observer(({ item, suggestion }) => {
         opacity={Number.parseFloat(item.control?.opacity || "1")}
         pixelSnapping={item.control?.snap === "pixel"}
         constrainToBounds={item.control?.constrainToBounds ?? true}
-        disabled={(!item.selected && !item.isDrawing) || suggestion || store.annotationStore.selected.isLinkingMode}
+        disabled={
+          item.isReadOnly() ||
+          (!item.selected && !item.isDrawing) ||
+          suggestion ||
+          store.annotationStore.selected.isLinkingMode
+        }
         // Point styling - customize point appearance based on control settings
         pointRadius={item.pointRadiusFromSize}
         pointFill={item.selected ? "#ffffff" : "#f8fafc"}
