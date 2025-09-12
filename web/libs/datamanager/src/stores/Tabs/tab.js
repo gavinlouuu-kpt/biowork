@@ -46,6 +46,7 @@ export const Tab = types
     deletable: true,
     semantic_search: types.optional(types.array(CustomJSON), []),
     threshold: types.optional(types.maybeNull(ThresholdType), null),
+    agreement_selected: types.optional(CustomJSON, {}),
   })
   .volatile(() => {
     const defaultWidth = getComputedStyle(document.body)
@@ -226,6 +227,7 @@ export const Tab = types
         gridFitImagesToWidth: self.gridFitImagesToWidth,
         semantic_search: self.semantic_search?.toJSON() ?? [],
         threshold: self.threshold?.toJSON(),
+        agreement_selected: self.agreement_selected,
       };
 
       if (self.saved || apiVersion === 1) {
@@ -418,6 +420,14 @@ export const Tab = types
       self.save();
     },
 
+    setAgreementFilters({ ground_truth = false, annotators = [], models = [] }) {
+      self.agreement_selected = {
+        ground_truth,
+        annotators,
+        models,
+      };
+    },
+
     reload: flow(function* ({ interaction } = {}) {
       if (self.saved) {
         yield self.dataStore.reload({ id: self.id, interaction });
@@ -524,7 +534,7 @@ export const Tab = types
   .preProcessSnapshot((snapshot) => {
     if (snapshot === null) return snapshot;
 
-    const { filters, ...sn } = snapshot ?? {};
+    const { filters, agreement_selected, ...sn } = snapshot ?? {};
 
     if (filters && !Array.isArray(filters)) {
       const { conjunction, items } = filters ?? {};
@@ -537,6 +547,12 @@ export const Tab = types
       sn.filters = filters;
     }
 
+    if (agreement_selected) {
+      Object.assign(sn, {
+        agreement_selected:
+          typeof agreement_selected === "string" ? JSON.parse(agreement_selected) : agreement_selected,
+      });
+    }
     delete sn.selectedItems;
 
     return sn;
