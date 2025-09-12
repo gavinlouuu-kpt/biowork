@@ -619,7 +619,6 @@ def set_convert_background_failure(job, connection, type, value, traceback_obj):
     ConvertedFormat.objects.filter(id=convert_id).update(status=Export.Status.FAILED, traceback=trace)
 
 
-@method_decorator(name='get', decorator=extend_schema(exclude=True))
 @method_decorator(
     name='post',
     decorator=extend_schema(
@@ -659,7 +658,7 @@ def set_convert_background_failure(job, connection, type, value, traceback_obj):
         },
     ),
 )
-class ExportConvertAPI(generics.RetrieveAPIView):
+class ExportConvertAPI(generics.CreateAPIView):
     queryset = Export.objects.all()
     lookup_url_kwarg = 'export_pk'
     permission_required = all_permissions.projects_change
