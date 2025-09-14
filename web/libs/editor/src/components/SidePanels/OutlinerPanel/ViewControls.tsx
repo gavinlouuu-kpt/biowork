@@ -8,9 +8,10 @@ import {
   IconPredictions,
   IconSortDown,
   IconSortUp,
+  IconTimelineRegion,
 } from "@humansignal/icons";
 import { Button } from "@humansignal/ui";
-import { type FC, useCallback, useContext, useMemo } from "react";
+import { type FC, useCallback, useContext, useEffect, useMemo } from "react";
 import { Dropdown } from "../../../common/Dropdown/Dropdown";
 // eslint-disable-next-line
 // @ts-ignore
@@ -25,7 +26,7 @@ const { Block, Elem } = BemWithSpecifiContext();
 
 export type GroupingOptions = "manual" | "label" | "type";
 
-export type OrderingOptions = "score" | "date";
+export type OrderingOptions = "score" | "date" | "mediaStartTime";
 
 export type OrderingDirection = "asc" | "desc";
 
@@ -42,6 +43,37 @@ export const ViewControls: FC<ViewControlsProps> = observer(
   ({ ordering, regions, orderingDirection, onOrderingChange, onGroupingChange, onFilterChange }) => {
     const grouping = regions.group;
     const context = useContext(SidePanelsContext);
+
+    // Check if any regions have media time information
+    const hasMediaTimeRegions = useMemo(() => {
+      return (
+        regions.filteredRegions?.some((region) => {
+          // Check for audio regions
+          if (
+            (region.type === "audioregion" || region.type === "timeseriesregion") &&
+            typeof region.start === "number"
+          ) {
+            return true;
+          }
+          // Check for timeline regions (video)
+          if (region.type === "timelineregion" && region.ranges && region.ranges.length > 0) {
+            const firstRange = region.ranges[0];
+            if (firstRange && typeof firstRange.start === "number") {
+              return true;
+            }
+          }
+          return false;
+        }) ?? false
+      );
+    }, [regions.filteredRegions]);
+
+    // Auto-fallback to "date" if current ordering is "mediaStartTime" but no media regions exist
+    useEffect(() => {
+      if (ordering === "mediaStartTime" && !hasMediaTimeRegions) {
+        onOrderingChange("date");
+      }
+    }, [ordering, hasMediaTimeRegions, onOrderingChange]);
+
     const getGroupingLabels = useCallback((value: GroupingOptions): LabelInfo => {
       switch (value) {
         case "manual":
@@ -102,6 +134,16 @@ export const ViewControls: FC<ViewControlsProps> = observer(
             selectedLabel: "By Score",
             icon: <IconPredictions width={16} height={16} />,
           };
+        case "mediaStartTime":
+          return {
+            label: (
+              <>
+                <IconTimelineRegion /> Order by Media Start Time
+              </>
+            ),
+            selectedLabel: "By Media Start Time",
+            icon: <IconTimelineRegion width={16} height={16} />,
+          };
       }
     }, []);
 
@@ -120,11 +162,12 @@ export const ViewControls: FC<ViewControlsProps> = observer(
             <Grouping
               value={ordering}
               direction={orderingDirection}
-              options={["score", "date"]}
+              options={hasMediaTimeRegions ? ["score", "date", "mediaStartTime"] : ["score", "date"]}
               onChange={(value) => onOrderingChange(value)}
               readableValueForKey={getOrderingLabels}
               allowClickSelected
               extraIcon={renderOrderingDirectionIcon}
+              width={230}
             />
           </Elem>
         )}
@@ -149,6 +192,7 @@ interface GroupingProps<T extends string> {
   onChange: (value: T) => void;
   readableValueForKey: (value: T) => LabelInfo;
   extraIcon?: JSX.Element;
+  width?: number;
 }
 
 const Grouping = <T extends string>({
@@ -159,6 +203,7 @@ const Grouping = <T extends string>({
   onChange,
   readableValueForKey,
   extraIcon,
+  width = 200,
 }: GroupingProps<T>) => {
   const readableValue = useMemo(() => {
     return readableValueForKey(value);
@@ -173,8 +218,8 @@ const Grouping = <T extends string>({
       <Menu
         size="medium"
         style={{
-          width: 200,
-          minWidth: 200,
+          width,
+          minWidth: width,
           borderRadius: isFF(FF_DEV_3873) && 4,
         }}
         selectedKeys={[value]}
@@ -195,7 +240,7 @@ const Grouping = <T extends string>({
   }, [value, optionsList, readableValue, direction, onChange]);
 
   return (
-    <Dropdown.Trigger content={dropdownContent} style={{ width: 200 }}>
+    <Dropdown.Trigger content={dropdownContent} style={{ width }}>
       <Button
         variant="neutral"
         size="smaller"
