@@ -32,9 +32,6 @@ import {
 } from "../../utils/feature-flags";
 import { Pagination } from "../../common/Pagination/Pagination";
 import { Image } from "./Image";
-import { isHoveringNonTransparentPixel } from "../../regions/BitmaskRegion/utils";
-import { ff } from "@humansignal/core";
-import { FF_BITMASK } from "@humansignal/core/lib/utils/feature-flags";
 
 Konva.showWarnings = false;
 
@@ -42,6 +39,8 @@ const hotkeys = Hotkey("Image");
 const imgDefaultProps = {};
 
 if (isFF(FF_LSDV_4711)) imgDefaultProps.crossOrigin = "anonymous";
+
+const LEFT_BUTTON = 1;
 
 const splitRegions = (regions) => {
   const brushRegions = [];
@@ -548,6 +547,7 @@ export default observer(
     skipNextClick = false;
     skipNextMouseUp = false;
     mouseDownPoint = null;
+    mouseDown = false;
 
     constructor(props) {
       super(props);
@@ -587,29 +587,26 @@ export default observer(
       // entire stage with a single image that is not click-through, and there is no particular
       // shape we can click on. Here we're relying on cursor position and non-transparent pixels
       // of the mask to detect cursor-region collision.
-      if (ff.isActive(FF_BITMASK)) {
-        const hasSelected = item.selectedRegions.some((r) => r.type === "bitmaskregion");
-        const isBitmask = ["BitmaskTool", "BitmaskEraserTool"].includes(
-          item.getToolsManager().findSelectedTool().toolName,
-        );
+      const allowedHoverTypes = /bitmask|vector/i;
+      const hasSelected = item.selectedRegions.some((r) => r.type.match(allowedHoverTypes) !== null);
+      const isAllowedTool =
+        item.getToolsManager().findSelectedTool()?.toolName?.match?.(allowedHoverTypes) !== null ?? false;
 
-        // We want to avoid weird behavior here with drawing while selecting another region
-        // so we just do nothing when clicked outside AND we have a tool selected
-        if (hasSelected && isBitmask) {
-          return;
-        }
+      // We want to avoid weird behavior here with drawing while selecting another region
+      // so we just do nothing when clicked outside AND we have a tool selected
+      if (hasSelected && isAllowedTool) {
+        return;
+      }
 
-        const hoveredRegion = item.regs.find((reg) => {
-          if (reg.type !== "bitmaskregion") return false;
-          if (reg.selected) return false;
+      const hoveredRegion = item.regs.find((reg) => {
+        if (reg.selected) return false;
 
-          return isHoveringNonTransparentPixel(reg);
-        });
+        return reg.isHovered?.() ?? false;
+      });
 
-        if (hoveredRegion) {
-          hoveredRegion.onClickRegion(e);
-          return;
-        }
+      if (hoveredRegion) {
+        hoveredRegion.onClickRegion(e);
+        return;
       }
       return item.event("click", evt, x, y);
     };
@@ -829,25 +826,30 @@ export default observer(
         item.event("mousemove", e, e.evt.offsetX, e.evt.offsetY);
       }
 
-      // Handle Bitmask hover
-      // We can only do it here due to Bitmask implementation. See `self.handleOnClick` method
-      // for a full explanation.
-      if (!e.evt.ctrlKey && !e.evt.shiftKey && ff.isActive(FF_BITMASK)) {
+      if (!e.evt.ctrlKey && !e.evt.shiftKey && !e.evt.button === LEFT_BUTTON) {
+        const allowedTypes = /bitmask|vector/;
+        const tool = item.getToolsManager().findSelectedTool();
+
         if (item.regs.some((r) => r.isDrawing)) return;
-        if (!item.regs.some((r) => r.type === "bitmaskregion")) return;
+        if (!item.regs.some((r) => r.type.match(allowedTypes) !== null)) return;
+
         requestAnimationFrame(() => {
+          tool?.enable();
+
           for (const region of item.regs) {
             region.setHighlight(false);
             region.updateCursor(false);
           }
+
           for (const region of item.regs) {
-            if (region.type !== "bitmaskregion") continue;
+            if (region.type.match(allowedTypes) === null) continue;
 
             const checkHover = !region.selected && !region.isDrawing;
-            const hovered = checkHover && isHoveringNonTransparentPixel(region);
+            const hovered = (checkHover && region.isHovered?.()) ?? false;
 
             if (hovered) {
               // region.setHighlight(true);
+              tool?.disable();
               region.updateCursor(true);
               break;
             }
@@ -1432,7 +1434,7 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
 
   return (
     <>
-      {ff.isActive(ff.FF_BITMASK) && <ImageLayer item={item} />}
+      <ImageLayer item={item} />
       {item.grid && item.sizeUpdated && <ImageGrid item={item} />}
 
       {isFF(FF_LSDV_4930) ? <TransformerBack item={item} /> : null}
@@ -1456,7 +1458,7 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
       })}
       <Selection item={item} isPanning={state.isPanning} />
       <DrawingRegion item={item} />
-      {ff.isActive(ff.FF_BITMASK) && item.smoothing === false && <PixelGridLayer item={item} />}
+      {item.smoothing === false && <PixelGridLayer item={item} />}
 
       {item.crosshair && (
         <Crosshair

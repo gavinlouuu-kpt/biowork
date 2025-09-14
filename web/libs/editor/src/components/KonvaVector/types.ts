@@ -92,6 +92,8 @@ export interface KonvaVectorRef {
     right: number;
     bottom: number;
   };
+  // Hit testing method
+  isPointOverShape: (x: number, y: number, hitRadius?: number) => boolean;
 }
 
 /**

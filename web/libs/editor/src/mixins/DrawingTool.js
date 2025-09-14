@@ -205,7 +205,13 @@ const DrawingTool = types
       },
 
       canStartDrawing() {
-        return !self.isIncorrectControl() && !self.isIncorrectLabel() && self.canStart() && !self.annotation.isDrawing;
+        return (
+          !self.disabled &&
+          !self.isIncorrectControl() &&
+          !self.isIncorrectLabel() &&
+          self.canStart() &&
+          !self.annotation.isDrawing
+        );
       },
 
       startDrawing(x, y) {

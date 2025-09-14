@@ -273,7 +273,7 @@
 
   "tool:vector": {
     "key": "P",
-    "description": "Select the polygon annotation tool"
+    "description": "Select the vector annotation tool"
   },
 
   "tool:rect": {

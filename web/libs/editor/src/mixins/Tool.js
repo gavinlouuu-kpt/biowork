@@ -8,6 +8,7 @@ const ToolMixin = types
     selected: types.optional(types.boolean, false),
     group: types.optional(types.string, "default"),
     shortcut: types.optional(types.maybeNull(types.string), null),
+    disabled: false,
   })
   .views((self) => ({
     get obj() {
@@ -108,6 +109,14 @@ const ToolMixin = types
       const hasSelection = self.control.annotation.hasSelection;
 
       return !!isCtrlPressed && !hasSelection;
+    },
+
+    disable() {
+      self.disabled = true;
+    },
+
+    enable() {
+      self.disabled = false;
     },
   }));
 
