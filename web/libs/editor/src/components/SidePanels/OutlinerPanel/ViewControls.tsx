@@ -211,7 +211,7 @@ const Grouping = <T extends string>({
 
   const optionsList: [T, LabelInfo][] = useMemo(() => {
     return options.map((key) => [key, readableValueForKey(key)]);
-  }, []);
+  }, [options, readableValueForKey]);
 
   const dropdownContent = useMemo(() => {
     return (
