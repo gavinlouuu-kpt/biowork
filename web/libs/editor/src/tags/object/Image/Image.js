@@ -690,6 +690,17 @@ const Model = types
 
           return skipInteractions || isPanning;
         },
+        get smoothingEnabled() {
+          const names = self.annotation?.names;
+
+          if (!names) return self.smoothing;
+
+          const hasBitmask = Array.from(names.values()).some(({ type }) => {
+            return type.includes("bitmask");
+          });
+          if (hasBitmask) return false;
+          return self.smoothing;
+        },
       },
       actions: {
         setSkipInteractions(value) {

@@ -117,7 +117,7 @@ const DrawingRegion = observer(({ item }) => {
   const Wrapper = drawingRegion && isBrush ? Fragment : Layer;
 
   return (
-    <Wrapper imageSmoothingEnabled={item.smoothing}>
+    <Wrapper imageSmoothingEnabled={item.smoothingEnabled}>
       {drawingRegion ? <Region key={"drawing"} region={drawingRegion} /> : drawingRegion}
     </Wrapper>
   );
@@ -552,7 +552,8 @@ export default observer(
     constructor(props) {
       super(props);
 
-      if (typeof props.item.smoothing === "boolean") props.store.settings.setSmoothing(props.item.smoothing);
+      if (typeof props.item.smoothingEnabled === "boolean")
+        props.store.settings.setSmoothing(props.item.smoothingEnabled);
     }
 
     handleOnClick = (e) => {
@@ -1329,7 +1330,7 @@ const ImageLayer = observer(({ item }) => {
   }, [loadedImage, brightness, contrast]);
 
   return loadedImage ? (
-    <Layer imageSmoothingEnabled={item.smoothing} scale={{ x: item.stageZoom, y: item.stageZoom }}>
+    <Layer imageSmoothingEnabled={item.smoothingEnabled} scale={{ x: item.stageZoom, y: item.stageZoom }}>
       <KonvaImage ref={konvaImageRef} image={loadedImage} width={width} height={height} listening={false} />
     </Layer>
   ) : null;
@@ -1450,7 +1451,7 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
             regions={list}
             useLayers={useLayers}
             suggestion={isSuggestion}
-            smoothing={item.smoothing}
+            smoothing={item.smoothingEnabled}
           />
         ) : (
           <Fragment key={groupName} />
@@ -1458,7 +1459,7 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
       })}
       <Selection item={item} isPanning={state.isPanning} />
       <DrawingRegion item={item} />
-      {item.smoothing === false && <PixelGridLayer item={item} />}
+      {item.smoothingEnabled === false && <PixelGridLayer item={item} />}
 
       {item.crosshair && (
         <Crosshair
