@@ -25,8 +25,6 @@ from projects.models import Project
 from tasks.models import Task
 from users.models import User
 
-from label_studio.core.utils.params import get_env
-
 # if we haven't this package, pytest.ini::env doesn't work
 try:
     import pytest_env.plugin  # noqa: F401
@@ -736,32 +734,6 @@ def ff_back_dev_4664_remove_storage_file_on_export_delete_29032023_short_on():
         yield
 
 
-@pytest.fixture(name='fflag_feat_utc_46_session_timeout_policy_off')
-def fflag_feat_utc_46_session_timeout_policy_off():
-    from core.feature_flags import flag_set
-
-    def fake_flag_set(*args, **kwargs):
-        if args[0] == 'fflag_feat_utc_46_session_timeout_policy':
-            return False
-        return flag_set(*args, **kwargs)
-
-    with mock.patch('core.middleware.flag_set', wraps=fake_flag_set):
-        yield
-
-
-@pytest.fixture(name='fflag_feat_utc_46_session_timeout_policy_on')
-def fflag_feat_utc_46_session_timeout_policy_on():
-    from core.feature_flags import flag_set
-
-    def fake_flag_set(*args, **kwargs):
-        if args[0] == 'fflag_feat_utc_46_session_timeout_policy':
-            return True
-        return flag_set(*args, **kwargs)
-
-    with mock.patch('core.middleware.flag_set', wraps=fake_flag_set):
-        yield
-
-
 @pytest.fixture(name='local_files_storage')
 def local_files_storage(settings):
     settings.LOCAL_FILES_SERVING_ENABLED = True
@@ -783,14 +755,6 @@ def local_files_document_root_tempdir(settings):
 def local_files_document_root_subdir(settings):
     tempdir = Path(tempfile.gettempdir()) / Path('files')
     settings.LOCAL_FILES_DOCUMENT_ROOT = str(tempdir)
-
-
-@pytest.fixture(name='testing_session_timeouts')
-def set_testing_session_timeouts(settings):
-    settings.MAX_SESSION_AGE = int(get_env('MAX_SESSION_AGE', timedelta(seconds=6).total_seconds()))
-    settings.MAX_TIME_BETWEEN_ACTIVITY = int(
-        get_env('MAX_TIME_BETWEEN_ACTIVITY', timedelta(seconds=2).total_seconds())
-    )
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ pytestmark = pytest.mark.django_db
 from label_studio_sdk.client import LabelStudio
 
 
-def test_session_policy_sdk(django_live_url, business_client, fflag_feat_utc_46_session_timeout_policy_on):
+def test_session_policy_sdk(django_live_url, business_client):
     ls = LabelStudio(base_url=django_live_url, api_key=business_client.api_key)
 
     policy = ls.session_policy.get()
