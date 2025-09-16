@@ -397,9 +397,15 @@ class ProjectModelVersionExtendedSerializer(serializers.Serializer):
 
 
 class GetFieldsSerializer(serializers.Serializer):
-    include = serializers.CharField(required=False)
-    filter = serializers.CharField(required=False, default='all')
-    search = serializers.CharField(required=False, default=None)
+    include = serializers.CharField(required=False, help_text='Comma-separated list of fields to include')
+    filter = serializers.CharField(
+        required=False,
+        default='all',
+        help_text="Project filter setting. One of 'all', 'pinned_only', 'exclude_pinned'.",
+    )
+    search = serializers.CharField(
+        required=False, default=None, help_text='Search term for project title and description'
+    )
 
     def validate_include(self, value):
         if value is not None:
