@@ -44,35 +44,22 @@ export const ViewControls: FC<ViewControlsProps> = observer(
     const grouping = regions.group;
     const context = useContext(SidePanelsContext);
 
-    // Check if any regions have media time information
-    const hasMediaTimeRegions = useMemo(() => {
-      return (
-        regions.filteredRegions?.some((region) => {
-          // Check for audio regions
-          if (
-            (region.type === "audioregion" || region.type === "timeseriesregion") &&
-            typeof region.start === "number"
-          ) {
-            return true;
-          }
-          // Check for timeline regions (video)
-          if (region.type === "timelineregion" && region.ranges && region.ranges.length > 0) {
-            const firstRange = region.ranges[0];
-            if (firstRange && typeof firstRange.start === "number") {
-              return true;
-            }
-          }
-          return false;
-        }) ?? false
+    // Check labeling configuration for media-time-capable object tags
+    const mediaTimeSupport: boolean | null = useMemo(() => {
+      const names = regions.annotation?.names;
+      if (!names || names.size === 0) return null;
+      // Any object tag of type audio, video, or timeseries enables the option
+      return Array.from(names.values()).some(
+        (tag: any) => tag?.isObjectTag && ["audio", "video", "timeseries"].includes(tag.type),
       );
-    }, [regions.filteredRegions]);
+    }, [regions.annotation?.names]);
 
-    // Auto-fallback to "date" if current ordering is "mediaStartTime" but no media regions exist
+    // Auto-fallback to "date" if current ordering is "mediaStartTime" but no media-time support in config
     useEffect(() => {
-      if (ordering === "mediaStartTime" && !hasMediaTimeRegions) {
+      if (ordering === "mediaStartTime" && mediaTimeSupport === false) {
         onOrderingChange("date");
       }
-    }, [ordering, hasMediaTimeRegions, onOrderingChange]);
+    }, [ordering, mediaTimeSupport, onOrderingChange]);
 
     const getGroupingLabels = useCallback((value: GroupingOptions): LabelInfo => {
       switch (value) {
@@ -162,7 +149,7 @@ export const ViewControls: FC<ViewControlsProps> = observer(
             <Grouping
               value={ordering}
               direction={orderingDirection}
-              options={hasMediaTimeRegions ? ["score", "date", "mediaStartTime"] : ["score", "date"]}
+              options={mediaTimeSupport ? ["score", "date", "mediaStartTime"] : ["score", "date"]}
               onChange={(value) => onOrderingChange(value)}
               readableValueForKey={getOrderingLabels}
               allowClickSelected

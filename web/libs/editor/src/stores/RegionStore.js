@@ -136,12 +136,12 @@ export default types
   .model("RegionStore", {
     sort: types.optional(
       types.enumeration(["date", "score", "mediaStartTime"]),
-      window.localStorage.getItem(localStorageKeys.sort) ?? "date",
+      () => window.localStorage.getItem(localStorageKeys.sort) ?? "date",
     ),
 
     sortOrder: types.optional(
       types.enumeration(["asc", "desc"]),
-      window.localStorage.getItem(localStorageKeys.sortDirection) ?? "asc",
+      () => window.localStorage.getItem(localStorageKeys.sortDirection) ?? "asc",
     ),
 
     group: types.optional(
