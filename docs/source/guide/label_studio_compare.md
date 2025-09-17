@@ -87,6 +87,12 @@ Label Studio is available to everyone as open source software (Label Studio Comm
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
+    <td><b>Chat</b><br/><a href="/tags/chat.html">Generate and label conversation data. Interact live with an LLM of your choice.</a></td>
+    <td style="text-align:center">❌</td>
+    <td style="text-align:center">Limited</td>
+    <td style="text-align:center">✅</td>
+  </tr>
+  <tr>
     <td colspan="4" style="text-align:center"><b>Project Management</b></td>
   </tr>
   <tr>
