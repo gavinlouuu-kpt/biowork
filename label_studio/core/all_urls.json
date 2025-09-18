@@ -1843,13 +1843,19 @@
     },
     {
         "url": "/django-rq/",
-        "module": "django_rq.views.stats",
+        "module": "django_rq.stats_views.stats",
         "name": "rq_home",
         "decorators": ""
     },
     {
+        "url": "/django-rq/stats.json/",
+        "module": "django_rq.stats_views.stats_json",
+        "name": "rq_home_json",
+        "decorators": ""
+    },
+    {
         "url": "/django-rq/stats.json/<token>/",
-        "module": "django_rq.views.stats_json",
+        "module": "django_rq.stats_views.stats_json",
         "name": "rq_home_json",
         "decorators": ""
     },

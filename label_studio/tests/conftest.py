@@ -412,6 +412,17 @@ def pytest_configure():
     for q in settings.RQ_QUEUES.values():
         q['ASYNC'] = False
 
+    # Reload django-rq module to pick up the ASYNC=False changes in django-rq 3.x
+    try:
+        import importlib
+
+        import django_rq.queues as dq
+
+        importlib.reload(dq)
+    except ImportError:
+        # django_rq might not be installed or imported yet
+        pass
+
 
 class URLS:
     """This class keeps urls with api"""
