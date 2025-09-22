@@ -155,7 +155,7 @@ const DrawingTool = types
             value[key] = source[key];
             return value;
           },
-          { coordstype: "px", dynamic: self.dynamic },
+          { coordstype: "px", dynamic: self.dynamic, converted: true },
         );
 
         const [main, ...rest] = currentArea.results;

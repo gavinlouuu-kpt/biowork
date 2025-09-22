@@ -150,7 +150,6 @@ const _Tool = types
         // we must skip one frame before starting a line
         // to make sure KonvaVector was fully initialized
         setTimeout(() => {
-          self.annotation.history.freeze();
           self.currentArea.startPoint(rx, ry);
         });
       },
@@ -174,13 +173,12 @@ const _Tool = types
       mouseupEv(_, [x, y]) {
         if (!self.isDrawing) return;
         const { x: rx, y: ry } = self.realCoordsFromCursor(x, y);
-        self.currentArea?.commitPoint?.(rx, ry);
         down = false;
 
         // skipping a frame to let KonvaVector render and update properly
         setTimeout(() => {
+          self.currentArea?.commitPoint?.(rx, ry);
           self.finishDrawing();
-          self.annotation.history.unfreeze();
         });
       },
 
@@ -194,10 +192,8 @@ const _Tool = types
       _finishDrawing() {
         const { currentArea, control } = self;
 
-        if (!currentArea) return;
-
         down = false;
-        self.currentArea.notifyDrawingFinished();
+        self.currentArea?.notifyDrawingFinished();
         self.setDrawing(false);
         self.mode = "viewing";
         self.currentArea = null;

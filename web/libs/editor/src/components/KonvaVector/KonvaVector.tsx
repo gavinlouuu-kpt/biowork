@@ -253,19 +253,10 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
   // Normalize input points to BezierPoint format
   const [initialPoints, setInitialPoints] = useState(() => normalizePoints(rawInitialPoints));
 
-  const stablePointsHash = useMemo(() => {
-    return JSON.stringify(rawInitialPoints);
-  }, [rawInitialPoints.length, rawInitialPoints]);
-
-  // Create a stable reference for rawInitialPoints to prevent infinite loops
-  const stableRawPoints = useMemo(() => {
-    return rawInitialPoints;
-  }, [stablePointsHash]);
-
   // Update initialPoints when rawInitialPoints changes
   useEffect(() => {
-    setInitialPoints(normalizePoints(stableRawPoints));
-  }, [stableRawPoints]);
+    setInitialPoints(normalizePoints(rawInitialPoints));
+  }, [rawInitialPoints]);
 
   // Initialize lastAddedPointId and activePointId when component loads with existing points
   useEffect(() => {
@@ -346,6 +337,9 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
   const [visibleControlPoints, setVisibleControlPoints] = useState<Set<number>>(new Set());
   const [activePointId, setActivePointId] = useState<string | null>(null);
   const [isTransforming, setIsTransforming] = useState(false);
+
+  // Flag to track if point selection was handled in VectorPoints onClick
+  const pointSelectionHandled = useRef(false);
 
   // Initialize PointCreationManager instance
   const pointCreationManager = useMemo(() => new PointCreationManager(), []);
@@ -1344,8 +1338,11 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
       return calculateShapeBoundingBox(initialPoints);
     },
     // Hit testing method
-    isPointOverShape: (x: number, y: number, hitRadius = 20) => {
-      const point = { x, y };
+    isPointOverShape: (x: number, y: number, hitRadius = 10) => {
+      // Convert screen coordinates to image coordinates
+      const imageX = (x - transform.offsetX) / (fitScale * transform.zoom);
+      const imageY = (y - transform.offsetY) / (fitScale * transform.zoom);
+      const point = { x: imageX, y: imageY };
 
       // If no points, return false
       if (initialPoints.length === 0) {
@@ -1353,10 +1350,9 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
       }
 
       // First check if hovering over any individual point (vertices)
-      for (let i = 0; i < initialPoints.length; i++) {
-        const vertex = initialPoints[i];
+      for (const vertex of initialPoints) {
         const distance = getDistance(point, vertex);
-        if (distance <= hitRadius) {
+        if (distance <= hitRadius / (fitScale * transform.zoom)) {
           return true; // Hovering over a vertex
         }
       }
@@ -1371,7 +1367,7 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
 
       if (closestPathPoint) {
         const distance = getDistance(point, closestPathPoint.point);
-        return distance <= hitRadius;
+        return distance <= hitRadius / (fitScale * transform.zoom);
       }
 
       // For closed polygons, also check if point is inside the polygon
@@ -1474,6 +1470,7 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
     setActivePointId,
     isTransforming,
     constrainToBounds,
+    disabled,
     pointCreationManager,
   });
 
@@ -1488,7 +1485,18 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
       onMouseDown={disabled ? undefined : eventHandlers.handleLayerMouseDown}
       onMouseMove={disabled ? undefined : eventHandlers.handleLayerMouseMove}
       onMouseUp={disabled ? undefined : eventHandlers.handleLayerMouseUp}
-      onClick={disabled ? undefined : eventHandlers.handleLayerClick}
+      onClick={
+        disabled
+          ? undefined
+          : (e) => {
+              // Skip if point selection was already handled by VectorPoints onClick
+              if (pointSelectionHandled.current) {
+                pointSelectionHandled.current = false;
+                return;
+              }
+              eventHandlers.handleLayerClick(e);
+            }
+      }
     >
       {/* Invisible rectangle - always render to capture mouse events for cursor position updates */}
       {!disabled && (
@@ -1538,8 +1546,21 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
               );
 
               if (distance <= hitRadius) {
-                // Trigger onFinish when clicking on the last added point
-                onFinish?.();
+                // Find the index of the last added point
+                const lastAddedPointIndex = initialPoints.findIndex((p) => p.id === lastAddedPointId);
+
+                // Only trigger onFinish if the last added point is already selected (second click)
+                // and no modifiers are pressed (ctrl, meta, shift, alt) and component is not disabled
+                if (lastAddedPointIndex !== -1 && selectedPoints.has(lastAddedPointIndex) && !disabled) {
+                  const hasModifiers = e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey || e.evt.altKey;
+                  if (!hasModifiers) {
+                    e.evt.preventDefault();
+                    onFinish?.(e);
+                    return;
+                  }
+                  // If modifiers are held, skip onFinish entirely and let normal modifier handling take over
+                  return;
+                }
               }
             }
           }
@@ -1641,6 +1662,26 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
               // Select all points in the path
               const allPointIndices = Array.from({ length: initialPoints.length }, (_, i) => i);
               tracker.selectPoints(instanceId, new Set(allPointIndices));
+              pointSelectionHandled.current = true; // Mark that we handled selection
+              e.evt.stopImmediatePropagation(); // Prevent all other handlers from running
+              return;
+            }
+
+            // Check if this is the last added point and already selected (second click)
+            const isLastAddedPoint = lastAddedPointId && initialPoints[pointIndex]?.id === lastAddedPointId;
+            const isAlreadySelected = selectedPoints.has(pointIndex);
+
+            // Only fire onFinish if this is the last added point AND it was already selected (second click)
+            // and no modifiers are pressed (ctrl, meta, shift, alt) and component is not disabled
+            if (isLastAddedPoint && isAlreadySelected && !disabled) {
+              const hasModifiers = e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey || e.evt.altKey;
+              if (!hasModifiers) {
+                onFinish?.(e);
+                pointSelectionHandled.current = true; // Mark that we handled selection
+                e.evt.stopImmediatePropagation(); // Prevent all other handlers from running
+                return;
+              }
+              // If modifiers are held, skip onFinish entirely and let normal modifier handling take over
               return;
             }
 
@@ -1655,18 +1696,18 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
               tracker.selectPoints(instanceId, new Set([pointIndex]));
             }
 
-            // Check if this is the last added point and trigger onFinish
-            if (lastAddedPointId && initialPoints[pointIndex]?.id === lastAddedPointId) {
-              onFinish?.();
-            }
-
             // Call the original onClick handler if provided
             onClick?.(e);
+
+            // Mark that we handled selection and prevent all other handlers from running
+            pointSelectionHandled.current = true;
+            e.evt.stopImmediatePropagation();
             return;
           }
 
           // When not disabled, let the normal event handlers handle it
           // The point click will be detected by the layer-level handlers
+          //
         }}
       />
 
@@ -1683,7 +1724,12 @@ export const KonvaVector = forwardRef<KonvaVectorRef, KonvaVectorProps>((props, 
           transformerRef={transformerRef}
           proxyRefs={proxyRefs}
           constrainToBounds={constrainToBounds}
-          bounds={{ width, height }}
+          bounds={{
+            x: 0,
+            y: 0,
+            width: width,
+            height: height,
+          }}
           onPointsChange={(newPoints) => {
             // Update main path points
             onPointsChange?.(newPoints);

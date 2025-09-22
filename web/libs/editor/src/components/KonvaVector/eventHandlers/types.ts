@@ -80,7 +80,7 @@ export interface EventHandlerProps {
   onPointConverted?: (point: BezierPoint, index: number, toBezier: boolean) => void;
   onPathShapeChanged?: (points: BezierPoint[]) => void;
   onPointSelected?: (pointIndex: number | null) => void;
-  onFinish?: () => void;
+  onFinish?: (e: KonvaEventObject<MouseEvent>) => void;
   onMouseDown?: (e: KonvaEventObject<MouseEvent>) => void;
   onMouseMove?: (e: KonvaEventObject<MouseEvent>) => void;
   onMouseUp?: (e?: KonvaEventObject<MouseEvent>) => void;
@@ -104,6 +104,7 @@ export interface EventHandlerProps {
   setLastAddedPointId?: (pointId: string | null) => void;
   isTransforming?: boolean;
   constrainToBounds?: boolean;
+  disabled?: boolean;
   pointCreationManager?: {
     isCreating: () => boolean;
     createRegularPointAt: (x: number, y: number, prevPointId?: string) => boolean;

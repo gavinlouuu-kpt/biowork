@@ -13,8 +13,7 @@ import { KonvaVector } from "../components/KonvaVector/KonvaVector";
 import { observer } from "mobx-react";
 import Constants from "../core/Constants";
 import { RegionWrapper } from "./RegionWrapper";
-import { LabelOnRect } from "../components/ImageView/LabelOnRegion";
-import ToolsManager from "../tools/Manager";
+import { LabelOnPolygon } from "../components/ImageView/LabelOnRegion";
 import { Group } from "react-konva";
 
 /**
@@ -362,9 +361,15 @@ const Model = types
         const pointer = stage.getPointerPosition();
 
         // Convert to pixel coords in the canvas backing the image
-        const x = Math.floor(pointer.x / self.parent.stageZoom);
-        const y = Math.floor(pointer.y / self.parent.stageZoom);
-        return self.vectorRef.isPointOverShape(x, y);
+        const { x, y } = self.parent?.layerZoomScalePosition ?? { x: 0, y: 0 };
+        return self.vectorRef.isPointOverShape(pointer.x, pointer.y);
+      },
+
+      // Checks is the region is being transformed or at least in
+      // transformable state (has at least 2 points selected)
+      isTransforming() {
+        const selection = self.vectorRef.getSelectedPointIds();
+        return selection.length > 1;
       },
 
       segGroupRef(ref) {
@@ -472,7 +477,19 @@ const Model = types
       //
       // Will create a new point if it was started but never updated (regular click)
       commitPoint(x, y) {
-        self.vectorRef.commitPoint(x, y);
+        self.vectorRef?.commitPoint(x, y);
+      },
+
+      handleFinish() {
+        const tm = self.parent.getToolsManager();
+        const tool = tm.findSelectedTool();
+        if (tool.currentArea) {
+          tool?.commitDrawingRegion();
+        } else {
+          const annotation = self.parent?.annotation;
+          annotation?.toggleRegionSelection(self);
+        }
+        tool?.complete();
       },
     };
   });
@@ -510,10 +527,10 @@ const HtxVectorView = observer(({ item, suggestion }) => {
         <KonvaVector
           ref={(kv) => item.setKonvaVectorRef(kv)}
           initialPoints={Array.from(item.vertices)}
-          onFinish={() => {
-            const tm = ToolsManager.allInstances();
-            const tools = tm.map((t) => t.findSelectedTool()).filter((t) => t.isDrawing);
-            tools.forEach((t) => t.complete?.());
+          onFinish={(e) => {
+            e.evt.stopPropagation();
+            e.evt.preventDefault();
+            item.handleFinish();
           }}
           onPointsChange={(points) => {
             item.updatePointsFromKonvaVector(points);
@@ -522,6 +539,9 @@ const HtxVectorView = observer(({ item, suggestion }) => {
             item.onPathClosedChange(isClosed);
           }}
           onClick={(e) => {
+            if (e.evt.defaultPrevented) {
+              return;
+            }
             // Handle region selection
             if (item.parent.getSkipInteractions()) return;
             if (item.isDrawing) return;
@@ -580,7 +600,7 @@ const HtxVectorView = observer(({ item, suggestion }) => {
         />
 
         {item.vertices.length > 0 && (
-          <LabelOnRect item={item} color={regionStyles.strokeColor} strokewidth={regionStyles.strokeWidth} />
+          <LabelOnPolygon item={item} color={regionStyles.strokeColor} strokewidth={regionStyles.strokeWidth} />
         )}
       </Group>
     </RegionWrapper>

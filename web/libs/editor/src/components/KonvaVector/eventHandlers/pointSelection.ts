@@ -136,13 +136,20 @@ export function handlePointSelection(e: KonvaEventObject<MouseEvent>, props: Eve
         }
       }
 
+      // Check if this is the active point (the one user is currently drawing from)
+      // Only trigger onFinish if no modifiers are pressed (ctrl, meta, shift, alt) and component is not disabled
+      if (props.activePointId && point.id === props.activePointId && !props.disabled) {
+        const hasModifiers = e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey || e.evt.altKey;
+        if (!hasModifiers) {
+          props.onFinish?.(e);
+          return true; // Don't proceed with selection
+        }
+        // If modifiers are held, skip onFinish entirely and let normal modifier handling take over
+        return false;
+      }
+
       // If Cmd/Ctrl is held, add to selection (multi-selection) - this takes priority
       if (e.evt.ctrlKey || e.evt.metaKey) {
-        // Check if this is the last added point and trigger onFinish
-        if (props.lastAddedPointId && point.id === props.lastAddedPointId) {
-          props.onFinish?.();
-        }
-
         const currentSelection = props.selectedPoints;
         const newSelection = new Set(currentSelection);
         newSelection.add(i);
@@ -154,22 +161,12 @@ export function handlePointSelection(e: KonvaEventObject<MouseEvent>, props: Eve
 
       // Handle skeleton mode point selection (when not multi-selecting)
       if (props.skeletonEnabled) {
-        // Check if this is the last added point and trigger onFinish
-        if (props.lastAddedPointId && point.id === props.lastAddedPointId) {
-          props.onFinish?.();
-        }
-
         // Use tracker for global selection management
         tracker.selectPoints(props.instanceId || "unknown", new Set([i]));
-        // Don't set lastAddedPointId when selecting a point - it should remain the last physically added point
-        // Set the selected point as the active point for drawing
+        // In skeleton mode, update the active point when selecting a different point
+        // This ensures onFinish only fires for the currently selected point
         props.setActivePointId?.(point.id);
         return true;
-      }
-
-      // Check if this is the last added point and trigger onFinish
-      if (props.lastAddedPointId && point.id === props.lastAddedPointId) {
-        props.onFinish?.();
       }
 
       // If no Cmd/Ctrl and not skeleton mode, clear multi-selection and select only this point
