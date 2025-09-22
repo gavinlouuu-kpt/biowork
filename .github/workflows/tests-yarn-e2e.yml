@@ -41,12 +41,6 @@ jobs:
         working-directory: ${{ env.FRONTEND_MONOREPO_DIR }}/libs/editor/tests/e2e
         run: yarn install
 
-      - name: Run LSO server
-        id: run-lso-server
-        run: |
-          container_id=$(docker run --rm -d -p 8080:8080 heartexlabs/label-studio:develop)
-          echo "container_id=${container_id}" >> $GITHUB_OUTPUT
-
       - name: Run LSF server
         id: run-lsf-server
         timeout-minutes: 2
@@ -92,11 +86,6 @@ jobs:
           path: |
             web/libs/editor/tests/e2e/output
             web/libs/editor/tests/coverage
-
-      - name: Kill LSO server
-        if: always()
-        continue-on-error: true
-        run: docker rm -f "${{ steps.run-lso-server.outputs.container_id }}"
 
       - name: Kill LSF server
         if: always()
