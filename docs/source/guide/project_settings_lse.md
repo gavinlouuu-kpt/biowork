@@ -40,17 +40,24 @@ Use these settings to configure what options annotators will see and how their l
 
 <dl>
 
-<dt>Instructions</dt>
+<dt>Annotation Instructions</dt>
 
 <dd>
 
-Specify instructions to show the annotators. This field accepts HTML formatting. 
+Specify instructions to show the annotators. 
+
+This field accepts HTML formatting, including iframes (click **Preview** to check your formatting).
+
+!!! note
+    If you are using HTML formatting and want to include CSS styles, use a `<Style>` block as inline styles will be removed when saving. 
 
 Enable **Show before labeling** to display a pop-up message to annotators when they enter the label stream. If disabled, users will need to click the **Show instructions** action at the bottom of the labeling interface. 
 
+The instructions do not pop-up when opening tasks individually from the Data Manager (Quick View). 
+
 </dd>
 
-<dt id="distribute-tasks">Distribute Labeling Tasks</dt>
+<dt id="distribute-tasks">Task Assignment</dt>
 
 <dd>
 
@@ -58,14 +65,33 @@ Select how you want to distribute tasks to annotators for labeling.
 
 | Field          | Description    |
 | ------------- | ------------ |
-| **Auto**         | Annotators are automatically assigned to tasks, and the option to manually assign annotators is disabled. Automatic assignments are distributed to all users with the Annotator role who are project [members](#Members) <br /><br />You can further define the automatic assignment workflow in the [**Quality** settings](#Quality).  |
-| **Manual** | You must [manually assign](manage_data#Assign-annotators-to-tasks) annotators to tasks. Annotators are not be able to view any labeling tasks until they have those tasks manually assigned to them. |
+| **Automatic**         | Annotators are automatically assigned to tasks, and the option to manually assign annotators is disabled. Automatic assignments are distributed to all users with the Annotator role who are project [members](#Members) <br /><br />You can further define the automatic assignment workflow in the [**Quality** settings](#Quality). <br /><br />When Automatic distribution is used, you will also have additional configuration options throughout the project settings, such as task ordering, task reservation, and many settings under **Quality**. |
+| **Manual** | [Manually assign](manage_data#Assign-annotators-to-tasks) tasks to annotators and manage their workload directly. Annotators will be able to start on tasks once you've assigned them. |
+
+</dd>
+
+<dt id="task-ordering">Task Ordering Method</dt>
+
+<dd>
+
+*Only available when using Automatic task distribution.* 
+
+Select the order in which tasks are presented to annotators.  
+
+| Field          | Description    |
+| ------------- | ------------ |
+| **By Task ID** | Tasks are shown to annotators in ascending order by ID. |
+| **Random** | Tasks are shown in random order.  |
+| **Uncertainty**         | This option is for when you are using a machine learning backend and want to employ [active learning](active_learning). Active learning mode continuously trains and reviews predictions from a connected machine learning model, allowing the model to improve iteratively as new annotations are created.<br /><br />When Uncertainty Sampling is enabled, Label Studio strategically selects tasks with the least confident, or most uncertain, prediction scores from your model. The goal is to minimize the amount of data that needs to be labeled while maximizing the performance of the model. |
+
 
 </dd>
 
 <dt id="lock-tasks">Task Reservation</dt>
 
 <dd>
+
+*Only available when using Automatic task distribution.* 
 
 Control how long tasks are reserved for annotators. 
 
@@ -107,11 +133,40 @@ When setting a reservation time, you should aim to allow a little above the max 
 
 </dd>
 
+<dt id="annotating-options">Annotation Options</dt>
+
+<dd>
+
+Configure additional settings for annotators. 
+
+| Field          | Description    |
+| ------------- | ------------ |
+| **Allow empty annotations** | This determines whether annotators can submit a task without making any annotations on it. If enabled, annotators can submit a task even if they haven't added any labels or regions, resulting in an empty annotation. |
+| **Show the Data Manager to annotators** | When disabled, annotators can only enter the label stream. When enabled, annotators can access the Data Manager. The tasks that are available to them depend on the labeling distribution mode: <ul><li>Automatic distribution: Annotators can only see tasks that they have already completed or have created a draft.</li><li>Manual distribution: Annotators can only see the tasks that they have been assigned.</li></ul>Note that some information is still hidden from annotators and they can only view a subset of the Data Manager columns. For example, they cannot see columns such as Annotators, Agreement, Reviewers, and more. |
+| **Show only columns used in labeling configuration to Annotators** | (Only available if the previous setting is enabled)<br><br /> Hide unused Data Manager columns from Annotators. <br><br />Unused Data Manager columns are columns that contain data that is not being used in the labeling configuration. <br><br />For example, you may include meta or system data that you want to view as part of a project, but you don't necessarily want to expose that data to Annotators. |
+
+
+</dd>
+
+<dt>Task Skipping</dt>
+
+<dd>
+
+Configure settings related to the **Skip** action in the labeling stream. 
+
+| Field          | Description    |
+| ------------- | ------------ |
+| **Allow skipping tasks**         | Use this to show or hide the **Skip** action for annotators. |
+| **Require comment to skip** | When enabled, annotators are required to leave a comment when skipping a task. |
+
+</dd>
+
+
 <dt>Skip Queue</dt>
 
 <dd>
 
-Select how you want to handle skipped tasks. To disallow skipped tasks, you can hide the **Skip** action under the **Annotating Options** section (see below).
+Select how you want to handle skipped tasks. To disallow skipping tasks, you can hide the **Skip** action under the **Task Skipping** section above.
 
 <table>
 <thead>
@@ -145,14 +200,17 @@ Skipped tasks are not marked as completed, and affect the Overall Project Progre
 </td>
 <td>
 
-If an annotator skips a task, the task is removed from their queue and assigned to a different annotator.
+*Only applies when using Automatic task distribution.*
 
-After skipping the task and completing their labeling queue, the annotator cannot return to the skipped task. How the skipped task is completed depends on how task distribution is set up. 
+If an annotator skips a task, the task is removed from their queue and automatically assigned to a different annotator.
 
-* Auto distribution: The task is automatically assigned to another annotator.
-* Manual distribution: The skipped task must be manually assigned to another annotator to be completed. 
+After skipping the task and completing their labeling queue, the annotator cannot return to the skipped task.  
 
-If there are no other annotators assigned to the task, or if all annotators skip the task, then the task remains unfinished. Skipped tasks are not marked as completed, and affect the Overall Project Progress calculation visible from the project Dashboard. (Meaning that the progress for a project that has skipped tasks will be less than 100%.) 
+If there are no other annotators assigned to the task, or if all annotators skip the task, then the task remains unfinished. 
+
+Skipped tasks are not marked as completed, and affect the Overall Project Progress calculation visible from the project Dashboard. (Meaning that the progress for a project that has skipped tasks will be less than 100%.) 
+
+Note that if you select this option before switching to Manual mode, this option stays selected and behaves the same as **Ignore skipped**.
 
 </td>
 </tr>
@@ -165,15 +223,15 @@ If there are no other annotators assigned to the task, or if all annotators skip
 
 How this setting works depends on your labeling distribution method. 
 
-* Auto distribution: If an annotator skips a task, the task is marked as completed and removed from the annotator's queue. 
+* Automatic distribution: If an annotator skips a task, the task is removed from the annotator's queue. 
 
-    If task overlap (as defined in [**Annotations per task minimum**](#overlap)) is set to 1, then the skipped task is not seen again by an annotator. However, if the overlap is greater than 1, then the task is shown to other annotators until the minimum annotations are reached. 
+    If task overlap (as defined in [**Annotations per task minimum**](#overlap)) is set to 1, then the skipped task is marked as Completed and is not seen again by an annotator. However, if the overlap is greater than 1, then the task is shown to other annotators until the minimum annotations are reached. 
 
 * Manual distribution: If the annotator skips a task, it is removed from their queue. But other annotators assigned to the task will still see it in their queue.  
 
 For both distribution methods, **Ignore skipped** treats skipped tasks differently when it comes to calculating progress. 
 
-Unlike the other skip queue options, in this case skipped tasks are marked as Completed and do not adversely affect the Overall Project Progress calculation visible from the project Dashboard. (Meaning that the progress for a project that has skipped tasks can still be 100%, assuming all tasks are otherwise completed.)
+Unlike the other skip queue options, in this case skipped tasks do not adversely affect the Overall Project Progress calculation visible from the project Dashboard. (Meaning that the progress for a project that has skipped tasks can still be 100%, assuming all tasks are otherwise completed.)
 
 </td>
 </tr>
@@ -181,46 +239,20 @@ Unlike the other skip queue options, in this case skipped tasks are marked as Co
 
 </dd>
 
-<dt id="annotating-options">Annotating Options</dt>
+
+
+<dt id="predictions">Task Pre-Labeling</dt>
 
 <dd>
 
-Configure additional settings for annotators. 
-
 | Field          | Description    |
 | ------------- | ------------ |
-| **Show Skip button**         | Use this to show or hide the **Skip** action for annotators. |
-| **Allow empty annotations** | This determines whether annotators can submit a task without making any annotations on it. If enabled, annotators can submit a task even if they haven't added any labels or regions, resulting in an empty annotation. |
-| **Show the Data Manager to annotators** | When disabled, annotators can only enter the label stream. When enabled, annotators can access the Data Manager. The tasks that are available to them depend on the labeling distribution mode: <ul><li>Auto distribution: Annotators can only see tasks that they have already completed or have created a draft.</li><li>Manual distribution: Annotators can only see the tasks that they have been assigned.</li></ul>Note that some information is still hidden from annotators and they can only view a subset of the Data Manager columns. For example, they cannot see columns such as Annotators, Agreement, Reviewers, and more. |
+| **Use predictions to pre-label tasks** | If you have an ML backend or model connected, or if you're using [Prompts](prompts_overview) to generate predictions, you can use this setting to determine whether tasks should be pre-labeled using predictions. For more information, see [Integrate Label Studio into your machine learning pipeline](ml) and [Generate predictions from a prompt](prompts_predictions).  |
+| **Model or predictions to use** | Use the drop-down menu to select the predictions source. For example, you can select a [connected model](#Model) or a set of [predictions](#Predictions). |
 | **Reveal pre-annotations interactively** | When enabled, pre-annotation regions (such as bounding boxes or text spans) are not automatically displayed to the annotator. Instead, annotators can draw a selection rectangle to reveal pre-annotation regions within that area. This allows annotators to first review the image or text without being influenced by the model’s predictions. Pre-annotation regions must have the attribute `"hidden": true`. <br /><br />This feature is particularly useful when there are multiple low-confidence regions that you prefer not to display all at once to avoid clutter. |
-| **Annotators must leave a comment on skip** | When enabled, annotators are required to leave a comment when skipping a task. |
 
 </dd>
 
-<dt id="predictions">Live Predictions</dt>
-
-<dd>
-
-If you have an ML backend or model connected, or if you're using [Prompts](prompts_overview) to generate predictions, you can use this setting to determine whether tasks should be pre-labeled using predictions. For more information, see [Integrate Label Studio into your machine learning pipeline](ml) and [Generate predictions from a prompt](prompts_predictions). 
-
-Use the drop-down menu to select the predictions source. For example, you can select a [connected model](#Model) or a set of [predictions](#Predictions). 
-
-
-</dd>
-
-<dt id="task-sampling">Task Sampling</dt>
-
-<dd>
-
-Configure the order in which tasks are presented to annotators.  
-
-| Field          | Description    |
-| ------------- | ------------ |
-| **Uncertainty Sampling**         | This option is for when you are using a machine learning backend and want to employ [active learning](active_learning). Active learning mode continuously trains and reviews predictions from a connected machine learning model, allowing the model to improve iteratively as new annotations are created.<br /><br />When Uncertainty Sampling is enabled, Label Studio strategically selects tasks with the least confident, or most uncertain, prediction scores from your model. The goal is to minimize the amount of data that needs to be labeled while maximizing the performance of the model. |
-| **Sequential Sampling** | Tasks are shown to annotators in the same order that they appear on the Data Manager. |
-| **Uniform Sampling** | Tasks are shown in random order.  |
-
-</dd>
 
 </dl>
 
