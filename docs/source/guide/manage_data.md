@@ -10,27 +10,24 @@ meta_description: Manage, filter, and sort project data for your labeling projec
 section: "Create & Manage Projects"
 parent: "manage_projects_lso"
 parent_enterprise: "manage_projects" 
-
 ---
 
-After you [set up your project](setup_project.html) and [labeling interface](setup.html) and [import your data](tasks.html), you can filter and sort your data to prepare it for [labeling](labeling.html).
+The Data Manager page is where you can view all your labeling tasks, sort and filter your data, import and export data, and perform various actions related to tasks. 
 
-You can also take steps to manage your data, such as assigning annotators to tasks in Label Studio Enterprise, or deleting tasks and annotations if needed. 
+For information on setting up a project, see [Create and configure projects](setup_project). 
 
 <div class="opensource-only">
-<br><br>
-<center><i>Data Manager Screenshot</i></center>
-<img class="make-intense-zoom" src="/images/terms/os/project--data-manager-min.png" alt="Screenshot of the Label Studio UI showing an OCR project including photographs of receipts, prediction scores, and other metadata for each labeling task.">
+
+![Screenshot of the Data Manager](/images/project/dm-community.png)
+
 </div>
 
 
 <div class="enterprise-only">
-<br><br>
-<center><i>Data Manager Screenshot</i></center>
-<img class="make-intense-zoom" src="/images/terms/ent/project--data-manager-min.png" alt="Screenshot of the Label Studio UI showing an OCR project including photographs of receipts, prediction scores, and other metadata for each labeling task.">
+
+![Screenshot of the Data Manager](/images/project/dm-community.png)
+
 </div>
-
-
 
 In Label Studio Community Edition, the data manager is the default view for your data. In Label Studio Enterprise, click **Data Manager** to open and view the data manager page. Every row in the data manager represents a labeling task in your dataset.
 
