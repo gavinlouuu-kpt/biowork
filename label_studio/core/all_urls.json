@@ -216,6 +216,12 @@
         "decorators": ""
     },
     {
+        "url": "/api/projects/<int:pk>/annotators/",
+        "module": "projects.api.ProjectAnnotatorsAPI",
+        "name": "projects:api:project-annotators",
+        "decorators": ""
+    },
+    {
         "url": "/api/templates/",
         "module": "projects.api.TemplateListAPI",
         "name": "projects:api-templates:template-list",
