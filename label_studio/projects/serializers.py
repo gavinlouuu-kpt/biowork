@@ -396,6 +396,12 @@ class ProjectModelVersionExtendedSerializer(serializers.Serializer):
     latest = serializers.DateTimeField()
 
 
+class ProjectModelVersionParamsSerializer(serializers.Serializer):
+    extended = serializers.BooleanField(required=False, default=False)
+    include_live_models = serializers.BooleanField(required=False, default=False)
+    limit = serializers.IntegerField(required=False, default=None)
+
+
 class GetFieldsSerializer(serializers.Serializer):
     include = serializers.CharField(required=False, help_text='Comma-separated list of fields to include')
     filter = serializers.CharField(
