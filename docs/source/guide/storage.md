@@ -13,13 +13,37 @@ section: "Import & Export"
 
 Integrate popular cloud and external storage systems with Label Studio to collect new items uploaded to the buckets, containers, databases, or directories and return the annotation results so that you can use them in your machine learning pipelines.
 
-Set up the following cloud and other storage systems with Label Studio:
-- [Amazon S3](#Amazon-S3)
-- [Google Cloud Storage](#Google-Cloud-Storage)
-- [Microsoft Azure Blob storage](#Microsoft-Azure-Blob-storage)
-- [Redis database](#Redis-database)
-- [Local storage](#Local-storage) <div class="enterprise-only">(for On-prem only)</div>
-- [Databricks Files (UC Volumes)](#Databricks-Files-UC-Volumes)
+<div class="opensource-only">
+
+| Storage | Community | Enterprise |
+|---|---|---|
+| [Amazon S3](#Amazon-S3) | ✅ | ✅ |
+| [Amazon S3 with IAM role](https://docs.humansignal.com/guide/storage#Set-up-an-S3-connection-with-IAM-role-access) | ❌ | ✅ |
+| [Google Cloud Storage](#Google-Cloud-Storage) | ✅ | ✅ |
+| [Google Cloud Storage WIF Auth](https://docs.humansignal.com/guide/storage#Google-Cloud-Storage-with-Workload-Identity-Federation-WIF) | ❌ | ✅ |
+| [Microsoft Azure Blob Storage](#Microsoft-Azure-Blob-storage) | ✅ | ✅ |
+| [Microsoft Azure Blob Storage with Service Principal](https://docs.humansignal.com/guide/storage#Azure-Blob-Storage-with-Service-Principal-authentication) | ❌ | ✅ |
+| [Databricks Files (UC Volumes)](https://docs.humansignal.com/guide/storage#Databricks-Files-UC-Volumes) | ❌ | ✅ |
+| [Redis database](#Redis-database)| ✅ | ✅ |
+| [Local storage](#Local-storage) | ✅ | ✅ |
+ 
+</div>
+
+<div class="enterprise-only">
+
+| Storage | Community | Enterprise |
+|---|---|---|
+| [Amazon S3](#Amazon-S3) | ✅ | ✅ |
+| [Amazon S3 with IAM role](#Set-up-an-S3-connection-with-IAM-role-access) | ❌ | ✅ |
+| [Google Cloud Storage](#Google-Cloud-Storage) | ✅ | ✅ |
+| [Google Cloud Storage WIF Auth](#Google-Cloud-Storage-with-Workload-Identity-Federation-WIF) | ❌ | ✅ |
+| [Microsoft Azure Blob Storage](#Microsoft-Azure-Blob-storage) | ✅ | ✅ |
+| [Microsoft Azure Blob Storage with Service Principal](#Azure-Blob-Storage-with-Service-Principal-authentication) | ❌ | ✅ |
+| [Databricks Files (UC Volumes)](#Databricks-Files-UC-Volumes) | ❌ | ✅ |
+| [Redis database](#Redis-database)| ✅ | ✅ |
+| [Local storage](#Local-storage) (on-prem only) | ✅ | ✅ |
+
+</div>
 
 
 ## Troubleshooting
