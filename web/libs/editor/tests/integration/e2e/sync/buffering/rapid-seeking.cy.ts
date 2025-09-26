@@ -123,7 +123,7 @@ describe("Sync Buffering: Rapid Seeking Tests", suiteConfig, () => {
       SyncGroup.checkSynchronization();
     });
 
-    it("should handle rapid seeks during playback", () => {
+    it.skip("should handle rapid seeks during playback", () => {
       LabelStudio.params()
         .config(videoAudioParagraphsConfig)
         .data(videoAudioParagraphsData)

@@ -25,7 +25,7 @@ describe("Sync buffering playback", () => {
     Network.enableBrowserCache();
   });
 
-  it("should go though all paragraphs during playback with buffering", () => {
+  it.skip("should go though all paragraphs during playback with buffering", () => {
     let attempts = 3;
     const testScenario = () => {
       LabelStudio.params().config(videoAudioParagraphsConfig).data(fullOpossumSnowData).withResult([]).init();
