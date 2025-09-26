@@ -196,7 +196,8 @@ class ImportStorageListFilesAPI(generics.CreateAPIView):
 
             return Response({'files': files})
         except Exception as exc:
-            raise ValidationError(exc)
+            logger.exception('Error listing storage files: %s', exc)
+            raise ValidationError('Failed to list storage files')
 
 
 @extend_schema(exclude=True)
