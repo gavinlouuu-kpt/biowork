@@ -567,6 +567,8 @@ MAX_TASK_BATCH_SIZE = int(get_env('MAX_TASK_BATCH_SIZE', 1000))
 TASK_DATA_PER_BATCH = int(get_env('TASK_DATA_PER_BATCH', 50 * 1024 * 1024))  # 50 MB in bytes
 # Batch size for streaming reimport operations to reduce memory usage
 REIMPORT_BATCH_SIZE = int(get_env('REIMPORT_BATCH_SIZE', 1000))
+# Batch size for streaming import operations to reduce memory usage
+IMPORT_BATCH_SIZE = int(get_env('IMPORT_BATCH_SIZE', 500))
 # Batch size for processing prediction imports to avoid memory issues with large datasets
 PREDICTION_IMPORT_BATCH_SIZE = int(get_env('PREDICTION_IMPORT_BATCH_SIZE', 500))
 PROJECT_TITLE_MIN_LEN = 3
