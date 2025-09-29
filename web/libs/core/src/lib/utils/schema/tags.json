@@ -833,6 +833,20 @@
         "type": "number",
         "required": false,
         "default": 64
+      },
+      "defaultPlaybackSpeed": {
+        "name": "defaultPlaybackSpeed",
+        "description": "default playback speed the player should start with when loaded",
+        "type": "number",
+        "required": false,
+        "default": 1
+      },
+      "minPlaybackSpeed": {
+        "name": "minPlaybackSpeed",
+        "description": "minimum allowed playback speed; defaultPlaybackSpeed cannot be set below this value",
+        "type": "number",
+        "required": false,
+        "default": 1
       }
     }
   },
