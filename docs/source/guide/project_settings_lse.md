@@ -243,97 +243,7 @@ Unlike the other skip queue options, in this case skipped tasks do not adversely
 </tr>
 </table>
 
-<p><strong>Related options</strong></p>
-<table>
-<thead>
-    <tr>
-      <th>Field</th>
-      <th>Description</th>
-    </tr>
-</thead>
-<tr>
-<td>
-
-<strong>Show only manually assigned tasks in the review stream</strong>
-</td>
-<td>
-
-If enabled, a reviewer can only see tasks to which they've been assigned. Otherwise, they can view all tasks that are ready for review.
-
-</td>
-</tr>
-<tr>
-<td>
-
-<strong>Show only finished tasks in the review stream</strong>
-</td>
-<td>
-
-When enabled, a reviewer only sees tasks that have been completed by all required annotators. With auto distribution, this means tasks that have met the <em>Annotations per task minimum</em>; with manual distribution, this means tasks in which all assigned annotators have submitted an annotation.
-
-</td>
-</tr>
-</table>
-
 </dd>
-
-<dt id="task-ordering">Task Ordering</dt>
-
-<dd>
-
-Choose the order in which reviewers see tasks in the review stream.
-
-<table>
-<thead>
-    <tr>
-      <th>Field</th>
-      <th>Description</th>
-    </tr>
-</thead>
-<tr>
-<td>
-
-<strong>By Task ID</strong>
-</td>
-<td>
-
-Tasks are ordered by their numeric ID (ascending). Annotation order within a task remains stable.
-
-</td>
-</tr>
-<tr>
-<td>
-
-<strong>Random</strong>
-</td>
-<td>
-
-Tasks are shown in randomized task order while preserving the stable order of annotations within each task. This mode enables <strong>Task limit (%)</strong> (see below).
-
-</td>
-</tr>
-</table>
-
-</dd>
-
-<dt id="task-limit">Task Limit (%)</dt>
-
-<dd>
-
-Limit the portion of project tasks that are available to reviewers when <strong>Task Ordering</strong> is set to <strong>Random</strong>.
-
-<ul>
-<li><strong>Scope</strong>: Applies only when sampling is <em>Random</em>. Hidden/disabled for <em>By Task ID</em>.</li>
-<li><strong>Value</strong>: Percentage (0–100). Values ≤0 or ≥100 effectively disable limiting.</li>
-<li><strong>Selection</strong>: The limit is applied over the eligible task set after filters (for example, <em>Show only finished tasks</em>).</li>
-<li><strong>Data Manager selection</strong>: If reviewers open the review stream with <code>selectedItems</code> from the Data Manager, the limit is bypassed for that session.</li>
-</ul>
-
-<p><strong>Example</strong>: If a project has 1,000 tasks and the limit is set to 60%, at most ~600 tasks will be served for review under Random sampling. When the limit is reached, the API returns “no more annotations to review,” and the UI displays <em>Review finished</em>.</p>
-
-</dd>
-
-
 
 <dt id="predictions">Task Pre-Labeling</dt>
 
@@ -347,9 +257,7 @@ Limit the portion of project tasks that are available to reviewers when <strong>
 
 </dd>
 
-
 </dl>
-
 
 ## Review
 
