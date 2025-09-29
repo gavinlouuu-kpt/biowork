@@ -16,6 +16,12 @@ date: 2024-02-06 22:28:14
 !!! error Enterprise
     Many settings are only available in Label Studio Enterprise Edition. If you're using Label Studio Community Edition, see [Label Studio Features](label_studio_compare) to learn more.
 
+!!! error Starter Cloud
+    If you see an Enterprise badge: <span class="badge"></span>.
+    
+    This means the setting is not available in Label Studio Starter Cloud. 
+
+
 ## General
 
 Use these settings to specify some basic information about the project. 
@@ -237,6 +243,94 @@ Unlike the other skip queue options, in this case skipped tasks do not adversely
 </tr>
 </table>
 
+<p><strong>Related options</strong></p>
+<table>
+<thead>
+    <tr>
+      <th>Field</th>
+      <th>Description</th>
+    </tr>
+</thead>
+<tr>
+<td>
+
+<strong>Show only manually assigned tasks in the review stream</strong>
+</td>
+<td>
+
+If enabled, a reviewer can only see tasks to which they've been assigned. Otherwise, they can view all tasks that are ready for review.
+
+</td>
+</tr>
+<tr>
+<td>
+
+<strong>Show only finished tasks in the review stream</strong>
+</td>
+<td>
+
+When enabled, a reviewer only sees tasks that have been completed by all required annotators. With auto distribution, this means tasks that have met the <em>Annotations per task minimum</em>; with manual distribution, this means tasks in which all assigned annotators have submitted an annotation.
+
+</td>
+</tr>
+</table>
+
+</dd>
+
+<dt id="task-ordering">Task Ordering</dt>
+
+<dd>
+
+Choose the order in which reviewers see tasks in the review stream.
+
+<table>
+<thead>
+    <tr>
+      <th>Field</th>
+      <th>Description</th>
+    </tr>
+</thead>
+<tr>
+<td>
+
+<strong>By Task ID</strong>
+</td>
+<td>
+
+Tasks are ordered by their numeric ID (ascending). Annotation order within a task remains stable.
+
+</td>
+</tr>
+<tr>
+<td>
+
+<strong>Random</strong>
+</td>
+<td>
+
+Tasks are shown in randomized task order while preserving the stable order of annotations within each task. This mode enables <strong>Task limit (%)</strong> (see below).
+
+</td>
+</tr>
+</table>
+
+</dd>
+
+<dt id="task-limit">Task Limit (%)</dt>
+
+<dd>
+
+Limit the portion of project tasks that are available to reviewers when <strong>Task Ordering</strong> is set to <strong>Random</strong>.
+
+<ul>
+<li><strong>Scope</strong>: Applies only when sampling is <em>Random</em>. Hidden/disabled for <em>By Task ID</em>.</li>
+<li><strong>Value</strong>: Percentage (0–100). Values ≤0 or ≥100 effectively disable limiting.</li>
+<li><strong>Selection</strong>: The limit is applied over the eligible task set after filters (for example, <em>Show only finished tasks</em>).</li>
+<li><strong>Data Manager selection</strong>: If reviewers open the review stream with <code>selectedItems</code> from the Data Manager, the limit is bypassed for that session.</li>
+</ul>
+
+<p><strong>Example</strong>: If a project has 1,000 tasks and the limit is set to 60%, at most ~600 tasks will be served for review under Random sampling. When the limit is reached, the API returns “no more annotations to review,” and the UI displays <em>Review finished</em>.</p>
+
 </dd>
 
 
@@ -277,7 +371,15 @@ Enable **Show before reviewing** to display a pop-up message to reviewers when t
 
 <dd>
 
-Configure what is required for a task to be considered reviewed. 
+Configure what is required for a task to be considered "reviewed."
+
+!!! note
+    This metric determines:
+
+    * **Review stream**: When a task is removed from the review queue.
+    * **Data Manager**: The value shown in the **Reviewed** column. 
+    * **Export**: Which tasks are included when you want to only include reviewed tasks in your export snapshot.
+    * **Dashboards**: Reviewed counts and related metrics. 
 
 <table>
 <thead>
@@ -289,7 +391,7 @@ Configure what is required for a task to be considered reviewed.
 <tr>
 <td>
 
-**Mark task as reviewed after it has at least 1 accepted annotation**
+**Task is reviewed after at least one accepted annotation**
 </td>
 <td>
 
@@ -300,7 +402,7 @@ In a task where multiple annotators submitted labels, the reviewer only needs to
 <tr>
 <td>
 
-**Mark task as reviewed after all annotations are processed**
+**Task is reviewed after all annotations are reviewed**
 </td>
 <td>
 
@@ -308,7 +410,95 @@ In a task where multiple annotators submitted labels, the reviewer needs to acce
 
 </td>
 </tr>
+<tr>
+<td>
+
+**Review only manually assigned tasks**
+</td>
+<td>
+
+If enabled, a reviewer can only see tasks to which they've been assigned. Otherwise, they can view all tasks that are ready for review.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Show only finished tasks in the review stream**
+</td>
+<td>
+
+When enabled, a reviewer only sees tasks that have been completed by all required annotators. 
+
+If your project is using auto distribution, then this means a reviewer only sees tasks that have met the **Annotations per task minimum** threshold. 
+
+If your project is using manual distribution, then this means a reviewer only sees tasks in which all assigned annotators have submitted an annotation. 
+
+Note that in most cases, skipped tasks do not contribute towards meeting the minimum.  
+
+</td>
+</tr>
 </table>
+
+</dd>
+
+<dt id="task-ordering">Task Ordering</dt>
+
+<dd>
+
+Choose the order in which reviewers see tasks in the review stream.
+
+<table>
+<thead>
+    <tr>
+      <th style="width: 20%;">Field</th>
+      <th>Description</th>
+    </tr>
+</thead>
+<tr>
+<td>
+
+**By Task ID**
+</td>
+<td>
+
+Tasks are ordered by their numeric ID (ascending). Annotation order within a task remains stable.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Random**
+<span class="badge"></span>
+</td>
+<td>
+
+Tasks are shown in randomized task order while preserving the stable order of annotations within each task. This mode enables **Task limit (%)** (see below).
+
+</td>
+</tr>
+</table>
+
+</dd>
+
+<dt id="task-limit">Task Limit (%) <span class="badge"></span></dt>
+
+<dd>
+
+Limit the portion of project tasks that are available to reviewers when **Task Ordering** is set to **Random**.
+
+Set this to a percentage from `0` to `100`. 
+
+!!! note
+    Note the following:
+
+    * This only applies only when sampling is **Random**. 
+    * If you enter a percentage of `≤0` or `≥100`, you will effectively disable limiting. 
+    * This limit is applied over the eligible task set after filters (for example, **Show only finished tasks**) are applied.
+    * If reviewers open the review stream by selecting tasks and then clicking **Label *n* Tasks** from the Data Manager, they will bypass the limit. 
+
+    For example, if a project has 1,000 tasks and the limit is set to 60%, at most ~600 tasks will be served for review under Random sampling. When the limit is reached, the API returns “no more annotations to review,” and the UI displays **Review finished**.
 
 </dd>
 
@@ -328,7 +518,7 @@ Configure what rejection options are available to reviewers.
 <tr>
 <td>
 
-**Requeue rejected tasks back to annotators**
+**Requeue rejected annotations back to annotators**
 </td>
 <td>
 
@@ -338,7 +528,7 @@ When a reviewer clicks **Reject**, the annotation is reassigned back to the anno
 </tr>
 <td>
 
-**Remove rejected tasks from labeling queue**
+**Remove rejected annotations from labeling queue**
 </td>
 <td>
 
@@ -369,11 +559,11 @@ Note that when you click **Remove**, the annotation is also marked as cancelled/
 
 </dd>
 
-<dt id="review-settings">Additional settings</dt>
+<dt id="data-manager">Data Manager</dt>
 
 <dd>
 
-Configure additional reviewer settings
+Configure what Data Manager features are available to reviewers.
 
 <table>
 <thead>
@@ -385,52 +575,26 @@ Configure additional reviewer settings
 <tr>
 <td>
 
-**Review only manually assigned tasks**
-</td>
-<td>
-
-If enabled, a reviewer can only see tasks to which they've been assigned. Otherwise, they can view all tasks that are ready for review.
-
-</td>
-</tr>
-<tr>
-<td>
-
-**Show only finished tasks in the review stream**
-</td>
-<td>
-
-When enabled, a reviewer only sees tasks that have been completed by all required annotators. 
-
-If your project is using auto distribution, then this means a reviewer only sees tasks that have met the **Annotations per task minimum** threshold. 
-
-If your project is using manual distribution, then this means a reviewer only sees tasks in which all assigned annotators have submitted an annotation. 
-
-Note that in most cases, skipped tasks do not contribute towards meeting the minimum.  
-
-</td>
-</tr>
-<tr>
-<td>
-
 **Show the Data Manager to reviewers**
 </td>
 <td>
 
-When disabled, reviewers can only enter the review stream. When enabled, reviewers can access the Data Manager, where they can select which tasks to review. 
-
-However, some information is still hidden from reviewers and they can only view a subset of the Data Manager columns. For example, they cannot see columns such as who the other Reviewers are. 
+When disabled, reviewers can only enter the review stream. When enabled, reviewers can access the Data Manager, where they can select which tasks to review. Some information is still hidden from reviewers and they can only view a subset of the Data Manager columns.
 
 </td>
 </tr>
 <tr>
 <td>
 
-**Reviewers must leave a comment on reject**
+**Show unused task data columns to reviewers in the Data Manager**
 </td>
 <td>
 
-When rejecting a task, the reviewer must leave a comment.
+If reviewers can view the Data Manager, this setting will hide unused columns from them.
+
+Unused Data Manager columns are columns that contain data that is not being used in the labeling configuration.
+
+For example, you may include meta or system data that you want to view as part of a project, but you don’t necessarily want to expose that data to reviewers.
 
 </td>
 </tr>
@@ -441,15 +605,13 @@ When rejecting a task, the reviewer must leave a comment.
 </td>
 <td>
 
-If reviewers can view the Data Manager, this setting controls whether they can access the Agreement column. 
+If reviewers can view the Data Manager, this setting controls whether they can access the **Agreement** column.
 
 </td>
 </tr>
 </table>
 
 </dd>
-
-</dl>
 
 
 ## Quality
