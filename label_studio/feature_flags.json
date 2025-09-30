@@ -1243,6 +1243,33 @@
       "version": 2,
       "deleted": false
     },
+    "fflag_feat_all_fit_730_review_time_column": {
+      "key": "fflag_feat_all_fit_730_review_time_column",
+      "on": false,
+      "prerequisites": [],
+      "targets": [],
+      "contextTargets": [],
+      "rules": [],
+      "fallthrough": {
+        "variation": 0
+      },
+      "offVariation": 1,
+      "variations": [
+        true,
+        false
+      ],
+      "clientSideAvailability": {
+        "usingMobileKey": false,
+        "usingEnvironmentId": false
+      },
+      "clientSide": false,
+      "salt": "50ddaa088ed84a9cba1aca9704af8b2c",
+      "trackEvents": false,
+      "trackEventsFallthrough": false,
+      "debugEventsUntilDate": null,
+      "version": 2,
+      "deleted": false
+    },
     "fflag_feat_all_leap_1081_reviewer_flow_updates": {
       "key": "fflag_feat_all_leap_1081_reviewer_flow_updates",
       "on": true,
