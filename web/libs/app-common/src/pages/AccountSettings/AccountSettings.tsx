@@ -7,6 +7,7 @@ import { HotkeysHeaderButtons } from "./sections/Hotkeys";
 import clsx from "clsx";
 import { useAtomValue } from "jotai";
 import { settingsAtom } from "./atoms";
+import { useAuth } from "@humansignal/core";
 
 /**
  * FIXME: This is legacy imports. We're not supposed to use such statements
@@ -15,6 +16,7 @@ import { settingsAtom } from "./atoms";
 import { SidebarMenu } from "apps/labelstudio/src/components/SidebarMenu/SidebarMenu";
 
 const AccountSettingsSection = () => {
+  const { user, permissions } = useAuth();
   const { sectionId } = useParams<{ sectionId: string }>();
   const settings = useAtomValue(settingsAtom);
   const contentClassName = clsx(styles.accountSettings__content, {
@@ -22,8 +24,8 @@ const AccountSettingsSection = () => {
   });
 
   const resolvedSections = useMemo(() => {
-    return settings.data && !("error" in settings.data) ? accountSettingsSections(settings.data) : [];
-  }, [settings.data]);
+    return settings.data && !("error" in settings.data) ? accountSettingsSections(settings.data, permissions) : [];
+  }, [settings.data, user]);
 
   const currentSection = useMemo(
     () => resolvedSections.find((section) => section.id === sectionId),
@@ -70,10 +72,10 @@ const AccountSettingsPage = () => {
   const settings = useAtomValue(settingsAtom);
   const match = useRouteMatch();
   const { sectionId } = useParams<{ sectionId: string }>();
-
+  const { user, permissions } = useAuth();
   const resolvedSections = useMemo(() => {
-    return settings.data && !("error" in settings.data) ? accountSettingsSections(settings.data) : [];
-  }, [settings.data]);
+    return settings.data && !("error" in settings.data) ? accountSettingsSections(settings.data, permissions) : [];
+  }, [settings.data, user]);
 
   const menuItems = useMemo(
     () =>
