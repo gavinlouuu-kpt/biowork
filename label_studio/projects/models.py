@@ -144,7 +144,40 @@ class Project(ProjectMixin, models.Model):
         _('label config'),
         blank=True,
         null=True,
-        default='<View></View>',
+        default='''<View>
+  <Image name="image" value="$image" zoom="true"/>
+  <!-- Smart Keypoint Labels (tag3) -->
+  <Header value="Interact: Keypoint Labels"/>
+  <KeyPointLabels name="tag3" toName="image" smart="true">
+    <Label value="Object" smart="true" background="#0000FF"/>
+  </KeyPointLabels>
+     
+   <!-- Smart Rectangle Labels (tag4) -->
+   <Header value="Interact: Rectangle Labels"/>
+   <RectangleLabels name="tag4" toName="image" smart="true">
+     <Label value="Object" smart="true" background="#0000FF"/>
+   </RectangleLabels>
+  
+    <TextArea name="mean_intensity" toName="image"
+            perRegion="true"
+            required="true"
+            maxSubmissions="1"
+            rows="5"
+            placeholder="Mean Intensity"
+            displayMode="region-list"
+            />
+  <!-- Brush Labels (tag1) -->
+  <Header value="Result: Brush Labels"/>
+  <BrushLabels name="tag1" toName="image">
+    <Label value="Object" background="#FF0000"/>
+  </BrushLabels>
+  
+  <!-- Polygon Labels (tag2) -->
+  <Header value="Result: Outline"/>
+  <PolygonLabels name="tag2" toName="image">
+    <Label value="Object" background="#00FF00"/>
+  </PolygonLabels>
+</View>''',
         help_text='Label config in XML format. See more about it in documentation',
     )
     parsed_label_config = models.JSONField(
