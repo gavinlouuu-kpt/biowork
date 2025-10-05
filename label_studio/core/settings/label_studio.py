@@ -16,7 +16,9 @@ MIDDLEWARE.append('core.middleware.UpdateLastActivityMiddleware')
 if INACTIVITY_SESSION_TIMEOUT_ENABLED:
     MIDDLEWARE.append('core.middleware.InactivitySessionTimeoutMiddleWare')
 
-ADD_DEFAULT_ML_BACKENDS = False
+ADD_DEFAULT_ML_BACKENDS = get_bool_env('ADD_DEFAULT_ML_BACKENDS', False)
+DEFAULT_ML_BACKEND_URL = get_env('DEFAULT_ML_BACKEND_URL', '')
+DEFAULT_ML_BACKEND_TITLE = get_env('DEFAULT_ML_BACKEND_TITLE', 'Default ML Backend')
 
 LOGGING['root']['level'] = get_env('LOG_LEVEL', 'WARNING')
 
