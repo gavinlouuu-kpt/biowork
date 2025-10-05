@@ -794,6 +794,7 @@ if ENABLE_CSP := get_bool_env('ENABLE_CSP', True):
         'blob:',
         'browser.sentry-cdn.com',
         'https://*.googletagmanager.com',
+        'https://challenges.cloudflare.com',
     )
     CSP_IMG_SRC = (
         "'self'",
@@ -802,6 +803,10 @@ if ENABLE_CSP := get_bool_env('ENABLE_CSP', True):
         'https://*.google-analytics.com',
         'https://*.googletagmanager.com',
         'https://*.google.com',
+    )
+    CSP_FRAME_SRC = (
+        "'self'",
+        'https://challenges.cloudflare.com',
     )
     CSP_CONNECT_SRC = (
         "'self'",
