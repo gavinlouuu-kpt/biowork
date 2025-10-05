@@ -98,6 +98,23 @@ def _create_project(title, user, label_config=None, sampling=None, description=N
         for url in ml_backends:
             logger.info('Adding new ML backend %s', url)
             MLBackend.objects.create(project=project, url=url)
+    elif settings.ADD_DEFAULT_ML_BACKENDS and settings.DEFAULT_ML_BACKEND_URL:
+        # Auto-connect default ML backend if no explicit backends provided
+        from ml.models import MLBackend
+        try:
+            ml_backend = MLBackend.objects.create(
+                project=project,
+                url=settings.DEFAULT_ML_BACKEND_URL,
+                title=settings.DEFAULT_ML_BACKEND_TITLE,
+                is_interactive=True  # Enable interactive preannotations on ML backend
+            )
+            logger.info('Auto-connected default ML backend "%s" to project with interactive preannotations enabled', ml_backend.title)
+            
+            # Enable interactive preannotations UI setting for better UX
+            project.reveal_preannotations_interactively = True
+            logger.info('Enabled reveal_preannotations_interactively for project')
+        except Exception as e:
+            logger.warning('Failed to auto-connect ML backend: %s', e)
 
     project.save()
     return project
