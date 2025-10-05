@@ -15,6 +15,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from organizations.forms import OrganizationSignupForm
 from organizations.models import Organization
 from rest_framework.authtoken.models import Token
+from turnstile.decorators import require_turnstile
 from users import forms
 from users.functions import login, proceed_registration
 
@@ -37,6 +38,7 @@ def logout(request):
 
 
 @enforce_csrf_checks
+@require_turnstile
 def user_signup(request):
     """Sign up page"""
     user = request.user
@@ -105,6 +107,7 @@ def user_signup(request):
 
 
 @enforce_csrf_checks
+@require_turnstile
 def user_login(request):
     """Login page"""
     user = request.user

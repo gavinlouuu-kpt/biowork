@@ -17,7 +17,12 @@ from datetime import timedelta
 
 from django.core.exceptions import ImproperlyConfigured
 
+import environ
 from label_studio.core.utils.params import get_bool_env, get_env_list
+
+# Load environment variables from .env file in data directory
+env = environ.Env()
+env.read_env(os.path.join(os.path.dirname(__file__), '../../../data/.env'))
 
 formatter = 'standard'
 JSON_LOG = get_bool_env('JSON_LOG', False)
@@ -670,6 +675,11 @@ COLLECT_ANALYTICS = get_bool_env('COLLECT_ANALYTICS', get_bool_env('collect_anal
 
 # Strip harmful content from SVG files by default
 SVG_SECURITY_CLEANUP = get_bool_env('SVG_SECURITY_CLEANUP', False)
+
+# Cloudflare Turnstile configuration
+TURNSTILE_ENABLED = get_bool_env('TURNSTILE_ENABLED', False)
+TURNSTILE_SITE_KEY = get_env('TURNSTILE_SITE_KEY', '')
+TURNSTILE_SECRET_KEY = get_env('TURNSTILE_SECRET_KEY', '')
 
 ML_BLOCK_LOCAL_IP = get_bool_env('ML_BLOCK_LOCAL_IP', False)
 

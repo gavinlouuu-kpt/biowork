@@ -14,6 +14,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from turnstile.decorators import require_turnstile
 from users.functions import check_avatar
 from users.models import User
 from users.serializers import UserSerializer, UserSerializerUpdate
@@ -170,6 +171,7 @@ class UserAPI(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         return super(UserAPI, self).list(request, *args, **kwargs)
 
+    @method_decorator(require_turnstile)
     def create(self, request, *args, **kwargs):
         return super(UserAPI, self).create(request, *args, **kwargs)
 

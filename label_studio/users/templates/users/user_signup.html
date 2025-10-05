@@ -50,6 +50,11 @@
         </p>
       {% endfor %}
     {% endif %}
+
+    {% if settings.TURNSTILE_ENABLED and settings.TURNSTILE_SITE_KEY %}
+    <div class="cf-turnstile" data-sitekey="{{ settings.TURNSTILE_SITE_KEY }}"></div>
+    {% endif %}
+
     <p><button type="submit" aria-label="Create Account" class="lsf-button-ls lsf-button-ls_look_primary">Create Account</button></p>
   </form>
 

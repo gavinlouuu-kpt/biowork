@@ -16,6 +16,11 @@
       <input type="checkbox" id="persist_session" name="persist_session" class="lsf-checkbox-ls" checked="checked" style="width: auto;" />
       <label for="persist_session">Keep me logged in this browser</label>
     </p>
+
+    {% if settings.TURNSTILE_ENABLED and settings.TURNSTILE_SITE_KEY %}
+    <div class="cf-turnstile" data-sitekey="{{ settings.TURNSTILE_SITE_KEY }}"></div>
+    {% endif %}
+
     <p><button type="submit" aria-label="Log In" class="lsf-button-ls lsf-button-ls_look_primary">Log in</button></p>
   </form>
 

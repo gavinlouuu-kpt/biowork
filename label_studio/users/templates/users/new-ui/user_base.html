@@ -9,6 +9,10 @@
 <link rel="stylesheet" href="{{ settings.HOSTNAME }}{% static 'css/login.css' %}"/>
 
 <script async src="https://www.googletagmanager.com/gtag/js?id=UA-129877673-1" nonce="{{request.csp_nonce}}"></script>
+
+{% if settings.TURNSTILE_ENABLED and settings.TURNSTILE_SITE_KEY %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+{% endif %}
 <script nonce="{{request.csp_nonce}}">
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
