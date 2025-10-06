@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: label-studio-custom:latest
+    image: gavinlouuu/label-studio-custom:latest
     container_name: label-studio-nginx
     restart: unless-stopped
     ports:
@@ -27,7 +27,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: label-studio-custom:latest
+    image: gavinlouuu/label-studio-custom:latest
     container_name: label-studio-app
     restart: unless-stopped
     expose:
@@ -43,6 +43,12 @@ services:
       - POSTGRE_HOST=db
       - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-http://localhost:8080}
       - JSON_LOG=1
+      # ML Backend Configuration
+      - ADD_DEFAULT_ML_BACKENDS=true
+      - DEFAULT_ML_BACKEND_URL=http://sam-ml-backend:9090
+      - DEFAULT_ML_BACKEND_TITLE=SAM Interactive Segmentation
+      # Base Data Directory (inside container)
+      - BASE_DATA_DIR=/label-studio/data
     volumes:
       - ./mydata:/label-studio/data:rw
     command: label-studio-uwsgi
