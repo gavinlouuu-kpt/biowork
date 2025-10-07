@@ -13,7 +13,7 @@ services:
       - app
     environment:
       - APP_HOST=app
-      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-http://localhost:8080}
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-https://biowork.app}
     volumes:
       - ./mydata:/label-studio/data:rw
       - ./deploy/nginx/certs:/certs:ro
@@ -41,14 +41,22 @@ services:
       - POSTGRE_PASSWORD=postgres
       - POSTGRE_PORT=5432
       - POSTGRE_HOST=db
-      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-http://localhost:8080}
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-https://biowork.app}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://biowork.app}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-1}
+      - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-1}
       - JSON_LOG=1
+      # Cloudflare Turnstile
+      - TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-false}
+      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
       # ML Backend Configuration
       - ADD_DEFAULT_ML_BACKENDS=true
       - DEFAULT_ML_BACKEND_URL=http://sam-ml-backend:9090
       - DEFAULT_ML_BACKEND_TITLE=SAM Interactive Segmentation
       # Base Data Directory (inside container)
       - BASE_DATA_DIR=/label-studio/data
+      
     volumes:
       - ./mydata:/label-studio/data:rw
     command: label-studio-uwsgi
@@ -75,6 +83,18 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TRANSPORT_PROTOCOL=quic
+    networks:
+      - label-studio-network
 
 networks:
   label-studio-network:
