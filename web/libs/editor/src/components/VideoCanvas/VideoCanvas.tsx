@@ -654,6 +654,7 @@ export const VideoCanvas = memo(
           controls={false}
           preload="auto"
           src={props.src}
+          speed={props.speed}
           muted={props.muted ?? false}
           canPlayType={(supported) => (supportedFileTypeRef.current = supported)}
           onPlay={handleVideoPlay}

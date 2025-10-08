@@ -592,6 +592,7 @@ main {
 
 dt {
   font-weight: bold;
+  font-size: 125%
 }
 
 dd .admonition:first-child {
@@ -2920,4 +2921,25 @@ code.hljs {
 
 .community-footer a:hover {
   text-decoration: underline;
+}
+
+/* works with DT*/
+
+.badge::after {
+  content: url("/images/badge.svg");
+  display: inline-block;
+  width: 20px;    
+  height: auto; 
+  margin-left: 6px;
+  vertical-align: middle; 
+}
+
+p .badge::after {
+  content: url("/images/badge.svg");
+  display: inline-block;
+  width: 20px;    
+  height: auto; 
+  margin-left: 6px;
+  vertical-align: middle; 
+  padding-top: 5px;
 }

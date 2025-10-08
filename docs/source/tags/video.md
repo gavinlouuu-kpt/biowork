@@ -55,6 +55,16 @@ Labeling configuration to display a video on the labeling interface
 ```
 ### Example
 
+Video with custom playback speed settings
+
+```html
+<View>
+  <Video name="video" value="$video" defaultPlaybackSpeed="2" minPlaybackSpeed="1.5" />
+</View>
+```
+
+### Example
+
 Video classification
 
 ```html

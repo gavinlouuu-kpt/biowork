@@ -199,6 +199,7 @@ export const Tab = types
         filters: self.filterSnapshot,
         ordering: self.ordering.toJSON(),
         hiddenColumns: self.hiddenColumnsSnapshot,
+        agreement_selected: self.agreement_selected,
       });
     },
 
@@ -208,6 +209,7 @@ export const Tab = types
           title: self.title,
           filters: self.filterSnapshot,
           ordering: self.ordering.toJSON(),
+          agreement_selected: self.agreement_selected,
         };
       }
 
