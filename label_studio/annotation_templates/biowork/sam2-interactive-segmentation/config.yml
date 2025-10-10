@@ -39,7 +39,7 @@ config: |
     </PolygonLabels>
   </View>
 ml_backends:
-  - url: http://sam2-backend:9091
+  - url: http://sam2-backend:9090
     title: SAM2
     is_interactive: true
     extra_params:

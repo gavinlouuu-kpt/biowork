@@ -43,6 +43,6 @@ ml_backends:
     title: FastSAM
     is_interactive: true
     extra_params:
-      SAM_PREANNOTATE: 1
+      # SAM_PREANNOTATE: 1
 
 
