@@ -17,7 +17,7 @@ import { Caption } from "../../components/Caption/Caption";
 import { FF_LSDV_E_297, isFF } from "../../utils/feature-flags";
 import { createURL } from "../../components/HeidiTips/utils";
 
-const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, setDescription, show = true }) =>
+const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, setDescription, show = true, templateOptions = [], selectedTemplateTitle, onSelectTemplate }) =>
   !show ? null : (
     <form
       className={cn("project-name")}
@@ -55,6 +55,20 @@ const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, 
           className="project-description w-full"
         />
       </div>
+      {templateOptions?.length > 0 && (
+        <div className="w-full flex flex-col gap-2">
+          <label className="w-full" htmlFor="template_select">
+            Template
+          </label>
+          <Select
+            placeholder="Select a template"
+            options={[{ value: "__none__", label: "None" }, ...templateOptions.map((t) => ({ value: t.title, label: t.title }))]}
+            value={selectedTemplateTitle ?? "__none__"}
+            onChange={(val) => onSelectTemplate?.(val === "__none__" ? null : val)}
+            triggerClassName="!flex-1"
+          />
+        </div>
+      )}
       {isFF(FF_LSDV_E_297) && (
         <div className="w-full flex flex-col gap-2">
           <label>
@@ -96,6 +110,8 @@ export const CreateProject = ({ onClose }) => {
   const [error, setError] = React.useState();
   const [description, setDescription] = React.useState("");
   const [sample, setSample] = React.useState(null);
+  const [selectedRecipe, setSelectedRecipe] = React.useState(null);
+  const [templateOptions, setTemplateOptions] = React.useState([]);
 
   const setStep = React.useCallback((step) => {
     _setStep(step);
@@ -110,6 +126,35 @@ export const CreateProject = ({ onClose }) => {
   React.useEffect(() => {
     setError(null);
   }, [name]);
+
+  // Load templates and expose FastSAM/SAM2 as options on the Name step
+  React.useEffect(() => {
+    const loadTemplates = async () => {
+      const res = await api.callApi("configTemplates");
+      const wanted = new Set([
+        "FastSAM – Interactive Segmentation",
+        "SAM2 – Interactive Segmentation",
+      ]);
+      const items = (res?.templates ?? []).filter((t) => wanted.has(t.title));
+      setTemplateOptions(items);
+    };
+    loadTemplates();
+  }, []);
+
+  const handleSelectTemplate = React.useCallback(
+    (titleOrNull) => {
+      if (!titleOrNull) {
+        setSelectedRecipe(null);
+        return;
+      }
+      const recipe = templateOptions.find((t) => t.title === titleOrNull) ?? null;
+      setSelectedRecipe(recipe ?? null);
+      if (recipe && project) {
+        updateProject({ ...project, label_config: recipe.config });
+      }
+    },
+    [templateOptions, project]
+  );
 
   const { columns, uploading, uploadDisabled, finishUpload, pageProps, uploadSample } = useImportPage(project, sample);
 
@@ -131,9 +176,9 @@ export const CreateProject = ({ onClose }) => {
     () => ({
       title: name,
       description,
-      label_config: project?.label_config ?? "<View></View>",
+      label_config: selectedRecipe?.config ?? project?.label_config ?? "<View></View>",
     }),
-    [name, description, project?.label_config],
+    [name, description, project?.label_config, selectedRecipe?.config],
   );
 
   const onCreate = React.useCallback(async () => {
@@ -152,6 +197,32 @@ export const CreateProject = ({ onClose }) => {
       },
       body: projectBody,
     });
+
+    // Attach ML backends from template (if any) with dedupe by URL
+    if (response && selectedRecipe?.ml_backends?.length) {
+      try {
+        const existing = await api.callApi("mlBackends", { params: { project: response.id } });
+        const existingUrls = new Set((existing || []).map((mb) => mb.url));
+        for (const mb of selectedRecipe.ml_backends) {
+          if (!existingUrls.has(mb.url)) {
+            const ep = mb.extra_params ?? {};
+            const extraParamsStr = typeof ep === "string" ? ep : JSON.stringify(ep);
+            await api.callApi("addMLBackend", {
+              body: {
+                project: response.id,
+                url: mb.url,
+                title: mb.title,
+                is_interactive: mb.is_interactive ?? true,
+                // Send as string for compatibility with older ML backends that require strings in cache
+                extra_params: extraParamsStr,
+              },
+            });
+          }
+        }
+      } catch (e) {
+        // non-blocking: continue navigation even if ML attach fails
+      }
+    }
 
     setWaitingStatus(false);
 
@@ -223,6 +294,9 @@ export const CreateProject = ({ onClose }) => {
           onSubmit={onCreate}
           description={description}
           setDescription={setDescription}
+          templateOptions={templateOptions}
+          selectedTemplateTitle={selectedRecipe?.title}
+          onSelectTemplate={handleSelectTemplate}
           show={step === "name"}
         />
         <ImportPage
@@ -234,10 +308,12 @@ export const CreateProject = ({ onClose }) => {
           {...pageProps}
         />
         <ConfigPage
+          config={selectedRecipe?.config ?? project?.label_config ?? ""}
           project={project}
           onUpdate={(config) => {
             updateProject({ ...project, label_config: config });
           }}
+          onSelectedRecipeChange={setSelectedRecipe}
           show={step === "config"}
           columns={columns}
           disableSaveButton={true}

@@ -51,7 +51,7 @@ services:
       - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
       # ML Backend Configuration
-      - ADD_DEFAULT_ML_BACKENDS=true
+      - ADD_DEFAULT_ML_BACKENDS=false
       - DEFAULT_ML_BACKEND_URL=http://ml-backend:9090
       - DEFAULT_ML_BACKEND_TITLE=SAM2 Interactive Segmentation
       # Base Data Directory (inside container)
