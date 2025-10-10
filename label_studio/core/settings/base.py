@@ -488,6 +488,8 @@ SUPPORTED_EXTENSIONS = set(
         '.jpg',
         '.jpeg',
         '.json',
+        '.tif',
+        '.tiff',
         '.m4a',
         '.mp3',
         '.ogg',
