@@ -139,6 +139,30 @@ class DataExport(object):
             if format.name not in supported_formats:
                 format_info['disabled'] = True
             formats.append(format_info)
+
+        # Append SEG_CSV format for image segmentation projects
+        try:
+            parsed = project.get_parsed_config() or {}
+            has_seg = False
+            for _, ctrl in parsed.items():
+                t = (ctrl or {}).get('type')
+                if t in ('BrushLabels', 'PolygonLabels'):
+                    has_seg = True
+                    break
+            if has_seg:
+                formats.append(
+                    {
+                        'name': 'SEG_CSV',
+                        'title': 'Segmentation CSV (per image)',
+                        'description': 'ZIP with one CSV per image; rows per annotation with bbox (px) and mean intensities (gray, RGB).',
+                        'link': 'https://labelstud.io/guide/export.html#CSV',
+                        'tags': ['image segmentation'],
+                    }
+                )
+        except Exception:
+            # If config parsing fails, ignore custom format
+            pass
+
         return sorted(formats, key=lambda f: f.get('disabled', False))
 
     @staticmethod
@@ -153,6 +177,12 @@ class DataExport(object):
         data = json.dumps(tasks, ensure_ascii=False)
         md5 = hashlib.md5(json.dumps(data).encode('utf-8')).hexdigest()   # nosec
         name = 'project-' + str(project.id) + '-at-' + now.strftime('%Y-%m-%d-%H-%M') + f'-{md5[0:8]}'
+
+        # Handle custom SEG_CSV export directly
+        if str(output_format).upper() == 'SEG_CSV':
+            from label_studio.data_export.formats.segmentation_csv_exporter import export_segmentation_metrics
+            out, content_type, filename = export_segmentation_metrics(tasks, project, download_resources, hostname)
+            return out, content_type, filename
 
         input_json = DataExport.save_export_files(project, now, get_args, data, md5, name)
 
