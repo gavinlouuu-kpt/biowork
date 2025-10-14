@@ -1,9 +1,9 @@
 [project]
 name = "label-studio"
 version = "1.20.0"
-description = "Label Studio annotation tool"
+description = "bioWork annotation tool"
 authors = [
-    { name = "HumanSignal", email = "support@humansignal.com" },
+    { name = "bioWork", email = "support@biowork.com" },
 ]
 readme = "README.md"
 license = "Apache-2.0"

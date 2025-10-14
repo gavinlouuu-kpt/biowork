@@ -31,7 +31,7 @@ const InvitationModal = ({ link }) => {
       />
 
       <Description style={{ marginTop: 16 }}>
-        Invite people to join your Label Studio instance. People that you invite have full access to all of your
+        Invite people to join your bioWork instance. People that you invite have full access to all of your
         projects.{" "}
         <a
           href="https://labelstud.io/guide/signup.html"
