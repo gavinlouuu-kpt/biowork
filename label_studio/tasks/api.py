@@ -185,7 +185,13 @@ class TaskListAPI(DMTaskListAPI):
     def perform_create(self, serializer):
         project_id = self.request.data.get('project')
         project = generics.get_object_or_404(Project, pk=project_id)
-        instance = serializer.save(project=project)
+        # allow passing import metadata on direct task creation
+        extra = {}
+        if isinstance(self.request.data, dict):
+            for key in ('import_tags', 'import_batch_id', 'import_source'):
+                if key in self.request.data:
+                    extra[key] = self.request.data.get(key)
+        instance = serializer.save(project=project, **extra)
         emit_webhooks_for_instance(
             self.request.user.active_organization, project, WebhookAction.TASKS_CREATED, [instance]
         )

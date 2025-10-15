@@ -16,6 +16,7 @@ export const useImportPage = (project, sample) => {
   const [csvHandling, setCsvHandling] = React.useState(); // undefined | choose | tasks | ts
   const uploadDisabled = csvHandling === "choose";
   const api = useAPI();
+  const [reimportExtras, setReimportExtras] = React.useState({});
 
   // don't use columns from csv if we'll not use it as csv
   const columns = ["choose", "ts"].includes(csvHandling) ? [DEFAULT_COLUMN] : _columns;
@@ -29,6 +30,7 @@ export const useImportPage = (project, sample) => {
       body: {
         file_upload_ids: fileIds,
         files_as_tasks_list: csvHandling === "tasks",
+        ...reimportExtras,
       },
     });
 
@@ -60,6 +62,7 @@ export const useImportPage = (project, sample) => {
     setCsvHandling,
     onFileListUpdate: setFileIds,
     dontCommitToProject: true,
+    setReimportExtras,
   };
 
   return { columns, uploading, uploadDisabled, finishUpload, fileIds, pageProps, uploadSample };

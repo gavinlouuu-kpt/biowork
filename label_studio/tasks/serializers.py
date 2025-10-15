@@ -559,6 +559,9 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
                 total_predictions=len(task_predictions[i]),
                 total_annotations=total_annotations,
                 cancelled_annotations=cancelled_annotations,
+                import_tags=task.get('import_tags', None),
+                import_batch_id=task.get('import_batch_id', None),
+                import_source=task.get('import_source', None),
             )
             db_tasks.append(t)
 
