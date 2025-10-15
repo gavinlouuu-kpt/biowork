@@ -150,6 +150,9 @@ export const ImportPage = ({
   openLabelingConfig,
 }) => {
   const [error, setError] = useState();
+  const [batchId, setBatchId] = useState("");
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState([]);
   const api = useAPI();
   const projectConfigured = project?.label_config !== "<View></View>";
   const sampleConfig = useAtomValue(sampleDatasetAtom);
@@ -226,6 +229,15 @@ export const ImportPage = ({
 
   const importFilesImmediately = useCallback(
     async (files, body) => {
+      // append optional tags and batch id for urlencoded or multipart forms
+      if (body instanceof FormData) {
+        if (batchId) body.append('import_batch_id', batchId);
+        if (tags.length) body.append('import_tags', JSON.stringify(tags));
+      } else if (body instanceof URLSearchParams) {
+        if (batchId) body.append('import_batch_id', batchId);
+        if (tags.length) body.append('import_tags', JSON.stringify(tags));
+      }
+
       importFiles({
         files,
         body,
@@ -237,7 +249,7 @@ export const ImportPage = ({
         dontCommitToProject,
       });
     },
-    [project, onFinish],
+    [project, onFinish, batchId, tags],
   );
 
   const sendFiles = useCallback(
@@ -323,6 +335,27 @@ export const ImportPage = ({
       <input id="file-input" type="file" name="file" multiple onChange={onUpload} style={{ display: "none" }} />
 
       <header className="flex gap-4">
+        <div className="flex gap-2 items-center">
+          <Input placeholder="Batch ID (optional)" value={batchId} onChange={(e) => setBatchId(e.target.value)} />
+          <Input
+            placeholder="Add import tag and press Enter"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && tagInput.trim()) {
+                e.preventDefault();
+                const val = tagInput.trim();
+                if (!tags.includes(val)) setTags([...tags, val]);
+                setTagInput('');
+              }
+            }}
+          />
+          {tags.map((t) => (
+            <Badge key={t} variant="secondary" className="h-6 text-xs">
+              {t}
+            </Badge>
+          ))}
+        </div>
         <form className={`${importClass.elem("url-form")} inline-flex`} method="POST" onSubmit={onLoadURL}>
           <Input placeholder="Dataset URL" name="url" ref={urlRef} style={{ height: 40 }} />
           <Button type="submit" look="primary">

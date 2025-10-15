@@ -361,5 +361,23 @@ def load_tasks(request, project):
     if not tasks:
         raise ValidationError('load_tasks: No tasks added')
 
+    # Attach optional import tags/batch metadata to every task before returning
+    if 'application/json' in request.content_type:
+        if isinstance(request.data, dict):
+            import_tags = request.data.get('import_tags')
+            import_batch_id = request.data.get('import_batch_id')
+        else:
+            import_tags = None
+            import_batch_id = None
+        if import_tags is not None or import_batch_id is not None:
+            for t in tasks:
+                if isinstance(t, dict):
+                    if import_tags is not None and 'import_tags' not in t:
+                        t['import_tags'] = import_tags
+                    if import_batch_id is not None and 'import_batch_id' not in t:
+                        t['import_batch_id'] = import_batch_id
+                    if 'import_source' not in t:
+                        t['import_source'] = 'ui'
+
     check_max_task_number(tasks)
     return tasks, file_upload_ids, could_be_tasks_list, found_formats, list(data_keys)

@@ -273,6 +273,20 @@ class ImportAPI(generics.CreateAPIView):
             # turn flat task JSONs {"column1": value, "column2": value} into {"data": {"column1"..}, "predictions": [{..."column2"}]
             parsed_data = reformat_predictions(parsed_data, preannotated_from_fields)
 
+        # Attach optional import tags/batch metadata to every task before saving
+        import_tags = request.data.get('import_tags') if isinstance(request.data, dict) else None
+        import_batch_id = request.data.get('import_batch_id') if isinstance(request.data, dict) else None
+        # If batch id not provided, keep None; it can be filled on caller side when needed
+        if import_tags is not None or import_batch_id is not None:
+            for t in parsed_data:
+                if isinstance(t, dict):
+                    if import_tags is not None and 'import_tags' not in t:
+                        t['import_tags'] = import_tags
+                    if import_batch_id is not None and 'import_batch_id' not in t:
+                        t['import_batch_id'] = import_batch_id
+                    if 'import_source' not in t:
+                        t['import_source'] = 'ui' if 'FILES' in dir(request) else 'api'
+
         if commit_to_project:
             # Immediately create project tasks and update project states and counters
             tasks, serializer = self._save(parsed_data)
@@ -438,6 +452,19 @@ class ReImportAPI(ImportAPI):
         tasks, found_formats, data_columns = FileUpload.load_tasks_from_uploaded_files(
             project, file_upload_ids, files_as_tasks_list=files_as_tasks_list
         )
+
+        # Attach optional import metadata coming from request body
+        import_tags = self.request.data.get('import_tags')
+        import_batch_id = self.request.data.get('import_batch_id')
+        if import_tags is not None or import_batch_id is not None:
+            for t in tasks:
+                if isinstance(t, dict):
+                    if import_tags is not None and 'import_tags' not in t:
+                        t['import_tags'] = import_tags
+                    if import_batch_id is not None and 'import_batch_id' not in t:
+                        t['import_batch_id'] = import_batch_id
+                    if 'import_source' not in t:
+                        t['import_source'] = 'ui'
 
         with transaction.atomic():
             project.remove_tasks_by_file_uploads(file_upload_ids)
