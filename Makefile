@@ -68,6 +68,19 @@ test:
 build-testing-image:
 	docker build -t heartexlabs/label-studio:latest . && docker build -t heartexlabs/label-studio:latest-testing -f Dockerfile.testing .
 
+# Build versioned Docker image using version from pyproject.toml
+build-versioned:
+	IMAGE_TAG=$$(grep -E '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/') ./scripts/build_docker.sh
+
+# Build with custom version tag
+build-tagged:
+	@if [ -z "$(TAG)" ]; then echo "Usage: make build-tagged TAG=v1.2.3"; exit 1; fi; \
+	IMAGE_TAG=$(TAG) ./scripts/build_docker.sh
+
+# Build and start with versioned image
+build-and-start-versioned:
+	IMAGE_TAG=$$(grep -E '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/') ./scripts/build_docker_and_start.sh
+
 # Run an interactive shell inside a testing container. Label studio dir will be mounted as a volume
 # to avoid need for rebuilds. Run `make build-testing-image` first.
 docker-testing-shell:

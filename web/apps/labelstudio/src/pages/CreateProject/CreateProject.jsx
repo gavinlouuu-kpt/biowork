@@ -305,6 +305,7 @@ export const CreateProject = ({ onClose }) => {
           sample={sample}
           onSampleDatasetSelect={setSample}
           openLabelingConfig={() => setStep("config")}
+          setReimportExtras={pageProps.setReimportExtras}
           {...pageProps}
         />
         <ConfigPage

@@ -93,6 +93,7 @@ export const Inner = () => {
         openLabelingConfig={() => {
           history.push(`/projects/${project.id}/settings/labeling`);
         }}
+        setReimportExtras={pageProps.setReimportExtras}
         {...pageProps}
       />
     </Modal>

@@ -241,6 +241,38 @@ class ImportAPI(generics.CreateAPIView):
     serializer_class = ImportApiSerializer
     queryset = Task.objects.all()
 
+    def _parse_import_meta_from_request(self, request):
+        """Parse optional import metadata (tags, batch id, source) from any request type.
+
+        - Accepts JSON arrays, comma-separated strings, or native lists for tags
+        - Works for multipart/form-data, x-www-form-urlencoded, and application/json
+        """
+        raw_tags = request.data.get('import_tags') if hasattr(request, 'data') else None
+
+        tags = []
+        if isinstance(raw_tags, (list, tuple)):
+            tags = list(raw_tags)
+        elif raw_tags is not None and raw_tags != '':
+            try:
+                parsed = json.loads(raw_tags)
+                if isinstance(parsed, list):
+                    tags = parsed
+                elif parsed is not None:
+                    tags = [str(parsed)]
+            except Exception:
+                # Fallback to comma-separated string
+                tags = [t.strip() for t in str(raw_tags).split(',') if t.strip()]
+
+        batch_id = request.data.get('import_batch_id') if hasattr(request, 'data') else None
+        batch_id = batch_id if batch_id not in ('', None) else None
+
+        source = request.data.get('import_source') if hasattr(request, 'data') else None
+        if not source:
+            # Default to UI for web-based imports; JSON POSTs from API can leave it empty
+            source = 'ui'
+
+        return tags, batch_id, source
+
     def get_serializer_context(self):
         project_id = self.kwargs.get('pk')
         if project_id:
@@ -272,6 +304,18 @@ class ImportAPI(generics.CreateAPIView):
         if preannotated_from_fields:
             # turn flat task JSONs {"column1": value, "column2": value} into {"data": {"column1"..}, "predictions": [{..."column2"}]
             parsed_data = reformat_predictions(parsed_data, preannotated_from_fields)
+
+        # Attach optional import tags/batch metadata to every task before saving
+        tags, batch_id, source = self._parse_import_meta_from_request(request)
+        if tags or batch_id or source:
+            for t in parsed_data:
+                if isinstance(t, dict):
+                    if tags and 'import_tags' not in t:
+                        t['import_tags'] = tags
+                    if batch_id and 'import_batch_id' not in t:
+                        t['import_batch_id'] = batch_id
+                    if source and 'import_source' not in t:
+                        t['import_source'] = source
 
         if commit_to_project:
             # Immediately create project tasks and update project states and counters
@@ -438,6 +482,18 @@ class ReImportAPI(ImportAPI):
         tasks, found_formats, data_columns = FileUpload.load_tasks_from_uploaded_files(
             project, file_upload_ids, files_as_tasks_list=files_as_tasks_list
         )
+
+        # Attach optional import metadata coming from request body
+        tags, batch_id, source = self._parse_import_meta_from_request(self.request)
+        if tags or batch_id or source:
+            for t in tasks:
+                if isinstance(t, dict):
+                    if tags and 'import_tags' not in t:
+                        t['import_tags'] = tags
+                    if batch_id and 'import_batch_id' not in t:
+                        t['import_batch_id'] = batch_id
+                    if source and 'import_source' not in t:
+                        t['import_source'] = source
 
         with transaction.atomic():
             project.remove_tasks_by_file_uploads(file_upload_ids)

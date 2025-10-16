@@ -1,4 +1,9 @@
 version: "3.9"
+
+# To use versioned builds, set IMAGE_TAG in your .env file or environment
+# Example: IMAGE_TAG=1.20.0
+# Or use: make build-versioned
+
 services:
   app:
     build:
