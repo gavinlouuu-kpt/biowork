@@ -97,3 +97,8 @@ export const FF_MULTICHANNEL_TS = "fflag_feat_front_bros58_timeseries_multichann
  * Enables enterprise email notifications
  */
 export const FF_ENTERPRISE_EMAIL_NOTIFICATIONS = "fflag_feat_front_fit_183_email_notifications_short";
+
+/**
+ * Hide Heidi mascot tips across UI
+ */
+export const FF_HIDE_HEIDI_TIPS = "fflag_feat_front_hide_heidi_tips_short";
