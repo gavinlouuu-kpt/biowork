@@ -168,6 +168,9 @@ def samples_paragraphs(request):
 
 def heidi_tips(request):
     """Fetch live tips from github raw liveContent.json to avoid caching and client side CORS issues"""
+    # Allow disabling via feature flag or env var (fflag_feat_front_hide_heidi_tips_short)
+    if flag_set('fflag_feat_front_hide_heidi_tips_short', user='auto'):
+        return HttpResponseNotFound()
     url = 'https://raw.githubusercontent.com/HumanSignal/label-studio/refs/heads/develop/web/apps/labelstudio/src/components/HeidiTips/liveContent.json'
 
     response = None

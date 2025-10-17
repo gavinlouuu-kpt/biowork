@@ -105,7 +105,9 @@ gtag('config', 'UA-129877673-1');
       
     <h3>A full-fledged open source solution for data labeling</h3>
 
+    {% if not feature_flags.fflag_feat_front_hide_heidi_tips_short %}
     {% include 'users/new-ui/user_tips.html' %}
+    {% endif %}
 
     <div class="by">
       Brought to you by
