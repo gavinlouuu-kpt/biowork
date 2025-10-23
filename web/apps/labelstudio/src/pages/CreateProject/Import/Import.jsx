@@ -350,14 +350,30 @@ export const ImportPage = ({
         <div className="flex gap-2 items-center">
           <Input placeholder="Batch ID (optional)" value={batchId} onChange={(e) => setBatchId(e.target.value)} />
           <Input
-            placeholder="Add import tag and press Enter"
+            placeholder="Add import tag"
             value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value ?? '';
+              const parts = next.split(/[;,]/);
+              const pending = parts.pop() ?? '';
+              const newTags = parts.map((p) => p.trim()).filter(Boolean);
+              if (newTags.length) {
+                const merged = [...tags];
+                for (const t of newTags) if (!merged.includes(t)) merged.push(t);
+                setTags(merged);
+              }
+              setTagInput(pending);
+            }}
+            onBlur={() => {
+              const val = (tagInput || '').trim();
+              if (val && !tags.includes(val)) setTags([...tags, val]);
+              setTagInput('');
+            }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && tagInput.trim()) {
+              if (e.key === 'Enter') {
                 e.preventDefault();
-                const val = tagInput.trim();
-                if (!tags.includes(val)) setTags([...tags, val]);
+                const val = (tagInput || '').trim();
+                if (val && !tags.includes(val)) setTags([...tags, val]);
                 setTagInput('');
               }
             }}
