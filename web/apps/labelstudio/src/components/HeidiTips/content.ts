@@ -4,7 +4,7 @@ export const defaultTipsCollection: TipsCollection = {
   projectCreation: [
     {
       title: "Did you know?",
-      content: "It's easier to find the projects when you organize them into workspaces using bioWork Enterprise.",
+      content: "It’s easier to find the projects when you organize them into workspaces using Label Studio Enterprise.",
       closable: true,
       link: {
         label: "Learn more",
@@ -18,7 +18,7 @@ export const defaultTipsCollection: TipsCollection = {
     {
       title: "Unlock faster access provisioning",
       content:
-        "Streamline assigning staff to multiple projects by assigning them to workspaces in bioWork Enterprise.",
+        "Streamline assigning staff to multiple projects by assigning them to workspaces in Label Studio Enterprise.",
       closable: true,
       link: {
         label: "Learn more",
@@ -46,7 +46,7 @@ export const defaultTipsCollection: TipsCollection = {
     {
       title: "Did you know?",
       content:
-        "You can control access to specific projects and workspaces for internal team members and external annotators using bioWork Enterprise.",
+        "You can control access to specific projects and workspaces for internal team members and external annotators using Label Studio Enterprise.",
       closable: true,
       link: {
         label: "Learn more",
@@ -74,7 +74,7 @@ export const defaultTipsCollection: TipsCollection = {
     {
       title: "Labeling for GenAI",
       content:
-        "bioWork has templates available for supervised LLM fine-tuning, RAG retrieval ranking, RLHF, chatbot evaluation, and more.",
+        "Label Studio has templates available for supervised LLM fine-tuning, RAG retrieval ranking, RLHF, chatbot evaluation, and more.",
       closable: true,
       link: {
         label: "Explore templates",
@@ -90,7 +90,7 @@ export const defaultTipsCollection: TipsCollection = {
     {
       title: "It looks like your team is growing!",
       content:
-        "Assign roles to your team using bioWork Enterprise and control access to sensitive data at the project and workspace levels.",
+        "Assign roles to your team using Label Studio Enterprise and control access to sensitive data at the project and workspace levels.",
       closable: true,
       link: {
         label: "Learn more",
@@ -103,7 +103,7 @@ export const defaultTipsCollection: TipsCollection = {
     },
     {
       title: "Want to simplify and secure logging in?",
-      content: "Enable Single Sign-On for your team using SAML, SCIM2 or LDAP with bioWork Enterprise.",
+      content: "Enable Single Sign-On for your team using SAML, SCIM2 or LDAP with Label Studio Enterprise.",
       closable: true,
       link: {
         label: "Learn more",
@@ -116,7 +116,7 @@ export const defaultTipsCollection: TipsCollection = {
     },
     {
       title: "Did you know?",
-      content: "Try bioWork Starter Cloud, optimized for small teams and projects.",
+      content: "Try Label Studio Starter Cloud, optimized for small teams and projects.",
       closable: true,
       link: {
         label: "Learn more",
@@ -144,7 +144,7 @@ export const defaultTipsCollection: TipsCollection = {
     {
       title: "Share knowledge with the community",
       content:
-        "Have questions or a tip to share with other bioWork users? Join the community slack channel for the latest updates. ",
+        "Have questions or a tip to share with other Label Studio users? Join the community slack channel for the latest updates. ",
       closable: true,
       link: {
         label: "Join the community",
@@ -158,7 +158,7 @@ export const defaultTipsCollection: TipsCollection = {
     {
       title: "Did you know?",
       content:
-        "bioWork supports multiple points of integration with cloud storage, machine learning models, and popular tools to automate your machine learning pipeline.",
+        "Label Studio supports multiple points of integration with cloud storage, machine learning models, and popular tools to automate your machine learning pipeline.",
       closable: true,
       link: {
         label: "Check out the integrations directory",
@@ -188,7 +188,7 @@ export const defaultTipsCollection: TipsCollection = {
     {
       title: "Did you know?",
       content:
-        "You can increase the quality of your labeled data with reviewer workflows and task agreement scores using bioWork Enterprise.",
+        "You can increase the quality of your labeled data with reviewer workflows and task agreement scores using Label Studio Enterprise.",
       closable: true,
       link: {
         label: "Learn more",
@@ -229,7 +229,7 @@ export const defaultTipsCollection: TipsCollection = {
     },
     {
       title: "Did you know?",
-      content: "Try bioWork Starter Cloud, optimized for small teams and projects.",
+      content: "Try Label Studio Starter Cloud, optimized for small teams and projects.",
       link: {
         label: "Learn more",
         url: "https://humansignal.com/pricing/",

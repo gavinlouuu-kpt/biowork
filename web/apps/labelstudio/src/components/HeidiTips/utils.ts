@@ -43,14 +43,6 @@ export function getTipMetadata(tip: Tip) {
 }
 
 export const loadLiveTipsCollection = () => {
-  // BIOWORK CUSTOMIZATION: Disabled external GitHub fetch to use local bioWork-branded content
-  // External tips were fetching from Label Studio's GitHub and overriding local content
-  // Re-enable this when bioWork has its own tips endpoint configured
-  
-  // Always return the local default content (which has been updated with bioWork branding)
-  return defaultTipsCollection;
-  
-  /* ORIGINAL CODE - Disabled for bioWork rebranding
   // stale while revalidate - we will return the data present in the cache or the default data and fetch updated data to be put into the cache for the next time this function is called without waiting for the promise.
   const cachedData = localStorage.getItem(CACHE_KEY);
   const fetchedAt = localStorage.getItem(CACHE_FETCHED_AT_KEY);
@@ -98,7 +90,6 @@ export const loadLiveTipsCollection = () => {
 
   // Default local content
   return defaultTipsCollection;
-  */
 };
 
 export function getRandomTip(collection: keyof TipsCollection): Tip | null {

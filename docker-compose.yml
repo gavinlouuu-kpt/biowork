@@ -51,13 +51,9 @@ services:
       - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-1}
       - JSON_LOG=1
       # Cloudflare Turnstile
-      - TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-false}
-      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
-      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
-      # ML Backend Configuration
-      - ADD_DEFAULT_ML_BACKENDS=false
-      - DEFAULT_ML_BACKEND_URL=http://ml-backend:9090
-      - DEFAULT_ML_BACKEND_TITLE=SAM2 Interactive Segmentation
+      - TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-true}
+      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
       # Base Data Directory (inside container)
       - BASE_DATA_DIR=/label-studio/data
       
@@ -88,17 +84,17 @@ services:
       timeout: 5s
       retries: 5
 
-  # cloudflared:
-  #   image: cloudflare/cloudflared:latest
-  #   container_name: cloudflared
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - nginx
-  #   command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-  #   environment:
-  #     - TUNNEL_TRANSPORT_PROTOCOL=quic
-  #   networks:
-  #     - label-studio-network
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TRANSPORT_PROTOCOL=quic
+    networks:
+      - label-studio-network
 
 networks:
   label-studio-network:
