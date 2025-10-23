@@ -1,0 +1,98 @@
+version: "3.9"
+
+name: biowork-dev
+
+# DEVELOPMENT ENVIRONMENT
+# - Ports: 8082 (main), 8083 (secondary)
+# - Data: ./postgres-data-dev/
+# - Containers: label-studio-dev-*
+
+volumes:
+  label-studio-data-dev:
+    driver: local
+
+services:
+  nginx-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.development
+      args:
+        - INCLUDE_DEV=true
+    image: gavinlouuu/label-studio-custom:dev
+    container_name: label-studio-nginx-dev
+    restart: unless-stopped
+    ports:
+      - "8082:8085"
+      - "8083:8086"
+    depends_on:
+      - app-dev
+    environment:
+      - APP_HOST=app-dev
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-http://localhost:8082}
+    volumes:
+      - label-studio-data-dev:/label-studio/data:rw
+      - ./deploy/nginx/certs:/certs:ro
+    command: nginx
+    networks:
+      - label-studio-dev-network
+
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.development
+      args:
+        - INCLUDE_DEV=true
+    image: gavinlouuu/label-studio-custom:dev
+    container_name: label-studio-app-dev
+    restart: unless-stopped
+    expose:
+      - "8000"
+    depends_on:
+      - db-dev
+    environment:
+      - DJANGO_DB=default
+      - POSTGRE_NAME=postgres
+      - POSTGRE_USER=postgres
+      - POSTGRE_PASSWORD=postgres
+      - POSTGRE_PORT=5432
+      - POSTGRE_HOST=db-dev
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-http://localhost:8082}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8082}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-1}
+      - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-1}
+      - JSON_LOG=1
+      - TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-true}
+      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
+      - BASE_DATA_DIR=/label-studio/data
+    volumes:
+      - label-studio-data-dev:/label-studio/data:rw
+    command: label-studio-uwsgi
+    networks:
+      - label-studio-dev-network
+
+  db-dev:
+    image: pgautoupgrade/pgautoupgrade:13-alpine
+    container_name: label-studio-db-dev
+    hostname: db-dev
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST_AUTH_METHOD=md5
+    volumes:
+      - ./postgres-data-dev:/var/lib/postgresql/data
+      - ./deploy/pgsql/certs:/var/lib/postgresql/certs:ro
+    networks:
+      - label-studio-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  label-studio-dev-network:
+    name: label-studio-dev-network
+    driver: bridge

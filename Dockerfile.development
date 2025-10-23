@@ -17,10 +17,39 @@ ARG BRANCH_OVERRIDE
 
 ################################ Stage: frontend-builder (build frontend assets)
 FROM --platform=${BUILDPLATFORM} node:${NODE_VERSION} AS frontend-builder
+ENV BUILD_NO_SERVER=true \
+    BUILD_NO_HASH=true \
+    BUILD_NO_CHUNKS=true \
+    BUILD_MODULE=true \
+    YARN_CACHE_FOLDER=/root/web/.yarn \
+    NX_CACHE_DIRECTORY=/root/web/.nx \
+    NODE_ENV=development
+
 WORKDIR /label-studio/web
+
+# Fix Docker Arm64 Build
+RUN yarn config set registry https://registry.npmjs.org/
+RUN yarn config set network-timeout 1200000 # HTTP timeout used when downloading packages, set to 20 minutes
+
+COPY web/package.json .
+COPY web/yarn.lock .
+COPY web/tools tools
+RUN --mount=type=cache,target=${YARN_CACHE_FOLDER},sharing=locked \
+    --mount=type=cache,target=${NX_CACHE_DIRECTORY},sharing=locked \
+    yarn install --prefer-offline --no-progress --pure-lockfile --frozen-lockfile --ignore-engines --non-interactive --production=false
 
 COPY web .
 COPY pyproject.toml ../pyproject.toml
+RUN --mount=type=cache,target=${YARN_CACHE_FOLDER},sharing=locked \
+    --mount=type=cache,target=${NX_CACHE_DIRECTORY},sharing=locked \
+    yarn run build
+
+################################ Stage: frontend-version-generator
+FROM frontend-builder AS frontend-version-generator
+RUN --mount=type=cache,target=${YARN_CACHE_FOLDER},sharing=locked \
+    --mount=type=cache,target=${NX_CACHE_DIRECTORY},sharing=locked \
+    --mount=type=bind,source=.git,target=../.git \
+    yarn version:libs
 
 ################################ Stage: venv-builder (prepare the virtualenv)
 FROM python:${PYTHON_VERSION}-slim AS venv-builder
