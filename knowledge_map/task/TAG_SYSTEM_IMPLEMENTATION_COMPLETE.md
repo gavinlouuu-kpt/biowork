@@ -78,6 +78,13 @@ Successfully imported task with tags via direct API call:
 
 4. **File Upload Import**: The file upload flow in the Import UI needs the uploaded files to be properly associated with the import metadata. Currently tested with direct API import which works correctly.
 
+5. **Sample Dataset Imports (Fixed 2025-10-23)**: Previously, importing sample datasets did not propagate `import_tags`/`import_batch_id` from the Import UI. This is now fixed by appending metadata in `uploadSample()` and allowing `URLSearchParams` in the `importFiles` helper.
+
+   - UI changes:
+     - `web/apps/labelstudio/src/pages/CreateProject/Import/useImportPage.js`: Append `import_batch_id`, `import_tags` (JSON), and `import_source='ui'` when triggering sample import.
+     - `web/apps/labelstudio/src/pages/CreateProject/Import/utils.ts`: Broaden `importFiles` signature to accept `URLSearchParams`.
+   - BE: No changes required for Community edition; existing import endpoint reads urlencoded `import_tags`/`import_batch_id`.
+
 ## Database Migration
 
 Migration file: `label_studio/tasks/migrations/0055_task_import_tags.py`
