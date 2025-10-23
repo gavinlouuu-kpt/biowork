@@ -90,6 +90,7 @@ services:
     restart: unless-stopped
     depends_on:
       - nginx
+    # Remember to add CLOUDFLARE_TUNNEL_TOKEN to environment variables i.e., source biowork_profile
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     environment:
       - TUNNEL_TRANSPORT_PROTOCOL=quic
