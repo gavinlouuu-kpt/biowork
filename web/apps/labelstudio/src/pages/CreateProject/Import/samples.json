@@ -8,5 +8,10 @@
     "title": "CoNLL 2012 NER",
     "description": "The CoNLL dataset of 13k sentences for Named Entity Recognition.",
     "url": "https://hs-sandbox-pub.s3.us-east-1.amazonaws.com/sample_data/conll_2012.json"
+  },
+  {
+    "title": "ddPCR Images",
+    "description": "All public images from gavinlouuu/ddPCR on Hugging Face.",
+    "url": "https://huggingface.co/datasets/gavinlouuu/ddPCR/resolve/main/labelstudio_tasks.json?download=true"
   }
 ]
