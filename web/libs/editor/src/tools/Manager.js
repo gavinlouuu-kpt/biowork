@@ -1,5 +1,5 @@
 import { ff } from "@humansignal/core";
-import { destroy } from "mobx-state-tree";
+import { destroy, getType } from "mobx-state-tree";
 import { FF_DEV_3391 } from "../utils/feature-flags";
 import { guidGenerator } from "../utils/unique";
 
@@ -159,6 +159,88 @@ class ToolsManager {
 
   allTools() {
     return Object.values(this.tools);
+  }
+
+  /**
+   * Return tools that belong to the provided control (by model or control name)
+   * @param {any|string} control
+   * @returns {Array}
+   */
+  findToolsForControl(control) {
+    const controlName = typeof control === "string" ? control : control?.name;
+    if (!controlName) return [];
+    return this.allTools().filter((t) => t?.control?.name === controlName);
+  }
+
+  /**
+   * Return the first smart (dynamic) tool for a given control
+   * @param {any|string} control
+   */
+  findSmartForControl(control) {
+    return this.findToolsForControl(control).find((t) => t?.dynamic === true) ?? null;
+  }
+
+  /**
+   * Return the preferred base (non-dynamic) tool for a given control
+   * Prefer a tool with `default === true` if available
+   * @param {any|string} control
+   */
+  findBaseForControl(control) {
+    const tools = this.findToolsForControl(control).filter((t) => t?.dynamic !== true);
+    return tools.find((t) => t?.default === true) ?? tools[0] ?? null;
+  }
+
+  /**
+   * Find a smart counterpart of a provided base tool (same type & control)
+   * @param {any} tool
+   */
+  findSmartCounterpart(tool) {
+    if (!tool) return null;
+    const typeName = getType(tool)?.name;
+    const controlName = tool?.control?.name;
+    return (
+      this.allTools().find(
+        (t) => t?.dynamic === true && getType(t)?.name === typeName && t?.control?.name === controlName,
+      ) ?? null
+    );
+  }
+
+  /**
+   * Select the smart tool for a control if available (or base as fallback)
+   * If no control is provided, try to switch the currently selected/default tool to its smart version
+   * This is intended to be used when enabling auto-annotation
+   * @param {any|string=} control
+   */
+  selectSmartDefault(control) {
+    // try to prefer the smart counterpart of the currently selected tool
+    const selected = this.findSelectedTool();
+
+    if (!control && selected) {
+      const smart = selected.dynamic ? selected : this.findSmartCounterpart(selected);
+      if (smart) {
+        this.selectTool(smart, true);
+        return smart;
+      }
+    }
+
+    // otherwise, try to resolve by control
+    const smartForControl = control ? this.findSmartForControl(control) : null;
+    if (smartForControl) {
+      this.selectTool(smartForControl, true);
+      return smartForControl;
+    }
+
+    // fallback: try to pick any smart tool for this manager
+    const anySmart = this.allTools().find((t) => t?.dynamic === true);
+    if (anySmart) {
+      this.selectTool(anySmart, true);
+      return anySmart;
+    }
+
+    // final fallback: ensure base default is selected
+    const base = control ? this.findBaseForControl(control) : this._default_tool;
+    if (base) this.selectTool(base, true);
+    return base ?? null;
   }
 
   addToolsFromControl(s) {

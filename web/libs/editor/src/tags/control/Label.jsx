@@ -190,17 +190,29 @@ const Model = types
 
       // if we are going to select label and it would be the first in this labels group
       if (!labels.selectedLabels.length && !self.selected) {
-        // unselect other tools if they exist and selected
+        // prefer smart tool when auto-annotation is enabled
         const manager = ToolsManager.getInstance({ name: self.parent.toname });
-        const tool = Object.values(self.parent?.tools || {})[0];
+        const store = self.annotation?.store;
+        const preferSmart = store?.autoAnnotation && self.parent?.smartEnabled;
 
-        const selectedTool = manager.findSelectedTool();
-        const sameType = tool && selectedTool ? getType(selectedTool).name === getType(tool).name : false;
-        const sameLabel = selectedTool ? tool?.control?.name === selectedTool?.control?.name : false;
-        const isNotSameTool = selectedTool && (!sameType || !sameLabel);
+        if (preferSmart) {
+          const selected = manager.findSelectedTool();
+          const sameControl = selected?.control?.name === self.parent?.name;
+          if (!sameControl || selected?.dynamic !== true) {
+            manager.selectSmartDefault(self.parent?.name);
+          }
+        } else {
+          // fall back to base/default tool selection logic
+          const tool = Object.values(self.parent?.tools || {})[0];
 
-        if (tool && (isNotSameTool || !selectedTool)) {
-          manager.selectTool(tool, true);
+          const selectedTool = manager.findSelectedTool();
+          const sameType = tool && selectedTool ? getType(selectedTool).name === getType(tool).name : false;
+          const sameLabel = selectedTool ? tool?.control?.name === selectedTool?.control?.name : false;
+          const isNotSameTool = selectedTool && (!sameType || !sameLabel);
+
+          if (tool && (isNotSameTool || !selectedTool)) {
+            manager.selectTool(tool, true);
+          }
         }
       }
 

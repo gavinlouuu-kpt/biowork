@@ -4,39 +4,38 @@ group: BioWork
 image: /static/templates/semantic-segmentation-with-masks.png
 order: 2
 config: |
-  <View>
+  <View style="display: flex;">
+  <!-- Left side: Image -->
+  <View style="flex: 80%; margin-right: 1em">
     <Image name="image" value="$image" zoom="true"/>
+  </View>
+  
+  <!-- Right side: All labeling tools -->
+  <View style="flex: 20%;">
     <!-- Smart Keypoint Labels (tag3) -->
-    <Header value="Interact: Keypoint Labels"/>
+    <Header value="Keypoint Labels"/>
     <KeyPointLabels name="tag3" toName="image" smart="true">
-      <Label value="Object" smart="true" background="#0000FF"/>
+      <Label value="Object" background="#0000FF" showInline="true" />
     </KeyPointLabels>
-      
+    
     <!-- Smart Rectangle Labels (tag4) -->
-    <Header value="Interact: Rectangle Labels"/>
+    <Header value="Rectangle Labels"/>
     <RectangleLabels name="tag4" toName="image" smart="true">
       <Label value="Object" smart="true" background="#0000FF"/>
     </RectangleLabels>
     
-      <TextArea name="mean_intensity" toName="image"
+    <TextArea name="mean_intensity" toName="image"
               perRegion="true"
-              required="true"
-              maxSubmissions="1"
               rows="5"
               placeholder="Mean Intensity"
               displayMode="region-list"
               />
-    <!-- Brush Labels (tag1) -->
-    <Header value="Result: Brush Labels"/>
-    <BrushLabels name="tag1" toName="image">
-      <Label value="Object" background="#FF0000"/>
-    </BrushLabels>
-    
     <!-- Polygon Labels (tag2) -->
     <Header value="Result: Outline"/>
     <PolygonLabels name="tag2" toName="image">
       <Label value="Object" background="#00FF00"/>
     </PolygonLabels>
+  </View>
   </View>
 ml_backends:
   - url: http://fastsam-backend:9090
