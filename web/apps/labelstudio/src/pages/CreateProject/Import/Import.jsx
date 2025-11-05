@@ -195,6 +195,10 @@ export const ImportPage = ({
   });
   const showList = Boolean(files.uploaded?.length || files.uploading?.length || sample);
 
+  // Track previously uploaded IDs and animation state for newly uploaded files
+  const prevUploadedRef = useRef(new Set());
+  const [newlyUploadedFiles, setNewlyUploadedFiles] = useState(new Set());
+
   const loadFilesList = useCallback(
     async (file_upload_ids) => {
       const query = {};
