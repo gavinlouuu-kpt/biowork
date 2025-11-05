@@ -5,7 +5,7 @@ import { Badge } from "@humansignal/shad/components/ui/badge";
 import { cn as scn } from "@humansignal/shad/utils";
 import { useAtomValue } from "jotai";
 import Input from "libs/datamanager/src/components/Common/Input/Input";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useAPI } from "../../../providers/ApiProvider";
 import { cn } from "../../../utils/bem";
 import { unique } from "../../../utils/helpers";
@@ -284,6 +284,16 @@ export const ImportPage = ({
     }
   }, [files.uploaded]);
 
+  // Ensure ddPCR sample is always available; other samples remain behind the flag
+  const ddpcrSamples = useMemo(() => {
+    return samples.filter((s) => {
+      const title = (s?.title || "").toLowerCase();
+      const url = (s?.url || "").toLowerCase();
+      return title.includes("ddpcr") || url.includes("/ddpcr/");
+    });
+  }, [samples]);
+  const sampleOptions = ff.isActive(ff.FF_SAMPLE_DATASETS) ? samples : ddpcrSamples;
+
   const importFilesImmediately = useCallback(
     async (files, body) => {
       // append optional tags and batch id for urlencoded or multipart forms
@@ -457,8 +467,8 @@ export const ImportPage = ({
         >
           Upload {files.uploaded.length ? "More " : ""}Files
         </Button>
-        {ff.isActive(ff.FF_SAMPLE_DATASETS) && (
-          <SampleDatasetSelect samples={samples} sample={sample} onSampleApplied={onSampleDatasetSelect} />
+        {sampleOptions.length > 0 && (
+          <SampleDatasetSelect samples={sampleOptions} sample={sample} onSampleApplied={onSampleDatasetSelect} />
         )}
         <div
           className={importClass.elem("csv-handling").mod({ highlighted: highlightCsvHandling, hidden: !csvHandling })}
