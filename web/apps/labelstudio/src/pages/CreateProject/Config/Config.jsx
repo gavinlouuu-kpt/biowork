@@ -585,6 +585,7 @@ export const ConfigPage = ({
   columns: externalColumns,
   project,
   onUpdate,
+  onSelectedRecipeChange,
   onSaveClick,
   onValidate,
   disableSaveButton,
@@ -658,6 +659,7 @@ export const ConfigPage = ({
     } else {
       setTemplate(recipe.config);
       setSelectedRecipe(recipe);
+      onSelectedRecipeChange?.(recipe);
       setMode("view");
       __lsa(`labeling_setup.view.${toSnakeCase(recipe.group)}.${toSnakeCase(recipe.title)}`);
     }

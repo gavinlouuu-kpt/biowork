@@ -258,7 +258,38 @@ class ProjectListAPI(generics.ListCreateAPIView):
 
     def perform_create(self, ser):
         try:
-            ser.save(organization=self.request.user.active_organization)
+            project = ser.save(organization=self.request.user.active_organization)
+            
+            # Auto-connect default ML backend if configured
+            if settings.ADD_DEFAULT_ML_BACKENDS and settings.DEFAULT_ML_BACKEND_URL:
+                from ml.models import MLBackend
+                try:
+                    ml_backend = MLBackend.objects.create(
+                        project=project,
+                        url=settings.DEFAULT_ML_BACKEND_URL,
+                        title=settings.DEFAULT_ML_BACKEND_TITLE,
+                        is_interactive=True  # Enable interactive preannotations on ML backend
+                    )
+                    ml_backend.update_state()
+                    logger.info(f'Auto-connected ML backend "{ml_backend.title}" to project {project.id} with interactive preannotations enabled')
+                    
+                    # Enable interactive preannotations and set model version
+                    update_fields = []
+                    if project.show_collab_predictions and not project.model_version:
+                        project.model_version = ml_backend.title
+                        update_fields.append('model_version')
+                    
+                    # Enable interactive preannotations UI setting for better UX
+                    if not project.reveal_preannotations_interactively:
+                        project.reveal_preannotations_interactively = True
+                        update_fields.append('reveal_preannotations_interactively')
+                        logger.info(f'Enabled reveal_preannotations_interactively for project {project.id}')
+                    
+                    if update_fields:
+                        project.save(update_fields=update_fields)
+                except Exception as e:
+                    logger.warning(f'Failed to auto-connect ML backend to project {project.id}: {e}')
+                    
         except IntegrityError as e:
             if str(e) == 'UNIQUE constraint failed: project.title, project.created_by_id':
                 raise ProjectExistException(

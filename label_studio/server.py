@@ -98,6 +98,23 @@ def _create_project(title, user, label_config=None, sampling=None, description=N
         for url in ml_backends:
             logger.info('Adding new ML backend %s', url)
             MLBackend.objects.create(project=project, url=url)
+    elif settings.ADD_DEFAULT_ML_BACKENDS and settings.DEFAULT_ML_BACKEND_URL:
+        # Auto-connect default ML backend if no explicit backends provided
+        from ml.models import MLBackend
+        try:
+            ml_backend = MLBackend.objects.create(
+                project=project,
+                url=settings.DEFAULT_ML_BACKEND_URL,
+                title=settings.DEFAULT_ML_BACKEND_TITLE,
+                is_interactive=True  # Enable interactive preannotations on ML backend
+            )
+            logger.info('Auto-connected default ML backend "%s" to project with interactive preannotations enabled', ml_backend.title)
+            
+            # Enable interactive preannotations UI setting for better UX
+            project.reveal_preannotations_interactively = True
+            logger.info('Enabled reveal_preannotations_interactively for project')
+        except Exception as e:
+            logger.warning('Failed to auto-connect ML backend: %s', e)
 
     project.save()
     return project
@@ -169,13 +186,10 @@ def _create_user(input_args, config):
         print('User {} already exists'.format(username))
 
     user = User.objects.get(email=username)
-    org = Organization.objects.first()
-    if not org:
-        org = Organization.create_organization(
-            created_by=user, title='Label Studio', legacy_api_tokens_enabled=input_args.enable_legacy_api_token
-        )
-    else:
-        org.add_user(user)
+    # Create individual organization for the admin user
+    org = Organization.create_organization(
+        created_by=user, title=f"{user.email}'s Organization", legacy_api_tokens_enabled=input_args.enable_legacy_api_token
+    )
     user.active_organization = org
     user.save(update_fields=['active_organization'])
 

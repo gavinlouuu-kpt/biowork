@@ -61,11 +61,22 @@ def save_user(request, next_page, user_form):
     user.username = user.email.split('@')[0]
     user.save()
 
-    if Organization.objects.exists():
-        org = Organization.objects.first()
-        org.add_user(user)
+    # Check if user is joining via invitation token
+    token = request.GET.get('token') or request.POST.get('token')
+    org = None
+    
+    if token:
+        # User is joining via invitation - add to existing organization
+        try:
+            org = Organization.objects.get(token=token)
+            org.add_user(user, joined_via_invitation=True)
+        except Organization.DoesNotExist:
+            # Invalid token, create individual organization
+            org = Organization.create_organization(created_by=user, title=f"{user.email}'s Organization")
     else:
-        org = Organization.create_organization(created_by=user, title='Label Studio')
+        # No token - create individual organization for new user
+        org = Organization.create_organization(created_by=user, title=f"{user.email}'s Organization")
+    
     user.active_organization = org
     user.save(update_fields=['active_organization'])
 

@@ -286,13 +286,49 @@ def apply_filters(queryset, filters, project, request):
             preprocess_filter = load_func(settings.DATA_MANAGER_PREPROCESS_FILTER)
             _filter = preprocess_filter(_filter, field_name)
 
-            # custom expressions for enterprise
-            filter_expression = custom_filter_expressions(
-                _filter,
-                field_name,
-                project,
-                request=request,
-                is_child_filter=is_child_filter,
+        # import tags filtering (simple contains and empty checks)
+        if field_name == 'import_tags':
+            if _filter.operator == Operator.CONTAINS:
+                # treat value as single tag string or list of tags
+                values = _filter.value if isinstance(_filter.value, list) else [_filter.value]
+                q = Q()
+                for v in values:
+                    q |= Q(import_tags__contains=[v])
+                filter_expressions.append(q)
+                continue
+            elif _filter.operator == Operator.NOT_CONTAINS:
+                values = _filter.value if isinstance(_filter.value, list) else [_filter.value]
+                q = Q()
+                for v in values:
+                    q &= ~Q(import_tags__contains=[v])
+                filter_expressions.append(q)
+                continue
+            elif _filter.operator == Operator.EMPTY:
+                value = cast_bool_from_str(_filter.value)
+                # empty means null or []
+                if value:
+                    filter_expressions.append(Q(Q(import_tags__isnull=True) | Q(import_tags=[])))
+                else:
+                    filter_expressions.append(~Q(Q(import_tags__isnull=True) | Q(import_tags=[])))
+                continue
+
+        if field_name == 'import_batch_id':
+            # supports equal/not_equal/contains/not_contains/empty via generic handling below
+            pass
+
+        # use other name because of model names conflict
+        if field_name == 'file_upload':
+            field_name = 'file_upload_field'
+
+        # annotate with cast to number if need
+        if _filter.type == 'Number' and field_name.startswith('data__'):
+            json_field = field_name.replace('data__', '')
+            queryset = queryset.annotate(
+                **{
+                    f'filter_{json_field.replace("$undefined$", "undefined")}': Cast(
+                        KeyTextTransform(json_field, 'data'), output_field=FloatField()
+                    )
+                }
             )
             if filter_expression:
                 filter_expressions.append(filter_expression)

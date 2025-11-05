@@ -16,6 +16,7 @@ export const useImportPage = (project, sample) => {
   const [csvHandling, setCsvHandling] = React.useState(); // undefined | choose | tasks | ts
   const uploadDisabled = csvHandling === "choose";
   const api = useAPI();
+  const [reimportExtras, setReimportExtras] = React.useState({});
 
   // don't use columns from csv if we'll not use it as csv
   const columns = ["choose", "ts"].includes(csvHandling) ? [DEFAULT_COLUMN] : _columns;
@@ -29,6 +30,9 @@ export const useImportPage = (project, sample) => {
       body: {
         file_upload_ids: fileIds,
         files_as_tasks_list: csvHandling === "tasks",
+        ...reimportExtras,
+        // propagate optional import metadata captured in Import.jsx via setReimportExtras
+        // Expected keys: import_batch_id (string), import_tags (array)
       },
     });
 
@@ -41,6 +45,10 @@ export const useImportPage = (project, sample) => {
       onStart?.();
       const url = sample.url;
       const body = new URLSearchParams({ url });
+      const { import_batch_id, import_tags } = reimportExtras || {};
+      if (import_batch_id) body.append('import_batch_id', import_batch_id);
+      if (Array.isArray(import_tags) && import_tags.length) body.append('import_tags', JSON.stringify(import_tags));
+      body.append('import_source', 'ui');
       await importFiles({
         files: [{ name: url }],
         body,
@@ -48,7 +56,7 @@ export const useImportPage = (project, sample) => {
       });
       onFinish?.();
     },
-    [project],
+    [project, reimportExtras],
   );
 
   const pageProps = {
@@ -60,6 +68,7 @@ export const useImportPage = (project, sample) => {
     setCsvHandling,
     onFileListUpdate: setFileIds,
     dontCommitToProject: true,
+    setReimportExtras,
   };
 
   return { columns, uploading, uploadDisabled, finishUpload, fileIds, pageProps, uploadSample };

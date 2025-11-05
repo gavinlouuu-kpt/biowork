@@ -11,7 +11,7 @@ export const importFiles = async ({
   dontCommitToProject,
 }: {
   files: { name: string }[];
-  body: Record<string, any> | FormData;
+  body: Record<string, any> | FormData | URLSearchParams;
   project: APIProject;
   onUploadStart?: (files: { name: string }[]) => void;
   onUploadFinish?: (files: { name: string }[]) => void;

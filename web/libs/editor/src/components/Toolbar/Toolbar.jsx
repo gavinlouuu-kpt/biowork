@@ -42,26 +42,52 @@ export const Toolbar = inject("store")(
       }, {});
 
     const smartTools = tools.filter((t) => t.dynamic);
+    const smartToolGroups = smartTools.reduce((res, tool) => {
+      const group = res[tool.group] ?? [];
+
+      group.push(tool);
+      res[tool.group] = group;
+      return res;
+    }, {});
 
     return (
       <ToolbarProvider value={{ expanded, alignment }}>
         <Block ref={(el) => setToolbar(el)} name="toolbar" mod={{ alignment, expanded }}>
-          {Object.entries(toolGroups).map(([name, tools], i) => {
-            const visibleTools = tools.filter((t) => t.viewClass);
+          {store.autoAnnotation ? (
+            // When auto-annotation is ON, show smart/interactive tools individually
+            Object.entries(smartToolGroups).map(([name, tools], i) => {
+              const visibleTools = tools.filter((t) => t.viewClass);
 
-            return visibleTools.length ? (
-              <Elem name="group" key={`toolset-${name}-${i}`}>
-                {visibleTools
-                  .sort((a, b) => a.index - b.index)
-                  .map((tool, i) => {
-                    const ToolComponent = tool.viewClass;
+              return visibleTools.length ? (
+                <Elem name="group" key={`toolset-${name}-${i}`}>
+                  {visibleTools
+                    .sort((a, b) => a.index - b.index)
+                    .map((tool, i) => {
+                      const ToolComponent = tool.viewClass;
 
-                    return <ToolComponent key={`${tool.toolName}-${i}`} />;
-                  })}
-              </Elem>
-            ) : null;
-          })}
-          {store.autoAnnotation && <SmartTools tools={smartTools} />}
+                      return <ToolComponent key={`${tool.toolName}-${i}`} />;
+                    })}
+                </Elem>
+              ) : null;
+            })
+          ) : (
+            // When auto-annotation is OFF, show regular tools
+            Object.entries(toolGroups).map(([name, tools], i) => {
+              const visibleTools = tools.filter((t) => t.viewClass);
+
+              return visibleTools.length ? (
+                <Elem name="group" key={`toolset-${name}-${i}`}>
+                  {visibleTools
+                    .sort((a, b) => a.index - b.index)
+                    .map((tool, i) => {
+                      const ToolComponent = tool.viewClass;
+
+                      return <ToolComponent key={`${tool.toolName}-${i}`} />;
+                    })}
+                </Elem>
+              ) : null;
+            })
+          )}
         </Block>
       </ToolbarProvider>
     );

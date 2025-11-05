@@ -109,6 +109,28 @@ class Task(TaskMixin, models.Model):
         related_name='tasks',
         help_text='Uploaded file used as data source for this task',
     )
+    # Import tagging fields to identify data origin/group
+    import_tags = JSONField(
+        'import tags',
+        null=True,
+        blank=True,
+        default=list,
+        help_text='Tags applied to this task during import (e.g. batch or experiment identifiers)',
+    )
+    import_batch_id = models.CharField(
+        'import batch id',
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text='Batch identifier assigned during import to group tasks',
+    )
+    import_source = models.CharField(
+        'import source',
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text='Source of import: ui, api, storage, etc.',
+    )
     inner_id = models.BigIntegerField(
         _('inner id'),
         default=0,
@@ -174,6 +196,7 @@ class Task(TaskMixin, models.Model):
             models.Index(fields=['id', 'overlap']),
             models.Index(fields=['overlap']),
             models.Index(fields=['project', 'id']),
+            models.Index(fields=['import_batch_id']),
         ]
 
     @property

@@ -15,6 +15,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from organizations.forms import OrganizationSignupForm
 from organizations.models import Organization
 from rest_framework.authtoken.models import Token
+from turnstile.decorators import require_turnstile
 from users import forms
 from users.functions import login, proceed_registration
 
@@ -37,6 +38,7 @@ def logout(request):
 
 
 @enforce_csrf_checks
+@require_turnstile
 def user_signup(request):
     """Sign up page"""
     user = request.user
@@ -58,13 +60,17 @@ def user_signup(request):
 
     # make a new user
     if request.method == 'POST':
-        organization = Organization.objects.first()
-        if settings.DISABLE_SIGNUP_WITHOUT_LINK is True:
-            if not (token and organization and token == organization.token):
-                raise PermissionDenied()
+        # Validate invitation token if provided
+        if token:
+            try:
+                organization = Organization.objects.get(token=token)
+            except Organization.DoesNotExist:
+                raise PermissionDenied("Invalid invitation token")
         else:
-            if token and organization and token != organization.token:
-                raise PermissionDenied()
+            # No token provided
+            if getattr(settings, 'DISABLE_SIGNUP_WITHOUT_LINK', False):
+                raise PermissionDenied("Signup without invitation link is disabled")
+            organization = None
 
         user_form = forms.UserSignupForm(request.POST)
         organization_form = OrganizationSignupForm(request.POST)
@@ -101,6 +107,7 @@ def user_signup(request):
 
 
 @enforce_csrf_checks
+@require_turnstile
 def user_login(request):
     """Login page"""
     user = request.user

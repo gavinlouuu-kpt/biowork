@@ -25,8 +25,16 @@ export const DynamicPreannotationsToggle = inject("store")(
 
                 store.setAutoAnnotation(checked);
 
-                if (!checked) {
-                  ToolsManager.allInstances().forEach((inst) => inst.selectDefault());
+                if (checked) {
+                  // when enabling auto-annotation prefer smart tools for managers with an active selection
+                  ToolsManager.allInstances().forEach((inst) => {
+                    if (inst.findSelectedTool()) inst.selectSmartDefault();
+                  });
+                } else {
+                  // when disabling auto-annotation, only revert managers that currently have a smart tool selected
+                  ToolsManager.allInstances().forEach((inst) => {
+                    if (inst.findSelectedTool()?.dynamic === true) inst.selectDefault();
+                  });
                 }
               }}
               label="Auto-Annotation"

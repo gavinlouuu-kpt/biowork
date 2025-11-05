@@ -71,8 +71,6 @@ const SettingsModel = types
     isDestroying: types.optional(types.boolean, false),
 
     videoDrawOutside: types.optional(types.boolean, false),
-
-    invertedZoom: types.optional(types.boolean, false),
   })
   .views((self) => ({
     get annotation() {

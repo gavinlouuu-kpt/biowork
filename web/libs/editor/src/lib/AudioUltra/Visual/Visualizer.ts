@@ -1125,6 +1125,10 @@ export class Visualizer extends Events<VisualizerEvents> {
         if (layer.name === "regions") {
           layer.height = this.height;
         }
+        // Update regions layer height to match the full visualizer height
+        if (layer.name === "regions") {
+          layer.height = this.height;
+        }
       }
     });
 
@@ -1254,7 +1258,14 @@ export class Visualizer extends Events<VisualizerEvents> {
     const spectrogramLayer = this.getLayer("spectrogram");
     if (!spectrogramLayer?.isVisible) return 0;
 
-    return this.spectrogramHeight;
+    const channelCount = this.audio?.channelCount ?? 1;
+
+    if (this.splitChannels) {
+      // Each channel gets an equal split of the spectrogram area
+      return this.waveHeight / channelCount;
+    }
+    // Spectrogram uses the full height when not split
+    return this.waveHeight;
   }
 
   setAmp(amp: number) {

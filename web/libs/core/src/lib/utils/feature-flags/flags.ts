@@ -94,29 +94,6 @@ export const FF_MULTICHANNEL_TS = "fflag_feat_front_bros58_timeseries_multichann
 export const FF_ENTERPRISE_EMAIL_NOTIFICATIONS = "fflag_feat_front_fit_183_email_notifications_short";
 
 /**
- * Bitmask is a new image segmentation tool for masking that allows pixel-perfect editing
- *
- * @link https://app.launchdarkly.com/projects/default/flags/fflag_front_feat_bros_87_pixel_wise_16062025_short
+ * Hide Heidi mascot tips across UI
  */
-export const FF_BITMASK = "fflag_front_feat_bros_87_pixel_wise_16062025_short";
-
-/**
- * New storage providers experience
- * @link https://app.launchdarkly.com/projects/default/flags/fflag_feat_bros_193_new_cloud_storage_providers_short/targeting?env=production&selected-env=production
- */
-export const FF_NEW_STORAGES = "fflag_feat_bros_193_new_cloud_storage_providers_short";
-
-/**
- * Datamanager filter members
- */
-export const FF_DM_FILTER_MEMBERS = "fflag_feat_fit_449_datamanager_filter_members_short";
-
-/**
- * Modify MST models to allow custom tags
- */
-export const FF_CUSTOM_TAGS = "fflag_feat_front_bros_194_custom_tags_short";
-
-/**
- * Multiple labels support for region creation - improved label blocks handling
- */
-export const FF_MULTIPLE_LABELS_REGIONS = "fflag_feat_front_bros_327_multiple_labels_regions_short";
+export const FF_HIDE_HEIDI_TIPS = "fflag_feat_front_hide_heidi_tips_short";
