@@ -86,6 +86,7 @@ urlpatterns = [
     re_path(r'^', include('ml.urls')),
     re_path(r'^', include('webhooks.urls')),
     re_path(r'^', include('labels_manager.urls')),
+    re_path(r'^', include('billing.urls')),
     re_path(r'data/local-files/', views.localfiles_data, name='localfiles_data'),
     re_path(r'version/', views.version_page, name='version'),  # html page
     re_path(r'api/version/', views.version_page, name='api-version'),  # json response
@@ -110,6 +111,8 @@ urlpatterns = [
     path('heidi-tips/', views.heidi_tips, name='heidi_tips'),
     path('__lsa/', views.collect_metrics, name='collect_metrics'),
     re_path(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    path('accounts/', include('allauth.urls')),  # login, logout, signup, email management
+    path('stripe/', include(('djstripe.urls', 'djstripe'), namespace='djstripe')),
     re_path(r'^', include('jwt_auth.urls')),
     re_path(r'^', include('session_policy.urls')),
 ]

@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/reading/Developer/biowork/logs/.c7d66fa2b7eea8e4e2a1d0813fef9bfb7891f6bc-audit.json",
+    "files": [
+        {
+            "date": 1764247295915,
+            "name": "/Users/reading/Developer/biowork/logs/mcp-puppeteer-2025-11-27.log",
+            "hash": "e4c22ad2cac4ab23da3b62c26c36bdcfa0acfc852ff32cbc46bdc1701610e693"
+        }
+    ],
+    "hashType": "sha256"
+}

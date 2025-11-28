@@ -16,7 +16,7 @@ import { AsyncPage } from "./AsyncPage/AsyncPage";
 import ErrorBoundary from "./ErrorBoundary";
 import { FF_UNSAVED_CHANGES, isFF } from "../utils/feature-flags";
 import { TourProvider } from "@humansignal/core";
-import { ToastProvider, ToastViewport } from "@humansignal/ui";
+import { ToastProvider, ToastViewport, Button } from "@humansignal/ui";
 import { JotaiProvider, JotaiStore } from "../utils/jotai-store";
 import { CurrentUserProvider } from "../providers/CurrentUser";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -78,6 +78,28 @@ const App = ({ content }) => {
             <DraftGuard />
             <RootPage content={content} />
             <ToastViewport />
+            {!window.APP_SETTINGS?.user?.is_premium && (
+              <div style={{ position: "fixed", bottom: 16, right: 16, zIndex: 1000 }}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/billing/checkout/session/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                      });
+                      const data = await res.json();
+                      if (data?.url) location.href = data.url;
+                    } catch (e) {
+                      // no-op
+                    }
+                  }}
+                >
+                  Upgrade
+                </Button>
+              </div>
+            )}
           </AsyncPage>
         </MultiProvider>
       </Router>

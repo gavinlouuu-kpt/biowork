@@ -5,11 +5,13 @@ import { ModelsPage } from "./Organization/Models/ModelsPage";
 import { FF_HOMEPAGE, isFF } from "../utils/feature-flags";
 import { pages } from "@humansignal/app-common";
 import { ff } from "@humansignal/core";
+import { BillingPage } from "./Billing/BillingPage";
 
 export const Pages = [
   isFF(FF_HOMEPAGE) && HomePage,
   ProjectsPage,
   OrganizationPage,
+  BillingPage,
   ModelsPage,
   ff.isFF(ff.FF_AUTH_TOKENS) && pages.AccountSettingsPage,
 ].filter(Boolean);

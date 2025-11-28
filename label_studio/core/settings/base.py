@@ -209,6 +209,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     'django.contrib.humanize',
     'drf_yasg',
     'corsheaders',
@@ -217,6 +218,10 @@ INSTALLED_APPS = [
     'django_filters',
     'rules',
     'annoying',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'djstripe',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt.token_blacklist',
@@ -237,6 +242,7 @@ INSTALLED_APPS = [
     'ml_model_providers',
     'jwt_auth',
     'session_policy',
+    'billing.apps.BillingConfig',
 ]
 
 MIDDLEWARE = [
@@ -244,6 +250,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'core.middleware.DisableCSRF',
     'django.middleware.csrf.CsrfViewMiddleware',
     'core.middleware.XApiKeySupportMiddleware',
@@ -305,10 +312,36 @@ AUTH_USER_MODEL = 'users.User'
 AUTHENTICATION_BACKENDS = [
     'rules.permissions.ObjectPermissionBackend',
     'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
 ]
 USE_USERNAME_FOR_LOGIN = False
+SITE_ID = 1
+
+# django-allauth configuration
+# Use email as the only authentication method
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_UNIQUE_EMAIL = True
+# Our custom user model uses email as USERNAME_FIELD already
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+# Keep email verification optional by default (can be set to 'mandatory' later)
+ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'optional')
 
 DISABLE_SIGNUP_WITHOUT_LINK = get_bool_env('DISABLE_SIGNUP_WITHOUT_LINK', False)
+
+# Stripe / dj-stripe configuration
+# Keys are expected to come from env. Example:
+#   STRIPE_SECRET_KEY=sk_test_...  STRIPE_PUBLISHABLE_KEY=pk_test_...
+#   DJSTRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_SECRET_KEY = get_env('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = get_env('STRIPE_PUBLISHABLE_KEY', '')
+DJSTRIPE_WEBHOOK_SECRET = get_env('STRIPE_WEBHOOK_SECRET', get_env('DJSTRIPE_WEBHOOK_SECRET', ''))
+DJSTRIPE_USE_NATIVE_JSONFIELD = True
+# Link dj-stripe Customer.subscriber to our custom user
+DJSTRIPE_SUBSCRIBER_MODEL = 'users.User'
+DJSTRIPE_FOREIGN_KEY_TO_FIELD = 'id'
+STRIPE_PRICE_ID_MONTHLY = get_env('STRIPE_PRICE_ID_MONTHLY', '')
 
 # Password validation:
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators

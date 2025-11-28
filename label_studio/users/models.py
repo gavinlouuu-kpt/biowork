@@ -58,7 +58,13 @@ class UserManager(BaseUserManager):
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser must have is_superuser=True.')
 
-        return self._create_user(email, password, **extra_fields)
+        user = self._create_user(email, password, **extra_fields)
+        # Ensure superusers have their own organization and active_organization set
+        if user.active_organization_id is None:
+            org = Organization.create_organization(created_by=user, title=f"{user.email}'s Organization")
+            user.active_organization = org
+            user.save(update_fields=['active_organization'])
+        return user
 
 
 class UserLastActivityMixin(models.Model):
@@ -112,6 +118,9 @@ class User(UserMixin, AbstractBaseUser, PermissionsMixin, UserLastActivityMixin)
     allow_newsletters = models.BooleanField(
         _('allow newsletters'), null=True, default=None, help_text=_('Allow sending newsletters to user')
     )
+    is_premium = models.BooleanField(_('premium subscription'), default=False)
+    stripe_customer_id = models.CharField(_('stripe customer id'), max_length=255, null=True, blank=True)
+    stripe_subscription_id = models.CharField(_('stripe subscription id'), max_length=255, null=True, blank=True)
 
     objects = UserManager()
 
