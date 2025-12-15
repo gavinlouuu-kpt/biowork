@@ -4,7 +4,9 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  padding: 12px;
+  padding: 16px;
+  min-height: 0;
+  overflow: hidden;
 
   &__loading,
   &__error,
@@ -19,7 +21,8 @@
   &__table {
     flex: 1;
     min-height: 0;
-    overflow: auto;
+    display: flex;
+    flex-direction: column;
   }
 }
 

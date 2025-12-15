@@ -1,33 +1,66 @@
 .segmetrics-table {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
   &__scroll {
     width: 100%;
     height: 100%;
+    flex: 1;
     overflow: auto;
+    background: var(--color-neutral-surface);
+    border: 1px solid var(--black_10);
+    border-radius: 4px;
+    scroll-behavior: smooth;
   }
 
   &__table {
     width: 100%;
+    min-width: 960px;
+    table-layout: fixed;
     border-collapse: collapse;
     font-size: 12px;
+    position: relative;
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      
+      th {
+        background: var(--color-neutral-surface);
+        border-bottom: 2px solid var(--black_20);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        position: relative;
+      }
+    }
 
     th,
     td {
-      padding: 4px 8px;
-      border-bottom: 1px solid var(--black_10);
+      padding: 8px 12px;
       text-align: left;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     th {
-      position: sticky;
-      top: 0;
-      z-index: 1;
-      background: var(--color-neutral-surface);
       font-weight: 600;
+      font-size: 13px;
     }
 
-    tbody tr:nth-child(even) {
-      background-color: var(--black_02);
+    tbody {
+      tr {
+        border-bottom: 1px solid var(--black_10);
+        
+        &:nth-child(even) {
+          background-color: var(--black_02);
+        }
+        
+        &:hover {
+          background-color: var(--black_05);
+        }
+      }
     }
   }
 }

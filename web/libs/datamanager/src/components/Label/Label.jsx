@@ -10,6 +10,7 @@ import { Resizer } from "../Common/Resizer/Resizer";
 import { Space } from "../Common/Space/Space";
 import { DataView } from "../MainView";
 import "./Label.scss";
+import { SegmentationMetricsPortal } from "./SegmentationMetricsPortal";
 import { SegmentationMetricsPane } from "./SegmentationMetricsPane";
 
 // Todo: consider renaming this file to something like LabelingWrapper as it is not a Label component
@@ -130,9 +131,8 @@ export const Labeling = injector(
           >
             {loading && !isSegmentation && <Elem name="waiting" mod={{ animated: true }} />}
             <Elem ref={lsfRef} id="label-studio-dm" name="lsf-container" key="label-studio" />
-            <Elem name="segmetrics-overlay" mod={{ visible: isSegmentation }}>
-              <SegmentationMetricsPane />
-            </Elem>
+            {/* Previously: overlay/pane; now using portal into annotation config <View> */}
+            <SegmentationMetricsPortal active={isSegmentation} />
           </Elem>
         </Elem>
       </Block>
