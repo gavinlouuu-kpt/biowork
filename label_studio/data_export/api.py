@@ -26,6 +26,80 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from tasks.models import Task
 
+
+class SegmentationMetricsAPI(generics.RetrieveAPIView):
+    """Return per-region segmentation metrics for a single task (and optionally annotation)."""
+
+    permission_required = all_permissions.projects_change
+
+    def get_queryset(self):
+        return Project.objects.filter(organization=self.request.user.active_organization)
+
+    def get_task_queryset(self, queryset):
+        # Reuse the same queryset optimisation as ExportAPI
+        return queryset.select_related('project').prefetch_related('annotations', 'predictions')
+
+    def get(self, request, *args, **kwargs):
+        from label_studio.data_export.formats.segmentation_csv_exporter import compute_segmentation_metrics
+
+        project = self.get_object()
+
+        # Reuse export params for download_resources / interpolate_key_frames defaults
+        query_serializer = ExportParamSerializer(data=request.GET)
+        query_serializer.is_valid(raise_exception=True)
+        download_resources = query_serializer.validated_data['download_resources']
+        interpolate_key_frames = query_serializer.validated_data['interpolate_key_frames']
+
+        task_id_raw = request.GET.get('task_id')
+        if not task_id_raw:
+            raise ValidationError({'task_id': ['This field is required.']})
+        try:
+            task_id = int(task_id_raw)
+        except (TypeError, ValueError):
+            raise ValidationError({'task_id': ['A valid integer is required.']})
+
+        annotation_id = None
+        annotation_id_raw = request.GET.get('annotation_id')
+        if annotation_id_raw is not None:
+            try:
+                annotation_id = int(annotation_id_raw)
+            except (TypeError, ValueError):
+                raise ValidationError({'annotation_id': ['A valid integer is required.']})
+
+        query = Task.objects.filter(project=project, id=task_id)
+        if not query.exists():
+            raise NotFound(detail='Task not found')
+
+        task_ids = query.values_list('id', flat=True)
+        tasks_payload = []
+        for _task_ids in batch(task_ids, 1000):
+            tasks_payload += ExportDataSerializer(
+                self.get_task_queryset(query.filter(id__in=_task_ids)),
+                many=True,
+                expand=['drafts'],
+                context={'interpolate_key_frames': interpolate_key_frames},
+            ).data
+
+        rows_by_image = compute_segmentation_metrics(
+            tasks_payload,
+            project,
+            download_resources,
+            request.build_absolute_uri('/'),
+        )
+
+        results = []
+        for image_key, rows in rows_by_image.items():
+            for row in rows:
+                if annotation_id is not None:
+                    try:
+                        if int(row.get('annotation_id')) != annotation_id:
+                            continue
+                    except (TypeError, ValueError):
+                        continue
+                results.append(row)
+
+        return Response({'count': len(results), 'results': results}, status=status.HTTP_200_OK)
+
 from .models import ConvertedFormat, DataExport, Export
 from .serializers import (
     ExportConvertSerializer,

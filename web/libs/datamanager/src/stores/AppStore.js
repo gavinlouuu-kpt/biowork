@@ -22,6 +22,8 @@ export const AppStore = types
   .model("AppStore", {
     mode: types.optional(types.enumeration(["explorer", "labelstream", "labeling"]), "explorer"),
 
+    labelingView: types.optional(types.enumeration(["annotation", "segmentation"]), "annotation"),
+
     viewsStore: types.optional(TabStore, {
       views: [],
     }),
@@ -164,6 +166,18 @@ export const AppStore = types
 
     setMode(mode) {
       self.mode = mode;
+    },
+
+    setLabelingView(view) {
+      self.labelingView = view;
+
+      try {
+        const sdk = self.SDK;
+
+        sdk?.invoke?.("segmentationViewChanged", view);
+      } catch (_e) {
+        // SDK might not be initialized yet; ignore
+      }
     },
 
     setActions(actions) {

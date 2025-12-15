@@ -100,7 +100,12 @@ export const AnnotationButton = observer(
           annotationStore.selectAnnotation(id);
         }
       }
-    }, [entity]);
+
+      const dm: any = (window as any).dataManager;
+      if (dm?.store?.setLabelingView instanceof Function) {
+        dm.store.setLabelingView("annotation");
+      }
+    }, [entity, annotationStore]);
 
     const AnnotationButtonContextMenu = injector(
       observer(({ entity, capabilities, store }: AnnotationButtonInterface) => {

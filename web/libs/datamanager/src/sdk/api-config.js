@@ -55,6 +55,9 @@ export const APIConfig = {
     /** List of task history */
     taskHistory: "/../projects/:projectId/label-stream-history",
 
+    /** Per-task segmentation metrics (JSON, mirrors SEG_CSV export) */
+    segmentationMetrics: "/../projects/:projectId/segmentation-metrics",
+
     /** Per-task annotations (annotations, predictions) */
     annotations: "/views/:tabID/annotations",
 

@@ -78,6 +78,10 @@
         border-top: 1px solid var(--black_15);
       }
     }
+
+    &_segmentationActive {
+      // when segmentation tab is active we hide the LSF internals via inline style on the container
+    }
   }
 
   &_loading {
@@ -101,6 +105,21 @@
       height: 100%;
     }
 
+  }
+
+  &__segmetrics-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    flex-direction: column;
+    background: var(--color-neutral-surface);
+    overflow: auto;
+    padding: 12px;
+
+    &_visible {
+      display: flex;
+    }
   }
 
   &__lsf-toolbar {

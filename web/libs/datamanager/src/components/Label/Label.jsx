@@ -10,6 +10,7 @@ import { Resizer } from "../Common/Resizer/Resizer";
 import { Space } from "../Common/Space/Space";
 import { DataView } from "../MainView";
 import "./Label.scss";
+import { SegmentationMetricsPane } from "./SegmentationMetricsPane";
 
 // Todo: consider renaming this file to something like LabelingWrapper as it is not a Label component
 const LabelingHeader = ({ SDK, onClick, isExplorerMode }) => {
@@ -61,6 +62,8 @@ export const Labeling = injector(
       return SDK.mode === "labelstream";
     }, []);
 
+    const activePane = store.labelingView ?? "annotation";
+
     const closeLabeling = useCallback(() => {
       store.closeLabeling();
     }, [store]);
@@ -94,6 +97,8 @@ export const Labeling = injector(
       window.dispatchEvent(new Event("resize"));
     }, []);
 
+    const isSegmentation = activePane === "segmentation";
+
     return (
       <Block name="label-view" mod={{ loading }}>
         {SDK.interfaceEnabled("labelingHeader") && (
@@ -119,9 +124,15 @@ export const Labeling = injector(
             </Elem>
           )}
 
-          <Elem name="lsf-wrapper" mod={{ mode: isExplorerMode ? "explorer" : "labeling" }}>
-            {loading && <Elem name="waiting" mod={{ animated: true }} />}
+          <Elem
+            name="lsf-wrapper"
+            mod={{ mode: isExplorerMode ? "explorer" : "labeling", segmentationActive: isSegmentation }}
+          >
+            {loading && !isSegmentation && <Elem name="waiting" mod={{ animated: true }} />}
             <Elem ref={lsfRef} id="label-studio-dm" name="lsf-container" key="label-studio" />
+            <Elem name="segmetrics-overlay" mod={{ visible: isSegmentation }}>
+              <SegmentationMetricsPane />
+            </Elem>
           </Elem>
         </Elem>
       </Block>

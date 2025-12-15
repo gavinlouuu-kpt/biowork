@@ -82,6 +82,7 @@ export const AnnotationsCarousel = observer(({ store, annotationStore }: Annotat
               annotationStore={annotationStore}
             />
           ))}
+          <SegmentationMetricsButton />
         </Elem>
       </Elem>
       {(!isLeftDisabled || !isRightDisabled) && (
@@ -111,3 +112,55 @@ export const AnnotationsCarousel = observer(({ store, annotationStore }: Annotat
     </Block>
   ) : null;
 });
+
+const SegmentationMetricsButton = observer(() => {
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const dm: any = (window as any).dataManager;
+    if (!dm || typeof dm.on !== "function" || !dm.store) return;
+
+    const updateFromStore = (view?: string) => {
+      const current = view ?? dm.store.labelingView;
+      setActive(current === "segmentation");
+    };
+
+    const handler = (view: string) => {
+      updateFromStore(view);
+    };
+
+    updateFromStore();
+
+    dm.on("segmentationViewChanged", handler);
+
+    return () => {
+      dm.off?.("segmentationViewChanged", handler);
+    };
+  }, []);
+
+  const handleClick = useCallback(() => {
+    const dm: any = (window as any).dataManager;
+    if (!dm || !dm.store || typeof dm.store.setLabelingView !== "function") return;
+
+    dm.store.setLabelingView("segmentation");
+  }, []);
+
+  const showButton = typeof (window as any).dataManager !== "undefined";
+
+  if (!showButton) return null;
+
+  return (
+    <Block name="annotation-button" mod={{ selected: active }}>
+      <Elem name="mainSection" onClick={handleClick}>
+        <Elem name="main">
+          <Elem name="user">
+            <Elem tag="span" name="name">
+              Segmentation metrics
+            </Elem>
+          </Elem>
+        </Elem>
+      </Elem>
+    </Block>
+  );
+});
+

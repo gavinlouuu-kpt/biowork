@@ -11,6 +11,7 @@ _api_urlpatterns = [
     # export api
     path('<int:pk>/export', api.ExportAPI.as_view(), name='project-export'),
     path('<int:pk>/export/formats', api.ExportFormatsListAPI.as_view(), name='project-export-formats'),
+    path('<int:pk>/segmentation-metrics', api.SegmentationMetricsAPI.as_view(), name='project-segmentation-metrics'),
     # Previously exported results
     path('<int:pk>/export/files', api.ProjectExportFiles.as_view(), name='project-export-files'),
     path('<int:pk>/exports/', api.ExportListAPI.as_view(), name='project-exports-list'),
