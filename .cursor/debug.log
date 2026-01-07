@@ -416,3 +416,7 @@
 {"location":"DataManager.jsx:221","message":"DataManager destroyed","data":{"hasHtx":true,"hasAnnotationStore":true},"timestamp":1767432520701,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
 {"location":"DraftGuard.jsx:56","message":"History accessed successfully","data":{"hasChanges":false,"submissionInProgress":false},"timestamp":1767432520687,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
 {"location":"DataManager.jsx:217","message":"destroyDM called","data":{"hasDataManager":true,"pathname":"/projects/179/data"},"timestamp":1767432520689,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"DraftGuard.jsx:101","message":"DraftGuard block called","data":{"hasHtx":true,"hasAnnotationStore":true,"hasSelected":true,"pathname":"/projects/179/data"},"timestamp":1767432642403,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"DraftGuard.jsx:56","message":"History accessed successfully","data":{"hasChanges":false,"submissionInProgress":false},"timestamp":1767432642405,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"DataManager.jsx:217","message":"destroyDM called","data":{"hasDataManager":true,"pathname":"/"},"timestamp":1767432642446,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"DataManager.jsx:221","message":"DataManager destroyed","data":{"hasHtx":true,"hasAnnotationStore":true},"timestamp":1767432642458,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}

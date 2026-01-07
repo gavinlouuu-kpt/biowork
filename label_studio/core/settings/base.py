@@ -247,6 +247,7 @@ INSTALLED_APPS = [
     'session_policy',
     'djstripe',
     'billing',
+    'feedback',
 ]
 
 MIDDLEWARE = [
