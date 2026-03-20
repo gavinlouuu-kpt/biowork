@@ -321,7 +321,22 @@ class TaskAPI(generics.RetrieveUpdateDestroyAPIView):
         if review:
             kwargs = {'fields_for_evaluation': ['annotators', 'reviewed']}
         else:
-            kwargs = {'all_fields': True}
+            # Exclude annotations_results and predictions_results from SQL aggregation
+            # as they perform expensive ArrayAgg on full annotation/prediction JSON results.
+            # The task editor uses prefetched annotation objects directly, not these summaries.
+            kwargs = {
+                'fields_for_evaluation': [
+                    'avg_lead_time',
+                    'completed_at',
+                    'predictions_model_versions',
+                    'predictions_score',
+                    'annotators',
+                    'annotations_ids',
+                    'file_upload',
+                    'draft_exists',
+                    'storage_filename',
+                ],
+            }
         project = self.request.query_params.get('project') or self.request.data.get('project')
         if not project:
             project = task.project.id
