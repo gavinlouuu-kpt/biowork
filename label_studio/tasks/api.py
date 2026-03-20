@@ -305,7 +305,22 @@ class TaskAPI(generics.RetrieveUpdateDestroyAPIView):
             project.evaluate_predictions_automatically or project.show_collab_predictions
         ) and not self.task.predictions.exists():
             evaluate_predictions([self.task])
-            self.task.refresh_from_db()
+            # Re-fetch with prefetch_related instead of refresh_from_db(),
+            # which would destroy the prefetch cache and cause N+1 queries.
+            self.task = self.prefetch(Task.objects.filter(pk=self.task.pk)).get()
+
+        # Pre-load organization members for all annotation users to avoid N+1 queries
+        # in BaseUserSerializer._is_deleted() during annotation serialization.
+        org_id = request.user.active_organization_id
+        if org_id:
+            from organizations.models import OrganizationMember
+
+            annotator_user_ids = set(
+                a.completed_by_id for a in self.task.annotations.all() if a.completed_by_id
+            )
+            context['organization_members'] = list(
+                OrganizationMember.objects.filter(user_id__in=annotator_user_ids, organization_id=org_id)
+            )
 
         serializer = self.get_serializer_class()(
             self.task, many=False, context=context, expand=['annotations.completed_by']
