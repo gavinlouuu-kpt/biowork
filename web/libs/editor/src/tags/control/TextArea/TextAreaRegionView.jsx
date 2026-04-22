@@ -2,15 +2,13 @@ import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "r
 import { observer } from "mobx-react";
 import { isAlive } from "mobx-state-tree";
 
-import Button from "antd/lib/button/index";
-import Form from "antd/lib/form/index";
-import Input from "antd/lib/input/index";
+import { Button, Form, Input } from "antd";
 
 import { IconTrash } from "@humansignal/icons";
 import styles from "../../../components/HtxTextBox/HtxTextBox.module.scss";
 import Registry from "../../../core/Registry";
 import { PER_REGION_MODES } from "../../../mixins/PerRegion";
-import { Block, Elem } from "../../../utils/bem";
+import { cn } from "../../../utils/bem";
 
 import "./TextArea.scss";
 
@@ -54,7 +52,7 @@ const HtxTextAreaResultLine = forwardRef(
     );
 
     const inputProps = {
-      className: `ant-input ${styles.input}`,
+      className: `ant-input ${styles.input} ${cn("textarea-tag").elem("input").toClassName()}`,
       value: displayValue,
       autoSize: isTextarea ? { minRows: 1 } : null,
       onChange: changeHandler,
@@ -73,22 +71,26 @@ const HtxTextAreaResultLine = forwardRef(
     };
 
     return (
-      <Elem name="item">
-        <Elem name="input" tag={isTextarea ? TextArea : Input} {...inputProps} ref={ref} />
+      <div className={cn("textarea-tag").elem("item").toClassName()} data-testid="textarea-region-item">
+        {isTextarea ? (
+          <TextArea {...inputProps} ref={ref} data-testid="textarea-region-textarea" />
+        ) : (
+          <Input {...inputProps} ref={ref} data-testid="textarea-region-input" />
+        )}
         {canDelete && !collapsed && !readOnly && (
-          <Elem
-            name="action"
-            aria-label="Delete Region"
-            tag={Button}
-            icon={<IconTrash />}
+          <Button
+            className={cn("textarea-tag").elem("action").toClassName()}
             size="small"
-            type="text"
+            look="string"
+            aria-label="Delete Region"
+            data-testid="textarea-region-delete"
+            leading={<IconTrash />}
             onClick={() => {
               onDelete(idx);
             }}
           />
         )}
-      </Elem>
+      </div>
     );
   },
 );
@@ -195,7 +197,7 @@ const HtxTextAreaRegionView = observer(({ item, area, collapsed, setCollapsed, o
     ref: mainInputRef,
     value,
     rows: item.rows,
-    className: "is-search",
+    className: `is-search ${cn("textarea-tag").elem("input").toClassName()}`,
     label: item.label,
     placeholder: item.placeholder,
     autoSize: isTextArea ? { minRows: 1 } : null,
@@ -247,7 +249,11 @@ const HtxTextAreaRegionView = observer(({ item, area, collapsed, setCollapsed, o
 
   return (
     (result || showSubmit) && (
-      <Block name="textarea-tag" mod={{ mode: item.mode, outliner }} style={styles}>
+      <div
+        className={cn("textarea-tag").mod({ mode: item.mode, outliner }).toClassName()}
+        style={styles}
+        data-testid="textarea-region-view"
+      >
         {result ? (
           <HtxTextAreaResult
             control={item}
@@ -260,9 +266,9 @@ const HtxTextAreaRegionView = observer(({ item, area, collapsed, setCollapsed, o
         ) : null}
 
         {showSubmit && (
-          <Elem
-            name="form"
-            tag={Form}
+          <Form
+            className={cn("textarea-tag").elem("form").toClassName()}
+            data-testid="textarea-region-form"
             onFinish={() => {
               if (item.allowsubmit && item._value && !item.annotation.isReadOnly()) {
                 submitValue();
@@ -273,17 +279,26 @@ const HtxTextAreaRegionView = observer(({ item, area, collapsed, setCollapsed, o
               e.stopPropagation();
             }}
           >
-            <Elem
-              name="input"
-              tag={isTextArea ? TextArea : Input}
-              {...props}
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-            />
-          </Elem>
+            {isTextArea ? (
+              <TextArea
+                {...props}
+                data-testid="textarea-region-input"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              />
+            ) : (
+              <Input
+                {...props}
+                data-testid="textarea-region-input"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              />
+            )}
+          </Form>
         )}
-      </Block>
+      </div>
     )
   );
 });

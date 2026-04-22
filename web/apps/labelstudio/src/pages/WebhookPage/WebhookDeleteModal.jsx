@@ -1,4 +1,4 @@
-import { Button } from "../../components";
+import { Button } from "@humansignal/ui";
 import { modal } from "../../components/Modal/Modal";
 import { useModalControls } from "../../components/Modal/ModalPopup";
 import { Space } from "../../components/Space/Space";
@@ -12,7 +12,7 @@ export const WebhookDeleteModal = ({ onDelete }) => {
       const rootClass = cn("webhook-delete-modal");
       return (
         <div className={rootClass}>
-          <div className={rootClass.elem("modal-text")}>
+          <div className={rootClass.elem("modal-text").toClassName()}>
             Are you sure you want to delete the webhook? This action cannot be undone.
           </div>
         </div>
@@ -24,22 +24,23 @@ export const WebhookDeleteModal = ({ onDelete }) => {
       return (
         <Space align="end">
           <Button
-            className={rootClass.elem("width-button")}
+            look="outlined"
             onClick={() => {
               ctrl.hide();
             }}
+            aria-label="Cancel webhook deletion"
           >
             Cancel
           </Button>
           <Button
-            look="destructive"
-            className={rootClass.elem("width-button")}
+            variant="negative"
             onClick={async () => {
               await onDelete();
               ctrl.hide();
             }}
+            aria-label="Confirm webhook deletion"
           >
-            Delete
+            Delete Webhook
           </Button>
         </Space>
       );

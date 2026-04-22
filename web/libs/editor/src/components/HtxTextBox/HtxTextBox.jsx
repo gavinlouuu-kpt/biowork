@@ -1,13 +1,9 @@
 import React from "react";
-import { Typography } from "antd";
-import { EnterOutlined } from "@ant-design/icons";
-import { Button } from "../../common/Button/Button";
-import { IconEdit, IconTrashAlt } from "@humansignal/icons";
-import { Tooltip } from "@humansignal/ui";
-import styles from "./HtxTextBox.module.scss";
-import throttle from "lodash.throttle";
+import { IconPencil, IconTrashAlt, IconCheck } from "@humansignal/icons";
+import { Button, Tooltip, Typography } from "@humansignal/ui";
+import { throttle } from "@humansignal/core/lib/utils/lodash-replacements";
+import { cn } from "../../utils/bem";
 
-const { Paragraph } = Typography;
 // used for correct auto-height calculation
 const BORDER_WIDTH = 1;
 
@@ -17,6 +13,9 @@ export class HtxTextBox extends React.Component {
     height: 0,
     value: this.props.text,
   };
+
+  inputClassName =
+    "text-color-neutral-content bg-neutral-surface border border-neutral-border px-base py-tight rounded-md w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-focus-outline leading-body-small min-h-10 hover:border-neutral-border-bold transition-colors transition-background-color duration-150 ease-out";
 
   textRef = React.createRef();
   inputRef = React.createRef();
@@ -110,18 +109,17 @@ export class HtxTextBox extends React.Component {
       isEditable: __,
       isDeleteable: ___,
       ignoreShortcuts: ____,
-
-      ...props
     } = this.props;
     const { height, value } = this.state;
 
     const inputProps = {
       name,
-      className: `ant-input ${styles.input}`,
+      className: `flex ${this.inputClassName}`,
       style: height ? { height, borderWidth: BORDER_WIDTH } : null,
       autoFocus: true,
       ref: this.inputRef,
       value,
+      "data-testid": "htx-textbox-input",
       onBlur: () => {
         onChange(this.state.value);
       },
@@ -151,14 +149,24 @@ export class HtxTextBox extends React.Component {
     this.updateHeight();
 
     return (
-      <Paragraph {...props} className={`${className} ant-typography-edit-content ${styles.editing}`}>
+      <div className={cn("textarea").elem("region").toClassName()} data-testid="htx-textbox-edit">
         {rows > 1 ? <textarea {...inputProps} /> : <input {...inputProps} />}
         {!onlyEdit && (
           <Tooltip title="Save: [shift+enter]">
-            <EnterOutlined className={`ant-typography-edit-content-confirm ${styles.enter}`} onClick={this.save} />
+            <Button
+              type="text"
+              variant="primary"
+              look="outlined"
+              size="small"
+              className="absolute right-tight top-tighter"
+              icon={<IconCheck />}
+              aria-label="Save"
+              data-testid="htx-textbox-save"
+              onClick={this.save}
+            />
           </Tooltip>
         )}
-      </Paragraph>
+      </div>
     );
   }
 
@@ -178,36 +186,50 @@ export class HtxTextBox extends React.Component {
     } = this.props;
 
     return (
-      <>
-        <Paragraph {...props}>
-          <span ref={this.textRef}>{text}</span>
-        </Paragraph>
-        {isEditable && onChange && (
-          <Button
-            type="text"
-            className={styles.button}
-            tooltip="Edit"
-            tooltipTheme="Dark"
-            style={{ padding: 0 }}
-            icon={<IconEdit />}
-            aria-label="Edit Region"
-            onClick={this.startEditing}
-          />
-        )}
-        {isDeleteable && onDelete && (
-          <Button
-            type="text"
-            look="danger"
-            className={styles.button}
-            tooltip="Delete"
-            tooltipTheme="Dark"
-            style={{ padding: 0 }}
-            icon={<IconTrashAlt />}
-            aria-label="Delete Region"
-            onClick={onDelete}
-          />
-        )}
-      </>
+      <div className={cn("textarea").elem("region").toClassName()} data-testid="htx-textbox-view">
+        <div className={this.inputClassName} id={props.id} name={props.name} data-testid="htx-textbox-content">
+          <Typography ref={this.textRef} size="small">
+            {text.split("\n").map((line, index, array) => {
+              const isLastLine = index === array.length - 1;
+              return (
+                <React.Fragment key={index}>
+                  {line}
+                  {!isLastLine && <br />}
+                </React.Fragment>
+              );
+            })}
+          </Typography>
+        </div>
+        <div className={cn("textarea").elem("actions").toClassName()} data-testid="htx-textbox-actions">
+          {isEditable && onChange && (
+            <Button
+              variant="neutral"
+              look="outlined"
+              size="small"
+              tooltip="Edit"
+              tooltipTheme="Dark"
+              leading={<IconPencil />}
+              aria-label="Edit Region"
+              data-testid="htx-textbox-edit-button"
+              onClick={this.startEditing}
+            />
+          )}
+          {isDeleteable && onDelete && (
+            <Button
+              type="text"
+              variant="negative"
+              look="outlined"
+              size="small"
+              tooltip="Delete"
+              tooltipTheme="Dark"
+              leading={<IconTrashAlt />}
+              aria-label="Delete Region"
+              data-testid="htx-textbox-delete-button"
+              onClick={onDelete}
+            />
+          )}
+        </div>
+      </div>
     );
   }
 

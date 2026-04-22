@@ -51,7 +51,7 @@ body {
   }
 
   &_showingBottomBar {
-    --bottombar-height: 48px;
+    --bottombar-height: 50px;
   }
 
   & .menu {
@@ -91,6 +91,9 @@ body {
 }
 
 .key-group {
+  display: inline-flex;
+  align-items: center;
+
   &__key {
     padding: 0 4px;
     height: 16px;

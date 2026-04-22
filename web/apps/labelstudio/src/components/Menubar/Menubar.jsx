@@ -5,23 +5,24 @@ import {
   IconDocument,
   IconFolder,
   IconHome,
+  IconHotkeys,
+  IconPeople,
   IconPersonInCircle,
   IconPin,
   IconTerminal,
   IconDoor,
   IconGithub,
-  IconSettings,
   IconSlack,
 } from "@humansignal/icons";
 import { LSLogo } from "../../assets/images";
-import { Userpic, ThemeToggle } from "@humansignal/ui";
+import { Button, Userpic, ThemeToggle } from "@humansignal/ui";
 import { useConfig } from "../../providers/ConfigProvider";
 import { useContextComponent, useFixedLocation } from "../../providers/RoutesProvider";
-import { useCurrentUser } from "../../providers/CurrentUser";
+import { useAuth } from "@humansignal/core/providers/AuthProvider";
 import { cn } from "../../utils/bem";
 import { absoluteURL, isDefined } from "../../utils/helpers";
 import { Breadcrumbs } from "../Breadcrumbs/Breadcrumbs";
-import { Dropdown } from "../Dropdown/Dropdown";
+import { Dropdown } from "@humansignal/ui";
 import { Hamburger } from "../Hamburger/Hamburger";
 import { Menu } from "../Menu/Menu";
 import { VersionNotifier, VersionProvider } from "../VersionNotifier/VersionNotifier";
@@ -33,6 +34,7 @@ import { pages } from "@humansignal/app-common";
 import { isFF } from "../../utils/feature-flags";
 import { ff } from "@humansignal/core";
 import { PlanBadge } from "../plan-badge/plan-badge";
+import { openHotkeyHelp } from "@humansignal/app-common/pages/AccountSettings/sections/Hotkeys/Help";
 
 export const MenubarContext = createContext();
 
@@ -57,7 +59,7 @@ const RightContextMenu = ({ className, ...props }) => {
 export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSidebarToggle, onSidebarPin }) => {
   const menuDropdownRef = useRef();
   const useMenuRef = useRef();
-  const { user, fetch, isInProgress } = useCurrentUser();
+  const { user, isLoading } = useAuth();
   const location = useFixedLocation();
 
   const config = useConfig();
@@ -146,12 +148,34 @@ export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSid
           </Dropdown.Trigger>
 
           <div className={menubarContext}>
-            <LeftContextMenu className={contextItem.mod({ left: true })} />
-
-            <RightContextMenu className={contextItem.mod({ right: true })} />
+            <LeftContextMenu className={contextItem.mod({ left: true }).toClassName()} />
+            <RightContextMenu className={contextItem.mod({ right: true }).toClassName()} />
           </div>
 
-          <div className={menubarClass.elem("spacer").toString()} />
+          <div className={menubarClass.elem("hotkeys").toClassName()}>
+            <div className={menubarClass.elem("hotkeys-button").toClassName()}>
+              <Button
+                variant="neutral"
+                look="outlined"
+                tooltip="Keyboard Shortcuts"
+                data-testid="hotkeys-button"
+                size="small"
+                onClick={() => {
+                  openHotkeyHelp([
+                    "annotation",
+                    "data_manager",
+                    "regions",
+                    "tools",
+                    "audio",
+                    "video",
+                    "timeseries",
+                    "image_gallery",
+                  ]);
+                }}
+                icon={<IconHotkeys />}
+              />
+            </div>
+          </div>
 
           <PlanBadge className={showThemeToggle ? menubarClass.elem("plan-badge").toString() : undefined} />
           {showThemeToggle && <ThemeToggle />}
@@ -162,7 +186,7 @@ export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSid
             content={
               <Menu>
                 <Menu.Item
-                  icon={<IconSettings />}
+                  icon={<IconPersonInCircle />}
                   label="Account &amp; Settings"
                   href={pages.AccountSettingsPage.path}
                 />
@@ -171,25 +195,28 @@ export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSid
                 {showNewsletterDot && (
                   <>
                     <Menu.Divider />
-                    <Menu.Item className={cn("newsletter-menu-item")} href={pages.AccountSettingsPage.path}>
+                    <Menu.Item
+                      className={cn("newsletter-menu-item").toClassName()}
+                      href={pages.AccountSettingsPage.path}
+                    >
                       <span>Please check new notification settings in the Account & Settings page</span>
-                      <span className={cn("newsletter-menu-badge")} />
+                      <span className={cn("newsletter-menu-badge").toClassName()} />
                     </Menu.Item>
                   </>
                 )}
               </Menu>
             }
           >
-            <div title={user?.email} className={menubarClass.elem("user")}>
-              <Userpic user={user} isInProgress={isInProgress} />
-              {showNewsletterDot && <div className={menubarClass.elem("userpic-badge")} />}
+            <div title={user?.email} className={menubarClass.elem("user").toClassName()}>
+              <Userpic user={user} isInProgress={isLoading} />
+              {showNewsletterDot && <div className={menubarClass.elem("userpic-badge").toClassName()} />}
             </div>
           </Dropdown.Trigger>
         </div>
       )}
 
       <VersionProvider>
-        <div className={contentClass.elem("body")}>
+        <div className={contentClass.elem("body").toClassName()}>
           {enabled && (
             <Dropdown
               ref={menuDropdownRef}
@@ -202,7 +229,7 @@ export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSid
               <Menu>
                 {isFF(FF_HOMEPAGE) && <Menu.Item label="Home" to="/" icon={<IconHome />} data-external exact />}
                 <Menu.Item label="Projects" to="/projects" icon={<IconFolder />} data-external exact />
-                <Menu.Item label="Organization" to="/organization" icon={<IconPersonInCircle />} data-external exact />
+                <Menu.Item label="Organization" to="/organization" icon={<IconPeople />} data-external exact />
                 <Menu.Item label="Billing" to="/billing" icon={<IconDocument />} data-external exact />
 
                 <Menu.Spacer />
@@ -237,7 +264,7 @@ export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSid
 
                 <Menu.Item
                   icon={<IconPin />}
-                  className={sidebarClass.elem("pin")}
+                  className={sidebarClass.elem("pin").toClassName()}
                   onClick={sidebarPin}
                   active={sidebarPinned}
                 >
@@ -248,7 +275,12 @@ export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSid
           )}
 
           <MenubarContext.Provider value={providerValue}>
-            <div className={contentClass.elem("content").mod({ withSidebar: sidebarPinned && sidebarOpened })}>
+            <div
+              className={contentClass
+                .elem("content")
+                .mod({ withSidebar: sidebarPinned && sidebarOpened })
+                .toClassName()}
+            >
               {children}
             </div>
           </MenubarContext.Provider>

@@ -3,7 +3,6 @@ name: "CI/CD Pipeline"
 on:
   push:
     branches:
-      - develop
       - 'ls-release/**'
   pull_request:
     types:
@@ -30,14 +29,16 @@ jobs:
       src: ${{ steps.changes.outputs.src }}
       frontend: ${{ steps.changes.outputs.frontend }}
       docker: ${{ steps.changes.outputs.docker }}
+      migrations: ${{ steps.changes.outputs.migrations }}
       commit-message: ${{ steps.commit-details.outputs.commit-message }}
+      membership: ${{ steps.check-membership.outputs.membership }}
     timeout-minutes: 25
     steps:
       - uses: hmarr/debug-action@v3.0.0
 
       - name: Checkout
         if: github.event_name == 'push'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
 
@@ -57,8 +58,7 @@ jobs:
             frontend:
               - 'web/**'
               - '.github/workflows/tests-yarn-unit.yml'
-              - '.github/workflows/tests-yarn-integration.yml'
-              - '.github/workflows/tests-yarn-e2e.yml'
+              - '.github/workflows/tests-yarn-lsf.yml'
             docker:
               - 'label_studio/**'
               - 'web/**'
@@ -68,8 +68,10 @@ jobs:
               - 'pyproject.toml'
               - '.github/workflows/cicd_pipeline.yml'
               - '.github/workflows/docker-build.yml'
+            migrations:
+              - 'label_studio/*/migrations/**'
 
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v8
         id: commit-details
         with:
           script: |
@@ -81,6 +83,27 @@ jobs:
             });
             console.log(`Last commit message is "${commit.commit.message}"`)
             core.setOutput("commit-message", commit.commit.message);
+
+      - name: Check user's membership
+        uses: actions/github-script@v8
+        id: check-membership
+        env:
+          ACTOR: ${{ github.actor }}
+        with:
+          github-token: ${{ secrets.GIT_PAT }}
+          script: |
+            const { repo, owner } = context.repo;
+            const actor = process.env.ACTOR;
+            if (actor === 'cursor[bot]' || actor === 'claude[bot]') {
+              console.log(`Bypassing membership check for ${actor} GitHub App`);
+              core.setOutput("membership", "active");
+              return;
+            }
+            const { data: membership } = await github.rest.orgs.getMembershipForUser({
+              org: owner,
+              username: actor,
+            });
+            core.setOutput("membership", membership.state);
 
   gitleaks:
     name: "Linter"
@@ -155,10 +178,7 @@ jobs:
     name: "Build"
     needs:
       - changed_files
-    if: |
-      github.event_name == 'push' &&
-      ( ( github.ref_name == 'develop' && needs.changed_files.outputs.docker == 'true' )
-        || startsWith(github.ref_name, 'ls-release/') )
+    if: startsWith(github.ref_name, 'ls-release/')
     permissions:
       contents: read
       checks: write
@@ -170,15 +190,15 @@ jobs:
 
   deploy:
     name: "Deploy"
-    if: startsWith(github.ref_name, 'ls-release/') || github.ref_name == 'develop'
+    if: startsWith(github.ref_name, 'ls-release/')
     runs-on: ubuntu-latest
     needs:
       - build-docker
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v8
         env:
           DOCKER_IMAGE_VERSION: ${{ needs.build-docker.outputs.build_version }}
-          RELEASE_NAME: ${{ startsWith(github.ref_name, 'ls-release/') && 'ls-release' || 'ls-develop' }}
+          RELEASE_NAME: 'ls-release'
         with:
           github-token: ${{ secrets.GIT_PAT }}
           script: |
@@ -216,6 +236,21 @@ jobs:
       head_sha: ${{ github.event.pull_request.head.sha || github.event.after }}
     secrets: inherit
 
+  cursor-review:
+    name: "Tests"
+    needs:
+      - changed_files
+    if: needs.changed_files.outputs.migrations == 'true' && github.event_name == 'pull_request' && needs.changed_files.outputs.membership == 'active'
+    uses: ./.github/workflows/cursor-review.yml
+    with:
+      head_sha: ${{ github.event.pull_request.head.sha }}
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      pr_number: ${{ github.event.pull_request.number }}
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets: inherit
+
   conda-test:
     name: "Tests"
     needs:
@@ -241,21 +276,21 @@ jobs:
       - uses: hmarr/debug-action@v3.0.0
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.GIT_PAT }}
           ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Checkout Actions Hub
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.GIT_PAT }}
           repository: HumanSignal/actions-hub
           path: ./.github/actions-hub
 
       - name: Create release draft
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         id: create-draft-release
         env:
           TARGET_COMMITISH: "${{ github.ref_name }}"
@@ -414,7 +449,7 @@ jobs:
           helm_chart_path: "heartex/label-studio/Chart.yaml"
 
       - name: Update Draft Release
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         id: update-draft-release
         env:
           CHANGELOG: "${{ steps.changelog.outputs.changelog }}"
@@ -465,22 +500,12 @@ jobs:
       head_sha: ${{ github.event.pull_request.head.sha || github.event.after }}
     secrets: inherit
 
-  tests-yarn-integration:
+  tests-yarn-lsf:
     name: "Tests"
     needs:
       - changed_files
     if: needs.changed_files.outputs.frontend == 'true'
-    uses: ./.github/workflows/tests-yarn-integration.yml
-    with:
-      head_sha: ${{ github.event.pull_request.head.sha || github.event.after }}
-    secrets: inherit
-
-  tests-yarn-e2e:
-    name: "Tests"
-    needs:
-      - changed_files
-    if: needs.changed_files.outputs.frontend == 'true'
-    uses: ./.github/workflows/tests-yarn-e2e.yml
+    uses: ./.github/workflows/tests-yarn-lsf.yml
     with:
       head_sha: ${{ github.event.pull_request.head.sha || github.event.after }}
     secrets: inherit
@@ -499,14 +524,19 @@ jobs:
       - migrations
       - build-docker
       - tests-yarn-unit
-      - tests-yarn-integration
-      - tests-yarn-e2e
+      - tests-yarn-lsf
+      - cursor-review
     runs-on: ubuntu-latest
     steps:
       - name: Decide whether the needed jobs succeeded or failed
         uses: re-actors/alls-green@release/v1
         with:
-          allowed-skips: gitleaks, bandit, ruff, blue, biome, stylelint, pytest, migrations, conda-test, build-docker, tests-yarn-unit, tests-yarn-integration, tests-yarn-e2e
+          allowed-skips: gitleaks, bandit, ruff, blue, biome, stylelint, pytest, migrations, conda-test, build-docker, tests-yarn-unit, tests-yarn-lsf, cursor-review
+          allowed-failures: |
+            [
+              "gitleaks",
+              "cursor-review",
+            ]
           jobs: ${{ toJSON(needs) }}
 
   dependabot-auto-merge:

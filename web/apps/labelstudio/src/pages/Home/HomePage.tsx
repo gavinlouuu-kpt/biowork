@@ -1,18 +1,24 @@
-import type { Page } from "../types/Page";
-import { SimpleCard, Spinner } from "@humansignal/ui";
 import { IconExternal, IconFolderAdd, IconHumanSignal, IconUserAdd, IconFolderOpen } from "@humansignal/icons";
-import { HeidiTips } from "../../components/HeidiTips/HeidiTips";
+import { Button, SimpleCard, Spinner, Tooltip, Typography } from "@humansignal/ui";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { useUpdatePageTitle } from "@humansignal/core";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { HeidiTips } from "../../components/HeidiTips/HeidiTips";
 import { useAPI } from "../../providers/ApiProvider";
-import { useState } from "react";
 import { CreateProject } from "../CreateProject/CreateProject";
 import { InviteLink } from "../Organization/PeoplePage/InviteLink";
-import { Heading, Sub } from "@humansignal/typography";
-import { useHistory } from "react-router";
-import { Link } from "react-router-dom";
-import { Button } from "../../components";
-
-const PROJECTS_TO_SHOW = 10;
+import type { Page } from "../types/Page";
+import {
+  creationDialogOpen,
+  invitationOpen,
+  locationKeyAtom,
+  PROJECTS_TO_SHOW,
+  projectsDataAtom,
+  sortedProjectsAtom,
+  visitedIdsAtom,
+} from "./atoms";
 
 const resources = [
   {
@@ -44,9 +50,9 @@ const actions = [
     type: "createProject",
   },
   {
-    title: "Invite People",
+    title: "Invite Members",
     icon: IconUserAdd,
-    type: "invitePeople",
+    type: "inviteMembers",
   },
 ] as const;
 
@@ -54,11 +60,19 @@ type Action = (typeof actions)[number]["type"];
 
 export const HomePage: Page = () => {
   const api = useAPI();
-  const history = useHistory();
-  const [creationDialogOpen, setCreationDialogOpen] = useState(false);
-  const [invitationOpen, setInvitationOpen] = useState(false);
+  const location = useLocation();
+  const [modalIsOpen, setModalIsOpen] = useAtom(creationDialogOpen);
+  const [invitationIsOpen, setInvitationIsOpen] = useAtom(invitationOpen);
+  const setLocationKey = useSetAtom(locationKeyAtom);
+  const setProjectsData = useSetAtom(projectsDataAtom);
+  const sortedProjects = useAtomValue(sortedProjectsAtom);
+  const visitedIds = useAtomValue(visitedIdsAtom);
+
+  useUpdatePageTitle("Home");
+
+  // Fetch regular projects
   const { data, isFetching, isSuccess, isError } = useQuery({
-    queryKey: ["projects", { page_size: 10 }],
+    queryKey: ["projects", { page_size: PROJECTS_TO_SHOW }],
     async queryFn() {
       return api.callApi<{ results: APIProject[]; count: number }>("projects", {
         params: { page_size: PROJECTS_TO_SHOW },
@@ -66,14 +80,51 @@ export const HomePage: Page = () => {
     },
   });
 
+  // Fetch visited projects specifically by their IDs
+  const { data: visitedProjectsData } = useQuery({
+    queryKey: ["visited-projects", { ids: visitedIds }],
+    async queryFn() {
+      if (visitedIds.length === 0) return { results: [], count: 0 };
+
+      return api.callApi<{ results: APIProject[]; count: number }>("projects", {
+        params: {
+          ids: visitedIds.join(","),
+          page_size: visitedIds.length,
+        },
+      });
+    },
+    enabled: visitedIds.length > 0,
+  });
+
+  // Update location key atom when navigating to/returning to this page
+  // This triggers visitedIdsAtom to re-read from localStorage
+  // We use a timestamp to ensure the atom always updates, forcing a re-read
+  useEffect(() => {
+    setLocationKey(Date.now().toString());
+  }, [location.pathname, setLocationKey]);
+
+  // Merge visited and regular projects, removing duplicates
+  useEffect(() => {
+    const visitedProjects = visitedProjectsData?.results ?? [];
+    const regularProjects = data?.results ?? [];
+
+    // Merge and deduplicate
+    const allProjects = [...visitedProjects, ...regularProjects];
+    const uniqueProjects = Array.from(new Map(allProjects.map((p) => [p.id, p])).values());
+
+    if (uniqueProjects.length > 0) {
+      setProjectsData(uniqueProjects);
+    }
+  }, [data?.results, visitedProjectsData?.results, setProjectsData]);
+
   const handleActions = (action: Action) => {
     return () => {
       switch (action) {
         case "createProject":
-          setCreationDialogOpen(true);
+          setModalIsOpen(true);
           break;
-        case "invitePeople":
-          setInvitationOpen(true);
+        case "inviteMembers":
+          setInvitationIsOpen(true);
           break;
       }
     };
@@ -84,18 +135,24 @@ export const HomePage: Page = () => {
       <div className="grid grid-cols-[minmax(0,1fr)_450px] gap-6">
         <section className="flex flex-col gap-6">
           <div className="flex flex-col gap-1">
-            <Heading size={1}>Welcome 👋</Heading>
-            <Sub>Let's get you started.</Sub>
+            <Typography variant="headline" size="small">
+              Welcome 👋
+            </Typography>
+            <Typography size="small" className="text-neutral-content-subtler">
+              Let's get you started.
+            </Typography>
           </div>
           <div className="flex justify-start gap-4">
             {actions.map((action) => {
               return (
                 <Button
                   key={action.title}
-                  rawClassName="flex-grow-0 text-16/24 gap-2 text-primary-content text-left min-w-[250px] [&_svg]:w-6 [&_svg]:h-6 pl-2"
+                  look="outlined"
+                  align="center"
+                  className="flex-grow-0 text-16/24 gap-2 text-primary-content text-left min-w-[250px] [&_svg]:w-6 [&_svg]:h-6 pl-2"
                   onClick={handleActions(action.type)}
+                  leading={<action.icon />}
                 >
-                  <action.icon className="text-primary-icon" />
                   {action.title}
                 </Button>
               );
@@ -120,7 +177,7 @@ export const HomePage: Page = () => {
               </div>
             ) : isError ? (
               <div className="h-64 flex justify-center items-center">can't load projects</div>
-            ) : isSuccess && data.results.length === 0 ? (
+            ) : isSuccess && data && sortedProjects.length === 0 ? (
               <div className="flex flex-col justify-center items-center border border-primary-border-subtle bg-primary-emphasis-subtle rounded-lg h-64">
                 <div
                   className={
@@ -129,15 +186,19 @@ export const HomePage: Page = () => {
                 >
                   <IconFolderOpen />
                 </div>
-                <Heading size={2}>Create your first project</Heading>
-                <Sub>Import your data and set up the labeling interface to start annotating</Sub>
-                <Button primary rawClassName="mt-4" onClick={() => setCreationDialogOpen(true)}>
+                <Typography variant="headline" size="small">
+                  Create your first project
+                </Typography>
+                <Typography size="small" className="text-neutral-content-subtler">
+                  Import your data and set up the labeling interface to start annotating
+                </Typography>
+                <Button className="mt-4" onClick={() => setModalIsOpen(true)} aria-label="Create new project">
                   Create Project
                 </Button>
               </div>
-            ) : isSuccess && data.results.length > 0 ? (
+            ) : isSuccess && data && sortedProjects.length > 0 ? (
               <div className="flex flex-col gap-1">
-                {data.results.map((project) => {
+                {sortedProjects.map((project) => {
                   return <ProjectSimpleCard key={project.id} project={project} />;
                 })}
               </div>
@@ -171,8 +232,8 @@ export const HomePage: Page = () => {
           </div>
         </section>
       </div>
-      {creationDialogOpen && <CreateProject onClose={() => setCreationDialogOpen(false)} />}
-      <InviteLink opened={invitationOpen} onClosed={() => setInvitationOpen(false)} />
+      {modalIsOpen && <CreateProject onClose={() => setModalIsOpen(false)} />}
+      <InviteLink opened={invitationIsOpen} onClosed={() => setInvitationIsOpen(false)} />
     </main>
   );
 };
@@ -181,11 +242,7 @@ HomePage.title = "Home";
 HomePage.path = "/";
 HomePage.exact = true;
 
-function ProjectSimpleCard({
-  project,
-}: {
-  project: APIProject;
-}) {
+function ProjectSimpleCard({ project }: { project: APIProject }) {
   const finished = project.finished_task_number ?? 0;
   const total = project.task_number ?? 0;
   const progress = (total > 0 ? finished / total : 0) * 100;
@@ -203,7 +260,9 @@ function ProjectSimpleCard({
         style={{ borderLeftColor: color }}
       >
         <div className="flex flex-col gap-1">
-          <span className="text-neutral-content">{project.title}</span>
+          <Tooltip title={project.title}>
+            <span className="text-neutral-content truncate">{project.title}</span>
+          </Tooltip>
           <div className="text-neutral-content-subtler text-sm">
             {finished} of {total} Tasks ({total > 0 ? Math.round((finished / total) * 100) : 0}%)
           </div>

@@ -26,13 +26,16 @@ export default function (
     downloadsFolder: localPath("./output/downloads"),
     fixturesFolder: localPath("./fixtures"),
     trashAssetsBeforeRuns: false, // Kills ability to run in parallel, must be off
-    videoUploadOnPasses: false,
     numTestsKeptInMemory: 1,
     env: {
       coverage: COLLECT_COVERAGE,
+      DEFAULT_CPU_THROTTLING: process.env.DEFAULT_CPU_THROTTLING ? Number(process.env.DEFAULT_CPU_THROTTLING) : null,
+      DEFAULT_NETWORK_THROTTLING: process.env.DEFAULT_NETWORK_THROTTLING || null,
     },
     e2e: {
       ...nxE2EPreset(__filename, { cypressDir: "tests/integration" }),
+      baseUrl: "http://localhost:3000",
+      injectDocumentDomain: true,
       viewportWidth: 1600,
       viewportHeight: 900,
       // output config

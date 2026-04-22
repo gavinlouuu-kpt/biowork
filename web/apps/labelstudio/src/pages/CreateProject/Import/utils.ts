@@ -11,7 +11,7 @@ export const importFiles = async ({
   dontCommitToProject,
 }: {
   files: { name: string }[];
-  body: Record<string, any> | FormData | URLSearchParams;
+  body: Record<string, any> | FormData;
   project: APIProject;
   onUploadStart?: (files: { name: string }[]) => void;
   onUploadFinish?: (files: { name: string }[]) => void;
@@ -33,8 +33,11 @@ export const importFiles = async ({
     { headers: { "Content-Type": contentType }, body },
   );
 
-  if (res && !res.error) onFinish?.(res);
-  else onError?.(res?.response);
+  if (res && !res.error) {
+    await onFinish?.(res);
+  } else {
+    onError?.(res?.response);
+  }
 
   onUploadFinish?.(files);
 };

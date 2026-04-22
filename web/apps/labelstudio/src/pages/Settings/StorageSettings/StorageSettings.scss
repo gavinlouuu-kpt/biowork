@@ -1,15 +1,8 @@
 .storage-settings {
-  max-width: 680px;
-
-  &__description {
-    font-size: 16px;
-    opacity: 0.6;
-    margin-bottom: 32px;
-  }
-
   &__controls {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 8px;
     margin-bottom: 32px;
   }
 
@@ -31,7 +24,7 @@
     align-items: center;
     justify-content: space-between;
 
-    & + .inline-error {
+    &+.inline-error {
       margin-top: 32px;
     }
   }
@@ -39,12 +32,12 @@
   &__info {
     display: flex;
     align-items: center;
-    color: var(--color-negative-content);
+    color: #d00;
     font-size: 14px;
     line-height: 22px;
 
     &_valid {
-      color: var(--color-neutral-content-subtler);
+      color: rgb(0 0 0 / 40%);
     }
   }
 
@@ -60,5 +53,14 @@
     line-height: 18px;
     font-size: 14px;
     opacity: 0.7;
+  }
+
+  &__summary {
+    .dl__dd {
+      min-width: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
   }
 }

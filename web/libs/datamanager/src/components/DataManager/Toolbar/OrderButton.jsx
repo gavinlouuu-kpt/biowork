@@ -1,6 +1,6 @@
-import { inject } from "mobx-react";
 import { IconSortDown, IconSortUp } from "@humansignal/icons";
-import { Button } from "../../Common/Button/Button";
+import { Button, ButtonGroup, EnterpriseBadge } from "@humansignal/ui";
+import { inject } from "mobx-react";
 import { FieldsButton } from "../../Common/FieldsButton";
 import { Space } from "../../Common/Space/Space";
 
@@ -16,7 +16,7 @@ const injector = inject(({ store }) => {
 export const OrderButton = injector(({ size, ordering, view, ...rest }) => {
   return (
     <Space style={{ fontSize: 12 }}>
-      <Button.Group collapsed {...rest}>
+      <ButtonGroup collapsed {...rest}>
         <FieldsButton
           size={size}
           style={{ minWidth: 67, textAlign: "left", marginRight: -1 }}
@@ -28,20 +28,13 @@ export const OrderButton = injector(({ size, ordering, view, ...rest }) => {
           filter={(col) => {
             return col.orderable ?? col.original?.orderable;
           }}
-          wrapper={({ column, children }) => (
+          wrapper={({ column, children, enterpriseBadge }) => (
             <Space style={{ width: "100%", justifyContent: "space-between" }}>
               {children}
 
-              <div
-                style={{
-                  width: 24,
-                  height: 24,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {column?.icon}
+              <div className="flex items-center gap-tight">
+                {enterpriseBadge && <EnterpriseBadge style="ghost" />}
+                {column?.icon && <div className="w-6 h-6 flex items-center justify-center">{column.icon}</div>}
               </div>
             </Space>
           )}
@@ -50,11 +43,15 @@ export const OrderButton = injector(({ size, ordering, view, ...rest }) => {
 
         <Button
           size={size}
+          look="outlined"
+          variant="neutral"
           disabled={!!ordering === false}
-          icon={ordering?.desc ? <IconSortUp /> : <IconSortDown />}
           onClick={() => view.setOrdering(ordering?.field)}
-        />
-      </Button.Group>
+          aria-label={ordering?.desc ? "Sort ascending" : "Sort descending"}
+        >
+          {ordering?.desc ? <IconSortUp /> : <IconSortDown />}
+        </Button>
+      </ButtonGroup>
     </Space>
   );
 });

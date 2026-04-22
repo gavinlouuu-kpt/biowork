@@ -1,15 +1,13 @@
-import { EnterpriseBadge, Select } from "@humansignal/ui";
+import { Badge, Button, Select, Typography, Tooltip, EnterpriseBadge } from "@humansignal/ui";
 import { useCallback, useContext } from "react";
-import { Button } from "../../components";
+import { IconSpark } from "@humansignal/icons";
 import { Form, Input, TextArea } from "../../components/Form";
 import { RadioGroup } from "../../components/Form/Elements/RadioGroup/RadioGroup";
 import { ProjectContext } from "../../providers/ProjectProvider";
-import { Block, Elem } from "../../utils/bem";
-import "./settings.scss";
+import { cn } from "../../utils/bem";
 import { HeidiTips } from "../../components/HeidiTips/HeidiTips";
 import { FF_LSDV_E_297, isFF } from "../../utils/feature-flags";
 import { createURL } from "../../components/HeidiTips/utils";
-import { Caption } from "../../components/Caption/Caption";
 
 export const GeneralSettings = () => {
   const { project, fetchProject } = useContext(ProjectContext);
@@ -26,23 +24,23 @@ export const GeneralSettings = () => {
   ];
 
   return (
-    <Block name="general-settings">
-      <Elem name={"wrapper"}>
+    <div className={cn("general-settings").toClassName()}>
+      <div className={cn("general-settings").elem("wrapper").toClassName()}>
         <h1>General Settings</h1>
-        <Block name="settings-wrapper">
+        <div className={cn("settings-wrapper").toClassName()}>
           <Form action="updateProject" formData={{ ...project }} params={{ pk: project.id }} onSubmit={updateProject}>
             <Form.Row columnCount={1} rowGap="16px">
               <Input name="title" label="Project Name" />
 
               <TextArea name="description" label="Description" style={{ minHeight: 128 }} />
               {isFF(FF_LSDV_E_297) && (
-                <Block name="workspace-placeholder">
-                  <Elem name="badge-wrapper">
-                    <Elem name="title">Workspace</Elem>
-                    <EnterpriseBadge className="ml-2" />
-                  </Elem>
+                <div className={cn("workspace-placeholder").toClassName()}>
+                  <div className={cn("workspace-placeholder").elem("badge-wrapper").toClassName()}>
+                    <div className={cn("workspace-placeholder").elem("title").toClassName()}>Workspace</div>
+                    <EnterpriseBadge size="small" className="ml-2" />
+                  </div>
                   <Select placeholder="Select an option" disabled options={[]} />
-                  <Caption>
+                  <Typography size="small" className="my-tight">
                     Simplify project management by organizing projects into workspaces.{" "}
                     <a
                       target="_blank"
@@ -54,16 +52,17 @@ export const GeneralSettings = () => {
                         },
                       )}
                       rel="noreferrer"
+                      className="underline hover:no-underline"
                     >
                       Learn more
                     </a>
-                  </Caption>
-                </Block>
+                  </Typography>
+                </div>
               )}
               <RadioGroup name="color" label="Color" size="large" labelProps={{ size: "large" }}>
                 {colors.map((color) => (
                   <RadioGroup.Button key={color} value={color}>
-                    <Block name="color" style={{ "--background": color }} />
+                    <div className={cn("color").toClassName()} style={{ "--background": color }} />
                   </RadioGroup.Button>
                 ))}
               </RadioGroup>
@@ -83,7 +82,16 @@ export const GeneralSettings = () => {
                     value=""
                     label={
                       <>
-                        Uncertainty sampling <EnterpriseBadge className="ml-2" />
+                        Uncertainty sampling{" "}
+                        <Tooltip title="Available on Label Studio Enterprise">
+                          <Badge
+                            variant="enterprise"
+                            icon={<IconSpark />}
+                            size="small"
+                            style="ghost"
+                            className="ml-tightest"
+                          />
+                        </Tooltip>
                       </>
                     }
                     disabled
@@ -111,15 +119,15 @@ export const GeneralSettings = () => {
               <Form.Indicator>
                 <span case="success">Saved!</span>
               </Form.Indicator>
-              <Button type="submit" look="primary" style={{ width: 120 }}>
+              <Button type="submit" className="w-[150px]" aria-label="Save general settings">
                 Save
               </Button>
             </Form.Actions>
           </Form>
-        </Block>
-      </Elem>
+        </div>
+      </div>
       {isFF(FF_LSDV_E_297) && <HeidiTips collection="projectSettings" />}
-    </Block>
+    </div>
   );
 };
 

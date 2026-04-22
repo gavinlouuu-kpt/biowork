@@ -1,12 +1,12 @@
 import { getEnv, getSnapshot, getType, types } from "mobx-state-tree";
 import { observer } from "mobx-react";
 import { Tool } from "../components/Toolbar/Tool";
-import { toKebabCase } from "strman";
+import { kebabCase } from "@humansignal/core/lib/utils/string";
 
 const ToolView = observer(({ item }) => {
   return (
     <Tool
-      ariaLabel={toKebabCase(getType(item).name)}
+      ariaLabel={kebabCase(getType(item).name)}
       active={item.selected}
       icon={item.iconClass}
       label={item.viewTooltip}
@@ -49,11 +49,6 @@ const BaseTool = types
         return null;
       },
       get shouldRenderView() {
-        // Regular tools (non-dynamic) should always render if they have an icon
-        // Smart tools (dynamic) should only render when smartEnabled
-        if (!self.dynamic) {
-          return self.isSeparated || self.iconClass;
-        }
         return (self.isSeparated || self.smartEnabled) && self.iconClass;
       },
       get iconClass() {
@@ -107,6 +102,7 @@ export const DEFAULT_DIMENSIONS = {
   rect: { width: 30, height: 30 },
   ellipse: { radius: 30 },
   polygon: { length: 30 },
+  vector: { length: 30 },
 };
 
 export default BaseTool;

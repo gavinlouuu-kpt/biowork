@@ -1,9 +1,11 @@
 import { observer } from "mobx-react";
-import { Block, Elem } from "../../utils/bem";
+import { isStarterCloudPlan } from "@humansignal/core";
+import { cn } from "../../utils/bem";
+import { FF_BULK_ANNOTATION, isFF } from "../../utils/feature-flags";
 import { Actions } from "./Actions";
 import { Controls } from "./Controls";
+import { CurrentTask } from "./CurrentTask";
 import "./BottomBar.scss";
-import { FF_DEV_3873, isFF } from "../../utils/feature-flags";
 
 export const BottomBar = observer(({ store }) => {
   const annotationStore = store.annotationStore;
@@ -11,19 +13,21 @@ export const BottomBar = observer(({ store }) => {
   const isPrediction = entity?.type === "prediction";
 
   const isViewAll = annotationStore?.viewingAll === true;
+  const isBulkMode = isFF(FF_BULK_ANNOTATION) && !isStarterCloudPlan() && store.hasInterface("annotation:bulk");
 
   return store && !isViewAll ? (
-    <Block name="bottombar" style={{ borderTop: isFF(FF_DEV_3873) && "1px solid rgba(0,0,0,0.1)" }}>
-      <Elem name="group">
+    <div className={cn("bottombar").toClassName()}>
+      <div className={cn("bottombar").elem("group").toClassName()}>
+        {!isBulkMode && <CurrentTask store={store} />}
         <Actions store={store} />
-      </Elem>
-      <Elem name="group">
+      </div>
+      <div className={cn("bottombar").elem("group").toClassName()}>
         {store.hasInterface("controls") && (store.hasInterface("review") || !isPrediction) && (
-          <Elem name="section" mod={{ flat: true }}>
+          <div className={cn("bottombar").elem("section").mod({ flat: true }).toClassName()}>
             <Controls annotation={entity} />
-          </Elem>
+          </div>
         )}
-      </Elem>
-    </Block>
+      </div>
+    </div>
   ) : null;
 });

@@ -16,6 +16,7 @@ export interface TimelineProps<D extends ViewTypes = "frames"> {
   mode: D;
   framerate: number;
   playing: boolean;
+  buffering?: boolean;
   zoom?: number;
   volume?: number;
   speed?: number;
@@ -32,6 +33,7 @@ export interface TimelineProps<D extends ViewTypes = "frames"> {
   controlsOnTop?: boolean;
   controls?: TimelineControls;
   customControls?: TimelineCustomControls[];
+  readonly?: boolean;
   onReady?: (data: Record<string, any>) => void;
   onPlay?: () => void;
   onPause?: () => void;
@@ -121,6 +123,7 @@ export interface TimelineContextValue {
   settings?: TimelineSettings;
   changeSetting?: (key: string, value: any) => void;
   data?: any;
+  readonly?: boolean;
 }
 
 export interface TimelineMinimapProps {
@@ -182,6 +185,7 @@ export interface TimelineControlsProps {
   playing: boolean;
   collapsed: boolean;
   fullscreen: boolean;
+  buffering?: boolean;
   volume?: number;
   speed?: number;
   zoom?: number;

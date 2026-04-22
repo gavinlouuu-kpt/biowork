@@ -1,10 +1,5 @@
 //// LEGACY FLAGS ////
 // Consider all pre-XFN flags legacy. Should be revised and removed.
-/**
- * Aync import for task data
- * @deprecated
- */
-export const FF_LSDV_4915 = "fflag_feat_all_lsdv_4915_async_task_import_13042023_short";
 
 /**
  * Fix displaying of created_at in the review mode
@@ -12,29 +7,15 @@ export const FF_LSDV_4915 = "fflag_feat_all_lsdv_4915_async_task_import_13042023
 export const FF_DEV_1480 = "ff_front_dev_1480_created_on_in_review_180122_short";
 
 /**
- * Notifications
- */
-export const FF_DEV_1658 = "ff_front_dev_1658_notification_center_170222_short";
-
-/**
  * Model version selector per model backend
  */
 export const FF_DEV_1682 = "ff_front_dev_1682_model_version_dropdown_070622_short";
-
-/**
- * Fixes how presigned urls are generated and accessed to remove possibility of CORS errors.
- */
-export const FF_LSDV_4711 = "fflag_fix_all_lsdv_4711_cors_errors_accessing_task_data_short";
 
 /**
  * Enables "Enterprise Awareness" features
  */
 export const FF_LSDV_E_297 = "fflag_feat_front_lsdv_e_297_increase_oss_to_enterprise_adoption_short";
 
-/**
- * Project list search
- */
-export const FF_PROD_281 = "fflag_feat_front_prod_281_project_list_search_19072023_short";
 //// END OF LEGACY FLAGS ////
 
 /**
@@ -74,24 +55,14 @@ export const FF_SAMPLE_DATASETS = "fflag_feat_dia_1920_project_creation_sample_d
 export const FF_JSON_PREVIEW = "fflag_feat_dia_1925_view_sample_raw_json_short";
 
 /**
- * Allow to resize spans in Text tag
- */
-export const FF_ADJUSTABLE_SPANS = "fflag_feat_front_leap_1973_adjustable_spans_090425_short";
-
-/**
  * Enables the theme toggle in the UI to enable the dark mode
  */
 export const FF_THEME_TOGGLE = "fflag_feat_front_optic_1217_theme_toggle_short";
 
 /**
- * Enables the summary view for annotations
+ * Fixes synced audio/video buffering
  */
-export const FF_SUMMARY = "fflag_feat_front_leap_2036_annotations_summary";
-
-/**
- * TimeSeries Multi-channel functionality
- */
-export const FF_MULTICHANNEL_TS = "fflag_feat_front_bros58_timeseries_multichannel_short";
+export const FF_SYNCED_BUFFERING = "fflag_fix_front_fit_31_synced_media_buffering";
 
 /**
  * Enables enterprise email notifications
@@ -99,6 +70,63 @@ export const FF_MULTICHANNEL_TS = "fflag_feat_front_bros58_timeseries_multichann
 export const FF_ENTERPRISE_EMAIL_NOTIFICATIONS = "fflag_feat_front_fit_183_email_notifications_short";
 
 /**
+ * New storage providers experience
+ * @link https://app.launchdarkly.com/projects/default/flags/fflag_feat_bros_193_new_cloud_storage_providers_short/targeting?env=production&selected-env=production
+ */
+export const FF_NEW_STORAGES = "fflag_feat_bros_193_new_cloud_storage_providers_short";
+
+/**
+ * Datamanager filter members
+ */
+export const FF_DM_FILTER_MEMBERS = "fflag_feat_fit_449_datamanager_filter_members_short";
+
+/**
+ * Modify MST models to allow custom tags
+ */
+export const FF_ENTERPRISE_EMAIL_NOTIFICATIONS = "fflag_feat_front_fit_183_email_notifications_short";
+
+/**
  * Hide Heidi mascot tips across UI
  */
 export const FF_HIDE_HEIDI_TIPS = "fflag_feat_front_hide_heidi_tips_short";
+
+export const FF_CUSTOM_TAGS = "fflag_feat_front_bros_194_custom_tags_short";
+
+/**
+ * Multiple labels support for region creation - improved label blocks handling
+ */
+export const FF_MULTIPLE_LABELS_REGIONS = "fflag_feat_front_bros_327_multiple_labels_regions_short";
+
+/**
+ * Agreement Filtered
+ */
+export const FF_AGREEMENT_FILTERED = "fflag_feat_utc_239_filterable_agreement_column_short";
+
+/**
+ * FSM State Fields
+ */
+export const FF_FSM_STATE_FIELDS = "fflag_feat_fit_710_fsm_state_fields";
+
+/**
+ * Starter Cloud (Self Serve) plan
+ * @link https://app.launchdarkly.com/default/test/features/fflag_feat_front_leap_482_self_serve_short/
+ */
+export const FF_SELF_SERVE = "fflag_feat_front_leap_482_self_serve_short";
+
+/**
+ * Preview performance improvements - uses lightweight static preview for large configs
+ */
+export const FF_PREVIEW_PERFORMANCE = "fflag_fix_all_fit_287_preview_performance_improvements";
+
+/**
+ * Lazy load annotations in LabelStream to improve performance for tasks with many annotations
+ * Also enables virtualization of annotation tabs carousel
+ * @link https://app.launchdarkly.com/default/production/features/fflag_fix_all_fit_720_lazy_load_annotations
+ */
+export const FF_FIT_720_LAZY_LOAD_ANNOTATIONS = "fflag_fix_all_fit_720_lazy_load_annotations";
+
+/**
+ * Analytics Label Distribution page
+ */
+export const FF_FIT_1443_ANALYTICS_LABEL_DISTRIBUTION_PAGE =
+  "fflag_feat_all_fit_1443_analytics_label_distribution_page";

@@ -1,15 +1,15 @@
 {
   "projectCreation": [
     {
-      "title": "Did you know?",
-      "content": "It's easier to find the projects when you organize them into workspaces using Label Studio Enterprise.",
+      "title": "New Storage Connector",
+      "content": "You can connect Label Studio Enterprise to Databricks Unity Catalog (UC) Volumes to import files as tasks and export annotations.",
       "closable": true,
       "link": {
         "label": "Learn more",
-        "url": "https://docs.humansignal.com/guide/manage_projects#Create-workspaces-to-organize-projects",
+        "url": "https://docs.humansignal.com/guide/storage.html#Databricks-Files-UC-Volumes",
         "params": {
           "experiment": "project_creation_tip",
-          "treatment": "find_and_manage_projects_live"
+          "treatment": "databricks_uc_live"
         }
       }
     }
@@ -31,6 +31,19 @@
   ],
   "projectSettings": [
     {
+      "title": "Apply your AWS spend to Label Studio Enterprise",
+      "content": "Label Studio Enterprise is now available on the AWS Marketplace so you can use your committed spend to streamline data labeling workflows.",
+      "closable": true,
+      "link": {
+        "label": "Learn more",
+        "url": "https://aws.amazon.com/marketplace/pp/prodview-wjac3msf77tny",
+        "params": {
+          "experiment": "project_settings_tip",
+          "treatment": "aws_marketplace"
+        }
+      }
+    },
+    {
       "title": "Save time with Auto-Labeling",
       "content": "Use automation to instantly label large-scale datasets without sacrificing quality in the Enterprise platform.",
       "closable": true,
@@ -49,11 +62,11 @@
       "title": "Auto-labeling with Prompts is here!",
       "description": "Use LLMs to instantly pre-label thousands of tasks with accurate predictions.",
       "link": {
-        "label": "Learn more",
-        "url": "https://docs.humansignal.com/guide/prompts_overview",
+        "label": "December 10, 2025 9am PST",
+        "url": "https://humansignal.com/webinars/label-studio-wrapped-2025/",
         "params": {
           "experiment": "login_revamp",
-          "treatment": "prompts_auto_labeling_live"
+          "treatment": "wrapped_webinar_2025_live"
         }
       }
     }

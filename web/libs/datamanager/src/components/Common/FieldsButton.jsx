@@ -1,10 +1,8 @@
+import { Button, Checkbox, Dropdown, EnterpriseBadge } from "@humansignal/ui";
 import { inject, observer } from "mobx-react";
 import React from "react";
-import { Button } from "./Button/Button";
-import { Checkbox, Tooltip } from "@humansignal/ui";
-import { Dropdown } from "./Dropdown/Dropdown";
+import { cn } from "../../utils/bem";
 import { Menu } from "./Menu/Menu";
-import { Elem } from "../../utils/bem";
 
 const injector = inject(({ store }) => {
   return {
@@ -14,12 +12,22 @@ const injector = inject(({ store }) => {
 
 const FieldsMenu = observer(({ columns, WrapperComponent, onClick, onReset, selected, resetTitle }) => {
   const MenuItem = (col, onClick) => {
+    const enterpriseBadge = col.enterprise_badge ?? col.original?.enterprise_badge;
+    const shouldDisable = col.disabled || enterpriseBadge;
+
+    const titleContent = <span>{col.title}</span>;
+
     return (
-      <Menu.Item key={col.key} name={col.key} onClick={onClick}>
+      <Menu.Item key={col.key} name={col.key} onClick={onClick} disabled={shouldDisable}>
         {WrapperComponent && col.wra !== false ? (
-          <WrapperComponent column={col}>{col.title}</WrapperComponent>
+          <WrapperComponent column={col} disabled={shouldDisable} enterpriseBadge={enterpriseBadge}>
+            {titleContent}
+          </WrapperComponent>
         ) : (
-          col.title
+          <span className="flex items-center justify-between w-full gap-base">
+            {titleContent}
+            {enterpriseBadge && <EnterpriseBadge style="ghost" />}
+          </span>
         )}
       </Menu.Item>
     );
@@ -73,6 +81,7 @@ export const FieldsButton = injector(
     tooltip,
     tooltipTheme = "dark",
     openUpwardForShortViewport = true,
+    "data-testid": dataTestId,
   }) => {
     const content = [];
 
@@ -80,7 +89,14 @@ export const FieldsButton = injector(
 
     const renderButton = () => {
       return (
-        <Button size={size} icon={icon} extra={trailingIcon} style={style} className={className}>
+        <Button
+          variant="neutral"
+          size="small"
+          look="outlined"
+          leading={icon}
+          trailing={trailingIcon}
+          data-testid={dataTestId}
+        >
           {content.length ? content : null}
         </Button>
       );
@@ -93,23 +109,29 @@ export const FieldsButton = injector(
             columns={filter ? columns.filter(filter) : columns}
             WrapperComponent={wrapper}
             onClick={onClick}
+            size={size}
             onReset={onReset}
             selected={selected}
             resetTitle={resetTitle}
           />
         }
-        style={{
-          maxHeight: 280,
-          overflow: "auto",
-        }}
+        style={{ maxHeight: 280, overflow: "auto" }}
         openUpwardForShortViewport={openUpwardForShortViewport}
       >
         {tooltip ? (
-          <Elem name={"field-button"} style={{ zIndex: 1000 }}>
-            <Tooltip title={tooltip} theme={tooltipTheme}>
-              {renderButton()}
-            </Tooltip>
-          </Elem>
+          <div className={`${cn("field-button").toClassName()} h-[40px] flex items-center`} style={{ zIndex: 1000 }}>
+            <Button
+              tooltip={tooltip}
+              variant="neutral"
+              size={size}
+              look="outlined"
+              leading={icon}
+              trailing={trailingIcon}
+              data-testid={dataTestId}
+            >
+              {content.length ? content : null}
+            </Button>
+          </div>
         ) : (
           renderButton()
         )}
@@ -118,15 +140,27 @@ export const FieldsButton = injector(
   },
 );
 
-FieldsButton.Checkbox = observer(({ column, children }) => {
+FieldsButton.Checkbox = observer(({ column, children, disabled, enterpriseBadge }) => {
+  const shouldDisable = disabled;
+
   return (
-    <Checkbox
-      size="small"
-      checked={!column.hidden}
-      onChange={column.toggleVisibility}
-      style={{ width: "100%", height: "100%" }}
-    >
-      {children}
-    </Checkbox>
+    <div className="w-full flex items-center justify-between gap-tight">
+      <div className="flex-1 flex items-center min-w-0 overflow-hidden">
+        <Checkbox
+          size="small"
+          checked={!column.is_hidden}
+          onChange={column.toggleVisibility}
+          disabled={shouldDisable}
+          className="w-full"
+        >
+          {children}
+        </Checkbox>
+      </div>
+      {enterpriseBadge && (
+        <div style={{ flexShrink: 0 }}>
+          <EnterpriseBadge style="ghost" />
+        </div>
+      )}
+    </div>
   );
 });

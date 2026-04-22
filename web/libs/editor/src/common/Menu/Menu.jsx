@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useMemo } from "react";
-import { Block, cn } from "../../utils/bem";
-import { useDropdown } from "../Dropdown/DropdownTrigger";
+import { cn } from "../../utils/bem";
+import { useDropdown } from "@humansignal/ui";
 import "./Menu.scss";
 import { MenuContext } from "./MenuContext";
 import { MenuItem } from "./MenuItem";
@@ -34,17 +34,14 @@ export const Menu = forwardRef(
 
     return (
       <MenuContext.Provider value={contextValue}>
-        <Block
+        <ul
           ref={ref}
-          tag="ul"
-          name="menu"
-          mod={{ size, collapsed }}
-          mix={className}
+          className={cn("menu").mod({ size, collapsed }).mix(className).toClassName()}
           style={style}
           onClick={clickHandler}
         >
           {children}
-        </Block>
+        </ul>
       </MenuContext.Provider>
     );
   },
@@ -73,9 +70,9 @@ Menu.Group = ({ children, title, className, style }) => {
   const rootClass = cn("menu-group");
 
   return (
-    <li className={rootClass.mix(className)} style={style}>
-      <div className={rootClass.elem("title")}>{title}</div>
-      <ul className={rootClass.elem("list")}>{children}</ul>
+    <li className={rootClass.mix(className).toClassName()} style={style}>
+      <div className={rootClass.elem("title").toClassName()}>{title}</div>
+      <ul className={rootClass.elem("list").toClassName()}>{children}</ul>
     </li>
   );
 };

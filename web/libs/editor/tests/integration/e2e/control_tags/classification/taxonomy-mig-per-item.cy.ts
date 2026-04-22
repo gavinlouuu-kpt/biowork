@@ -19,9 +19,11 @@ describe("Control Tags - MIG perItem - Taxonomy", () => {
     ImageView.waitForImage();
 
     Taxonomy.open();
-    Taxonomy.findItem("Choice 1").click();
+    Taxonomy.clickItem("Choice 1");
 
+    Taxonomy.hasSelected("Choice 1");
     LabelStudio.serialize().then((result) => {
+      expect(result).to.have.length.at.least(1);
       expect(result[0]).to.have.property("item_index", 0);
     });
   });
@@ -72,20 +74,23 @@ describe("Control Tags - MIG perItem - Taxonomy", () => {
     ImageView.waitForImage();
 
     Taxonomy.open();
-    Taxonomy.findItem("Choice 1").click();
+    Taxonomy.clickItem("Choice 1");
+    Taxonomy.hasSelected("Choice 1");
 
     ImageView.paginationNextBtn.click();
     ImageView.waitForImage();
     Taxonomy.open();
-    Taxonomy.findItem("Choice 2").click();
+    Taxonomy.clickItem("Choice 2");
+    Taxonomy.hasSelected("Choice 2");
 
     ImageView.paginationNextBtn.click();
     ImageView.waitForImage();
     Taxonomy.open();
-    cy.wait(500);
-    Taxonomy.findItem("Choice 3").click();
+    Taxonomy.clickItem("Choice 3");
+    Taxonomy.hasSelected("Choice 3");
 
     LabelStudio.serialize().then((result) => {
+      expect(result).to.have.length.at.least(3);
       expect(result[0]).to.include({ item_index: 0 });
       expect(result[0].value.taxonomy).to.be.deep.eq([["Choice 1"]]);
 
@@ -106,7 +111,7 @@ describe("Control Tags - MIG perItem - Taxonomy", () => {
 
     ImageView.waitForImage();
 
-    ToolBar.submitBtn.click();
+    ToolBar.updateBtn.click();
     Modals.hasWarning(TAXONOMY_REQUIRED_WARNING);
   });
 
@@ -120,9 +125,9 @@ describe("Control Tags - MIG perItem - Taxonomy", () => {
     ImageView.waitForImage();
 
     Taxonomy.open();
-    Taxonomy.findItem("Choice 1").click();
+    Taxonomy.clickItem("Choice 1");
 
-    ToolBar.submitBtn.click();
+    ToolBar.updateBtn.click();
     Modals.hasWarning(TAXONOMY_REQUIRED_WARNING);
   });
 
@@ -136,24 +141,28 @@ describe("Control Tags - MIG perItem - Taxonomy", () => {
     ImageView.waitForImage();
 
     Taxonomy.open();
-    Taxonomy.findItem("Choice 1").click();
+    Taxonomy.clickItem("Choice 1");
+    Taxonomy.hasSelected("Choice 1");
     ImageView.paginationNextBtn.click();
     ImageView.waitForImage();
 
     Taxonomy.open();
-    Taxonomy.findItem("Choice 2").click();
+    Taxonomy.clickItem("Choice 2");
+    Taxonomy.hasSelected("Choice 2");
     ImageView.paginationNextBtn.click();
     ImageView.waitForImage();
 
     Taxonomy.open();
-    Taxonomy.findItem("Choice 3").click();
+    Taxonomy.clickItem("Choice 3");
+    Taxonomy.hasSelected("Choice 3");
     ImageView.paginationNextBtn.click();
     ImageView.waitForImage();
 
     Taxonomy.open();
-    Taxonomy.findItem("Choice 2").click();
+    Taxonomy.clickItem("Choice 2");
+    Taxonomy.hasSelected("Choice 2");
 
-    ToolBar.submitBtn.click();
+    ToolBar.updateBtn.click();
     Modals.hasNoWarnings();
   });
 });

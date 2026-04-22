@@ -19,7 +19,7 @@ import SelectedChoiceMixin from "../../../mixins/SelectedChoiceMixin";
 import { SharedStoreMixin } from "../../../mixins/SharedChoiceStore/mixin";
 import VisibilityMixin from "../../../mixins/Visibility";
 import { parseValue } from "../../../utils/data";
-import { FF_LEAP_218, FF_LSDV_4583, FF_TAXONOMY_ASYNC, FF_TAXONOMY_LABELING, isFF } from "../../../utils/feature-flags";
+import { FF_LSDV_4583, FF_TAXONOMY_LABELING, isFF } from "../../../utils/feature-flags";
 import ControlBase from "../Base";
 import ClassificationBase from "../ClassificationBase";
 
@@ -71,9 +71,9 @@ import { errorBuilder } from "../../../core/DataValidator/ConfigValidator";
  * @param {boolean} [showFullPath=false]  - Whether to show the full path of selected items
  * @param {string} [pathSeparator= / ]    - Separator to show in the full path (default is " / "). To avoid errors, ensure that your data does not include this separator
  * @param {number} [maxUsages]            - Maximum number of times a choice can be selected per task or per region
- * @param {number} [maxWidth]             - Maximum width for dropdown
- * @param {number} [minWidth]             - Minimum width for dropdown
- * @param {boolean} [required=false]      - Whether taxonomy validation is required
+ * @param {number} [maxWidth]             - Maximum width for dropdown with units (eg: "500px")
+ * @param {number} [minWidth]             - Minimum width for dropdown with units (eg: "300px")
+ * @param {boolean} [required=false]      - Whether it is required to have selected at least one option
  * @param {string} [requiredMessage]      - Message to show if validation fails
  * @param {string} [placeholder=]         - What to display as prompt on the input
  * @param {boolean} [perRegion]           - Use this tag to classify specific regions instead of the whole object
@@ -260,7 +260,7 @@ const Model = types
     },
 
     get isLoadedByApi() {
-      return isFF(FF_TAXONOMY_ASYNC) && !!self.apiurl;
+      return !!self.apiurl;
     },
 
     get items() {
@@ -358,6 +358,10 @@ const Model = types
       } else {
         self.loading = false;
       }
+    },
+
+    afterClone(node) {
+      self.selected = [...node.selected];
     },
 
     /**
@@ -579,9 +583,7 @@ const TaxonomyModel = types.compose(
 
 const HtxTaxonomy = observer(({ item }) => {
   // literal "taxonomy" class name is for external styling
-  const className = [styles.taxonomy, "taxonomy", isFF(FF_TAXONOMY_ASYNC) ? styles.taxonomy__new : ""]
-    .filter(Boolean)
-    .join(" ");
+  const className = [styles.taxonomy, "taxonomy", styles.taxonomy__new].filter(Boolean).join(" ");
   const visibleStyle = item.perRegionVisible() && item.isVisible ? {} : { display: "none" };
   const options = {
     showFullPath: item.showfullpath,
@@ -600,7 +602,7 @@ const HtxTaxonomy = observer(({ item }) => {
   // they are indicated by loading icon on the item itself
   const firstLoad = item.isLoadedByApi ? !item.items.length : true;
 
-  if (item.loading && isFF(FF_TAXONOMY_ASYNC) && firstLoad) {
+  if (item.loading && firstLoad) {
     return (
       <div className={className} style={visibleStyle}>
         <div className={styles.taxonomy__loading}>
@@ -612,7 +614,7 @@ const HtxTaxonomy = observer(({ item }) => {
 
   return (
     <div className={className} style={visibleStyle} ref={item.elementRef}>
-      {isFF(FF_TAXONOMY_ASYNC) && !item.legacy ? (
+      {!item.legacy ? (
         <NewTaxonomy
           items={item.items}
           selected={item.selectedItems}
@@ -621,7 +623,6 @@ const HtxTaxonomy = observer(({ item }) => {
           onAddLabel={item.userLabels && item.onAddLabel}
           onDeleteLabel={item.userLabels && item.onDeleteLabel}
           options={options}
-          defaultSearch={!isFF(FF_LEAP_218)}
           isEditable={!item.isReadOnly()}
         />
       ) : (
@@ -641,4 +642,4 @@ const HtxTaxonomy = observer(({ item }) => {
 
 Registry.addTag("taxonomy", TaxonomyModel, HtxTaxonomy);
 
-export { HtxTaxonomy, TaxonomyModel, TagAttrs };
+export { HtxTaxonomy, TaxonomyModel, TagAttrs, traverse };

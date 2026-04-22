@@ -38,11 +38,6 @@ class OrganizationMember(OrganizationMemberMixin, models.Model):
         'If NULL, the member is not considered deleted.',
     )
 
-    joined_via_invitation = models.BooleanField(
-        default=False,
-        help_text='Whether this user joined via an invitation link'
-    )
-
     # objects = OrganizationMemberQuerySet.as_manager()
 
     @classmethod
@@ -60,11 +55,6 @@ class OrganizationMember(OrganizationMemberMixin, models.Model):
     def is_owner(self):
         return self.user.id == self.organization.created_by.id
 
-    @cached_property
-    def can_leave(self):
-        """Users who joined via invitation cannot leave the organization"""
-        return not self.joined_via_invitation
-
     class Meta:
         ordering = ['pk']
 
@@ -75,7 +65,10 @@ class OrganizationMember(OrganizationMemberMixin, models.Model):
             self.user.active_organization = self.user.organizations.filter(
                 organizationmember__deleted_at__isnull=True
             ).first()
-            self.user.save(update_fields=['active_organization'])
+            if self.user.avatar:
+                self.user.avatar.delete(save=False)
+                self.user.avatar = None
+            self.user.save(update_fields=['active_organization', 'avatar'])
 
         self.user.task_locks.all().delete()
 
@@ -144,13 +137,13 @@ class Organization(OrganizationMixin, models.Model):
     def has_permission(self, user):
         return OrganizationMember.objects.filter(user=user, organization=self, deleted_at__isnull=True).exists()
 
-    def add_user(self, user, joined_via_invitation=False):
+    def add_user(self, user):
         if self.users.filter(pk=user.pk).exists():
             logger.debug('User already exists in organization.')
             return
 
         with transaction.atomic():
-            om = OrganizationMember(user=user, organization=self, joined_via_invitation=joined_via_invitation)
+            om = OrganizationMember(user=user, organization=self)
             om.save()
 
             return om
@@ -165,53 +158,9 @@ class Organization(OrganizationMixin, models.Model):
         self.token = create_hash()
         self.save(update_fields=['token'])
 
-    def get_project_limit(self):
-        """Get the maximum number of projects allowed for this organization."""
-        from billing.services.plans import get_org_limits
-        limits = get_org_limits(self)
-        return limits['max_projects']
-
-    def get_task_limit(self):
-        """Get the maximum number of tasks allowed for this organization."""
-        from billing.services.plans import get_org_limits
-        limits = get_org_limits(self)
-        return limits['max_tasks']
-
-    def get_stripe_email(self):
-        """Get the email address to use for Stripe customer creation."""
-        if self.contact_info:
-            return self.contact_info
-        elif self.created_by:
-            return self.created_by.email
-        else:
-            # Fallback for organizations without contact info or creator
-            return f"org-{self.id}@example.com"
-
-    @property
-    def email(self) -> str:
-        """
-        dj-stripe expects the subscriber model to have an `email` attribute.
-        We expose it as a computed property to avoid schema changes.
-        """
-        return self.get_stripe_email()
-
     def check_max_projects(self):
         """This check raise an exception if the projects limit is hit"""
-        from billing.services.plans import check_org_limits
-
-        limits_check = check_org_limits(self, additional_projects=1)
-        if not limits_check['projects_ok']:
-            from django.core.exceptions import ValidationError
-            raise ValidationError(f"Project limit exceeded. Your current plan allows a maximum of {self.get_project_limit()} projects.")
-
-    def check_max_tasks(self, additional_tasks: int):
-        """This check raises an exception if the tasks limit would be hit"""
-        from billing.services.plans import check_org_limits
-
-        limits_check = check_org_limits(self, additional_tasks=additional_tasks)
-        if not limits_check['tasks_ok']:
-            from django.core.exceptions import ValidationError
-            raise ValidationError(f"Task limit exceeded. Your current plan allows a maximum of {self.get_task_limit()} tasks total.")
+        pass
 
     def projects_sorted_by_created_at(self):
         return (

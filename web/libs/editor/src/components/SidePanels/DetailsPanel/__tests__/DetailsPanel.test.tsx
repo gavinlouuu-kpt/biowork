@@ -1,19 +1,27 @@
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { Relations, Info, Stats } from "../DetailsPanel";
+import { Relations, Info } from "../DetailsPanel";
 
 // Mock the dependencies
 jest.mock("../../../../utils/bem", () => ({
-  Block: ({ children, ...props }: any) => (
-    <div data-testid="block" {...props}>
-      {children}
-    </div>
-  ),
-  Elem: ({ children, ...props }: any) => (
-    <div data-testid="elem" {...props}>
-      {children}
-    </div>
-  ),
+  cn: (block: string) => ({
+    elem: (elem: string) => ({
+      toClassName: () => `dm-${block}__${elem}`,
+      mod: (mods: any) => ({
+        toClassName: () => `dm-${block}__${elem}`,
+      }),
+    }),
+    mod: (mods: any) => ({
+      toClassName: () => `dm-${block}`,
+      mix: (...args: any[]) => ({
+        toClassName: () => `dm-${block}`,
+      }),
+    }),
+    toClassName: () => `dm-${block}`,
+    mix: (...args: any[]) => ({
+      toClassName: () => `dm-${block}`,
+    }),
+  }),
 }));
 
 jest.mock("../../../Comments/Comments", () => ({
@@ -31,7 +39,7 @@ jest.mock("../RegionDetails", () => ({
 
 jest.mock("../RegionItem", () => ({
   RegionItem: ({ region, mainDetails, metaDetails }: any) => (
-    <div data-testid="region-item">
+    <div data-testid="detailed-region">
       <div data-testid="region-id">{region.id}</div>
       {mainDetails && <div data-testid="main-details">Main Details</div>}
       {metaDetails && <div data-testid="meta-details">Meta Details</div>}
@@ -148,9 +156,7 @@ describe("DetailsPanel", () => {
       it("does not render relations count header when no relations exist", () => {
         render(<Relations currentEntity={mockCurrentEntityWithoutRelations} />);
 
-        const allElems = screen.getAllByTestId("elem");
-        const relationsCountElem = allElems.find((elem) => elem.textContent?.includes("Relations ("));
-        expect(relationsCountElem).toBeUndefined();
+        expect(screen.queryByText(/Relations \(/)).not.toBeInTheDocument();
       });
     });
 
@@ -171,9 +177,7 @@ describe("DetailsPanel", () => {
       it("renders relations count in header when relations exist", () => {
         render(<Relations currentEntity={mockCurrentEntityWithRelations} />);
 
-        const allElems = screen.getAllByTestId("elem");
-        const relationsCountElem = allElems.find((elem) => elem.textContent === "Relations (3)");
-        expect(relationsCountElem).toBeInTheDocument();
+        expect(screen.getByText("Relations (3)")).toBeInTheDocument();
       });
     });
   });
@@ -221,18 +225,18 @@ describe("DetailsPanel", () => {
         expect(description).toHaveTextContent("Select a region to view its properties, metadata and available actions");
       });
 
-      it("does not render selection details header when no selection", () => {
+      it("does not render region details on info panel when no selection", () => {
         render(<Info selection={mockSelectionEmpty} />);
 
-        const allElems = screen.getAllByTestId("elem");
-        const selectionDetailsElem = allElems.find((elem) => elem.textContent === "Selection Details");
-        expect(selectionDetailsElem).toBeUndefined();
+        const detailedRegions = screen.queryAllByTestId("detailed-region");
+        expect(detailedRegions).toHaveLength(0);
       });
 
-      it("does not render regions panel when no selection", () => {
+      it("does not render info panel when no selection", () => {
         render(<Info selection={mockSelectionEmpty} />);
 
-        expect(screen.queryByTestId("region-item")).not.toBeInTheDocument();
+        const detailedRegions = screen.queryAllByTestId("detailed-region");
+        expect(detailedRegions).toHaveLength(0);
       });
 
       it("renders empty state when selection is null", () => {
@@ -257,19 +261,18 @@ describe("DetailsPanel", () => {
         expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
       });
 
-      it("renders selection details header when regions are selected", () => {
+      it("renders selection details when regions are selected", () => {
         render(<Info selection={mockSelectionWithRegions} />);
 
-        const allElems = screen.getAllByTestId("elem");
-        const selectionDetailsElem = allElems.find((elem) => elem.textContent === "Selection Details");
-        expect(selectionDetailsElem).toBeInTheDocument();
+        const detailedRegions = screen.getAllByTestId("detailed-region");
+        expect(detailedRegions).toHaveLength(2);
       });
 
-      it("renders region items when regions are selected", () => {
+      it("renders region info with specific regions selected", () => {
         render(<Info selection={mockSelectionWithRegions} />);
 
-        const regionItems = screen.getAllByTestId("region-item");
-        expect(regionItems).toHaveLength(2);
+        const detailedRegions = screen.getAllByTestId("detailed-region");
+        expect(detailedRegions).toHaveLength(2);
 
         // Check that specific regions are rendered
         expect(screen.getByText("region1")).toBeInTheDocument();
@@ -313,107 +316,8 @@ describe("DetailsPanel", () => {
         expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
 
         // But also won't render region items since list is empty
-        expect(screen.queryByTestId("region-item")).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("Stats", () => {
-    const baseRegion = (overrides: any = {}) => ({
-      id: "region-id",
-      meta: {},
-      ...overrides,
-    });
-
-    const makeSelection = (regions: any[]) => ({
-      size: regions.length,
-      list: regions,
-    });
-
-    const makeCurrentEntity = (regions: any[]) => ({
-      regionStore: {
-        list: regions,
-      },
-    });
-
-    describe("when there is no selection and no regions", () => {
-      it("renders empty state", () => {
-        const selection = makeSelection([]);
-        const currentEntity = makeCurrentEntity([]);
-
-        render(<Stats selection={selection} currentEntity={currentEntity} />);
-
-        const emptyState = screen.getByTestId("empty-state");
-        expect(emptyState).toBeInTheDocument();
-
-        const header = screen.getByTestId("empty-state-header");
-        expect(header).toHaveTextContent("View region statistics");
-      });
-    });
-
-    describe("when there is a selection with regions having meta", () => {
-      it("renders statistics table for selection", () => {
-        const regions = [
-          baseRegion({
-            meta: {
-              area: 10,
-              bbox: { width: 5, height: 2 },
-              mean_r: 1,
-              mean_g: 2,
-              mean_b: 3,
-            },
-          }),
-          baseRegion({
-            meta: {
-              area: 30,
-              bbox: { width: 15, height: 4 },
-              mean_r: 3,
-              mean_g: 4,
-              mean_b: 5,
-            },
-          }),
-        ];
-
-        const selection = makeSelection(regions);
-        const currentEntity = makeCurrentEntity(regions);
-
-        render(<Stats selection={selection} currentEntity={currentEntity} />);
-
-        const scope = screen.getByTestId("stats-scope");
-        expect(scope).toHaveTextContent("Selection (2 regions)");
-
-        const table = screen.getByTestId("region-stats-table");
-        expect(table).toBeInTheDocument();
-
-        // Area stats: values [10, 30] => mean 20, sd 10, p25 15, median 20, p75 25
-        expect(screen.getByText("Area (px)")).toBeInTheDocument();
-        expect(screen.getByText("2")).toBeInTheDocument();
-        expect(screen.getByText("20")).toBeInTheDocument();
-      });
-    });
-
-    describe("when there is no selection but regions exist", () => {
-      it("uses all regions in image as scope", () => {
-        const regions = [
-          baseRegion({
-            meta: {
-              area: 5,
-            },
-          }),
-          baseRegion({
-            meta: {
-              area: 15,
-            },
-          }),
-        ];
-
-        const selection = makeSelection([]);
-        const currentEntity = makeCurrentEntity(regions);
-
-        render(<Stats selection={selection} currentEntity={currentEntity} />);
-
-        const scope = screen.getByTestId("stats-scope");
-        expect(scope).toHaveTextContent("All regions in image (2 regions)");
+        const detailedRegions = screen.queryAllByTestId("detailed-region");
+        expect(detailedRegions).toHaveLength(0);
       });
     });
   });

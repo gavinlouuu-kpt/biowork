@@ -1,6 +1,6 @@
 import { observer } from "mobx-react";
 import { type FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Block, Elem } from "../../../utils/bem";
+import { cn } from "../../../utils/bem";
 import { useMedia } from "../../../hooks/useMedia";
 import ResizeObserver from "../../../utils/resize-observer";
 import { clamp } from "../../../utils/utilities";
@@ -56,6 +56,7 @@ const SideTabsPanelsComponent: FC<SidePanelsProps> = ({
   panelsHidden,
   children,
   showComments,
+  showCustomTab,
   focusTab,
 }) => {
   const snapThreshold = 5;
@@ -69,7 +70,7 @@ const SideTabsPanelsComponent: FC<SidePanelsProps> = ({
   const [initialized, setInitialized] = useState(false);
   const rootRef = useRef<HTMLDivElement>();
   const [snap, setSnap] = useState<DropSide | Side | undefined>();
-  const initialState = useMemo(() => restorePanel(showComments), [showComments]);
+  const initialState = useMemo(() => restorePanel(showComments, showCustomTab), [showComments, showCustomTab]);
   const [panelData, setPanelData] = useState<Record<string, PanelBBox>>(initialState.panelData);
   const [collapsedSide, setCollapsedSide] = useState(initialState.collapsedSide);
   const [breakPointActiveTab, setBreakPointActiveTab] = useState(0);
@@ -197,7 +198,7 @@ const SideTabsPanelsComponent: FC<SidePanelsProps> = ({
       const panelLeftHit = left <= targetLeftWidth;
       const topHit = top <= snapThreshold;
       const bottomHit = bottom >= parentHeight - snapThreshold;
-      let snap: DropSide | undefined = undefined;
+      let snap: DropSide | undefined;
 
       if (!collapsedSideRef.current?.[Side.left] && panelLeftHit) {
         if (left <= snapThreshold) snap = DropSide.left;
@@ -540,29 +541,34 @@ const SideTabsPanelsComponent: FC<SidePanelsProps> = ({
 
   return (
     <SidePanelsContext.Provider value={contextValue}>
-      <Block
+      <div
         ref={(el: HTMLDivElement | null) => {
           if (el) {
             rootRef.current = el;
             setViewportSizeMatch(el.clientWidth <= maxWindowWidth);
           }
         }}
-        name="sidepanels"
-        mod={{ collapsed: panelBreakPoint }}
+        className={cn("sidepanels").mod({ collapsed: panelBreakPoint }).toClassName()}
         style={{ ...padding }}
       >
         {initialized && (
           <>
-            <Elem ref={contentRef} name="content" mod={{ resizing: lockPanelContents || positioning }}>
+            <div
+              ref={contentRef}
+              className={cn("sidepanels")
+                .elem("content")
+                .mod({ resizing: lockPanelContents || positioning })
+                .toClassName()}
+            >
               {children}
-            </Elem>
+            </div>
             {panelsHidden !== true && panelBreakPoint ? (
               <>
-                <Elem name="wrapper">
+                <div className={cn("sidepanels").elem("wrapper").toClassName()}>
                   <PanelTabsBase {...emptyBaseProps} contentRef={contentRef} isBottomPanel={true}>
                     <Tabs {...emptyBaseProps} />
                   </PanelTabsBase>
-                </Elem>
+                </div>
               </>
             ) : (
               <>
@@ -581,20 +587,22 @@ const SideTabsPanelsComponent: FC<SidePanelsProps> = ({
                     return <Fragment key={panelType}>{content}</Fragment>;
                   }
                   return (
-                    <Elem
+                    <div
                       key={panelType}
-                      name="wrapper"
-                      mod={{ align: panelType, snap: !lockPanelContents && snap === panelType && snap !== undefined }}
+                      className={cn("sidepanels")
+                        .elem("wrapper")
+                        .mod({ align: panelType, snap: !lockPanelContents && snap === panelType && snap !== undefined })
+                        .toClassName()}
                     >
                       {content}
-                    </Elem>
+                    </div>
                   );
                 })}
               </>
             )}
           </>
         )}
-      </Block>
+      </div>
     </SidePanelsContext.Provider>
   );
 };

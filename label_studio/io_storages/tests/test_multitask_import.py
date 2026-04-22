@@ -1,7 +1,6 @@
 import json
 
 import boto3
-import mock
 import pytest
 from io_storages.models import S3ImportStorage
 from io_storages.s3.models import S3ImportStorageLink
@@ -15,47 +14,7 @@ from io_storages.utils import StorageObject, load_tasks_json
 from moto import mock_s3
 from projects.tests.factories import ProjectFactory
 from rest_framework.test import APIClient
-from tests.utils import azure_client_mock, gcs_client_mock, mock_feature_flag, redis_client_mock
-
-
-@pytest.fixture(name='fflag_feat_dia_2092_multitasks_per_storage_link_on', autouse=True)
-def fflag_feat_dia_2092_multitasks_per_storage_link_on():
-    from core.feature_flags import flag_set
-
-    def fake_flag_set(*args, **kwargs):
-        if args[0] == 'fflag_feat_dia_2092_multitasks_per_storage_link':
-            return True
-        return flag_set(*args, **kwargs)
-
-    with mock.patch('io_storages.base_models.flag_set', wraps=fake_flag_set):
-        yield
-
-
-@pytest.fixture(name='fflag_feat_root_11_support_jsonl_cloud_storage_on')
-def fflag_feat_root_11_support_jsonl_cloud_storage_on():
-    from core.feature_flags import flag_set
-
-    def fake_flag_set(*args, **kwargs):
-        if args[0] == 'fflag_feat_root_11_support_jsonl_cloud_storage':
-            return True
-        return flag_set(*args, **kwargs)
-
-    with mock.patch('io_storages.utils.flag_set', wraps=fake_flag_set):
-        yield
-
-
-@pytest.fixture(name='fflag_feat_root_11_support_jsonl_cloud_storage_off')
-def fflag_feat_root_11_support_jsonl_cloud_storage_off():
-    from core.feature_flags import flag_set
-
-    def fake_flag_set(*args, **kwargs):
-        if args[0] == 'fflag_feat_root_11_support_jsonl_cloud_storage':
-            return False
-        return flag_set(*args, **kwargs)
-
-    with mock.patch('io_storages.utils.flag_set', wraps=fake_flag_set):
-        yield
-
+from tests.utils import azure_client_mock, gcs_client_mock, redis_client_mock
 
 #
 # Integration tests for storage.sync()
@@ -85,6 +44,9 @@ def _test_storage_import(project, storage_class, task_data, **storage_kwargs):
     # Setup storage with required credentials
     storage = storage_class(project=project, **storage_kwargs)
 
+    # Save the storage to the database before syncing
+    storage.save()
+
     # Validate connection before sync
     try:
         storage.validate_connection()
@@ -92,8 +54,11 @@ def _test_storage_import(project, storage_class, task_data, **storage_kwargs):
         pytest.fail(f'Storage connection validation failed: {str(e)}')
 
     # Sync storage
-    # Don't have to wait for sync to complete because it's blocking without rq
-    storage.sync()
+    # Mock redis_connected to force synchronous execution in tests
+    import mock
+
+    with mock.patch('io_storages.base_models.redis_connected', return_value=False):
+        storage.sync()
 
     # Validate tasks were imported correctly
     tasks_response = client.get(f'/api/tasks?project={project.id}')
@@ -106,7 +71,6 @@ def _test_storage_import(project, storage_class, task_data, **storage_kwargs):
         assert task['data'] == expected_data['data']
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_import_multiple_tasks_s3(project, common_task_data):
     with mock_s3():
         # Setup S3 bucket and test data
@@ -125,10 +89,10 @@ def test_import_multiple_tasks_s3(project, common_task_data):
             aws_access_key_id='example',
             aws_secret_access_key='example',
             use_blob_urls=False,
+            recursive_scan=True,
         )
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_import_multiple_tasks_gcs(project, common_task_data):
     # initialize mock with sample data
     with gcs_client_mock():
@@ -139,10 +103,10 @@ def test_import_multiple_tasks_gcs(project, common_task_data):
             # magic bucket name to set correct data in gcs_client_mock
             bucket='multitask_JSON',
             use_blob_urls=False,
+            recursive_scan=True,
         )
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_import_multiple_tasks_azure(project, common_task_data):
     # initialize mock with sample data
     with azure_client_mock(sample_json_contents=common_task_data, sample_blob_names=['test.json']):
@@ -151,10 +115,10 @@ def test_import_multiple_tasks_azure(project, common_task_data):
             AzureBlobImportStorageFactory,
             common_task_data,
             use_blob_urls=False,
+            recursive_scan=True,
         )
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_import_multiple_tasks_redis(project, common_task_data):
     with redis_client_mock() as redis:
         redis.set('test.json', json.dumps(common_task_data))
@@ -168,7 +132,6 @@ def test_import_multiple_tasks_redis(project, common_task_data):
         )
 
 
-@pytest.mark.fflag_feat_dia_2092_multitasks_per_storage_link_on
 def test_storagelink_fields(project, common_task_data):
     # use an actual storage and storagelink to test this, since factories aren't connected properly
     with mock_s3():
@@ -187,6 +150,7 @@ def test_storagelink_fields(project, common_task_data):
             aws_access_key_id='example',
             aws_secret_access_key='example',
             use_blob_urls=False,
+            recursive_scan=True,
         )
         storage.save()
         storage.sync()
@@ -206,7 +170,17 @@ def test_storagelink_fields(project, common_task_data):
 
 @pytest.fixture
 def storage():
-    project = ProjectFactory()
+    project = ProjectFactory(
+        label_config="""
+        <View>
+          <Text name="text" value="$text"/>
+          <Labels name="label" toName="text">
+            <Label value="FIELD" background="red"/>
+            <Label value="ACTION" background="blue"/>
+          </Labels>
+        </View>
+        """
+    )
     storage = S3ImportStorage(
         project=project,
         bucket='example',
@@ -269,7 +243,7 @@ annots_preds_task_list = [
             }
         ],
     },
-    {'data': {'text': 'Prosper annotation helps improve model accuracy.'}, 'predictions': [{'result': []}]},
+    {'data': {'text': 'Prosper annotation helps improve model accuracy.'}},
 ]
 
 
@@ -279,9 +253,9 @@ def test_bare_task(storage):
     blob = json.dumps(task_data).encode()
     output = load_tasks_json(blob, 'test.json')
     expected_output = [StorageObject(key='test.json', task_data=task_data)]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_data_key(storage):
@@ -290,9 +264,9 @@ def test_data_key(storage):
     blob = json.dumps(task_data).encode()
     output = load_tasks_json(blob, 'test.json')
     expected_output = [StorageObject(key='test.json', task_data=task_data)]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_1elem_list(storage):
@@ -303,9 +277,9 @@ def test_1elem_list(storage):
     expected_output = [
         StorageObject(key='test.json', task_data=task_data[0], row_index=0),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_2elem_list(storage):
@@ -317,9 +291,9 @@ def test_2elem_list(storage):
         StorageObject(key='test.json', task_data=task_data[0], row_index=0),
         StorageObject(key='test.json', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_preds_and_annots_list(storage):
@@ -332,9 +306,9 @@ def test_preds_and_annots_list(storage):
         StorageObject(key='test.json', task_data=task_data[0], row_index=0),
         StorageObject(key='test.json', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
 def test_mixed_formats(storage):
@@ -347,12 +321,11 @@ def test_mixed_formats(storage):
         StorageObject(key='test.json', task_data=task_data[0], row_index=0),
         StorageObject(key='test.json', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
-@mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', True, 'io_storages.utils')
 def test_list_jsonl(storage):
     task_data = bare_task_list
 
@@ -362,12 +335,11 @@ def test_list_jsonl(storage):
         StorageObject(key='test.jsonl', task_data=task_data[0], row_index=0),
         StorageObject(key='test.jsonl', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
-@mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', True, 'io_storages.utils')
 def test_list_jsonl_with_preds_and_annots(storage):
     task_data = annots_preds_task_list
 
@@ -378,18 +350,11 @@ def test_list_jsonl_with_preds_and_annots(storage):
         StorageObject(key='test.jsonl', task_data=task_data[0], row_index=0),
         StorageObject(key='test.jsonl', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
-
-
-@mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', False, 'io_storages.utils')
-def test_ff_blocks_jsonl():
-    with pytest.raises(ValueError):
-        load_tasks_json(b'{"text": "Test task 1"}\n{"text": "Test task 2"}', 'test.jsonl')
+    create_tasks(storage, list(output))
 
 
-@mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', True, 'io_storages.utils')
 def test_mixed_formats_jsonl(storage):
     task_data = [bare_task_list[0], annots_preds_task_list[0]]
 
@@ -400,12 +365,11 @@ def test_mixed_formats_jsonl(storage):
         StorageObject(key='test.jsonl', task_data=task_data[0], row_index=0),
         StorageObject(key='test.jsonl', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
 
 
-@mock_feature_flag('fflag_feat_root_11_support_jsonl_cloud_storage', True, 'io_storages.utils')
 def test_list_jsonl_with_datetimes(storage):
     task_data = [
         {'data': {'text': 'Test task 1', 'created_at': '2021-01-01T00:00:00Z'}},
@@ -418,6 +382,18 @@ def test_list_jsonl_with_datetimes(storage):
         StorageObject(key='test.jsonl', task_data=task_data[0], row_index=0),
         StorageObject(key='test.jsonl', task_data=task_data[1], row_index=1),
     ]
-    assert output == expected_output
+    assert list(output) == expected_output
 
-    create_tasks(storage, output)
+    create_tasks(storage, list(output))
+
+
+def test_allow_skip_false_is_saved(storage):
+    project, s3_storage = storage
+    task_data = {
+        'data': {'text': 'Task with disallowed skip'},
+        'allow_skip': False,
+    }
+    params = StorageObject(key='test.json', task_data=task_data)
+    # Create one task via cloud import pathway
+    task = S3ImportStorage.add_task(project, 1, 1, s3_storage, params, S3ImportStorageLink)
+    assert task.allow_skip is False

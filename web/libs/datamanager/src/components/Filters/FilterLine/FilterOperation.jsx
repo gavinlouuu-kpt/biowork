@@ -1,8 +1,8 @@
 import { observer } from "mobx-react";
 import { getRoot } from "mobx-state-tree";
 import { useCallback, useMemo } from "react";
-import { Elem } from "../../../utils/bem";
-import { debounce } from "../../../utils/debounce";
+import { cn } from "../../../utils/bem";
+import { debounce } from "@humansignal/core/lib/utils/debounce";
 import { FilterDropdown } from "../FilterDropdown";
 import * as FilterInputs from "../types";
 import { allowedFilterOperations } from "../types/Utility";
@@ -17,7 +17,7 @@ import { Common } from "../types/Common";
  *
  * @param {{field: FieldConfig}} param0
  */
-export const FilterOperation = observer(({ filter, field, operator, value }) => {
+export const FilterOperation = observer(({ filter, field, operator, value, disabled }) => {
   const cellView = filter.cellView;
   const types = cellView?.customOperators ?? [
     ...(FilterInputs[filter.filter.currentType] ?? FilterInputs.String),
@@ -66,34 +66,42 @@ export const FilterOperation = observer(({ filter, field, operator, value }) => 
   }
   const operators = operatorList.map(({ key, label }) => {
     if (filter.filter.field.isAnnotationResultsFilterColumn) {
-      if (key === "contains") label = "includes all";
-      if (key === "not_contains") label = "does not include all";
+      if (filter.schema?.multiple ?? false) {
+        if (key === "contains") label = "includes all";
+        if (key === "not_contains") label = "does not include all";
+      } else {
+        if (key === "contains") label = "is";
+        if (key === "not_contains") label = "is not";
+      }
     }
     return { value: key, label };
   });
+  const columnClass = cn("filterLine").elem("column");
 
   return Input ? (
     <>
-      <Elem block="filter-line" name="column" mix="operation">
+      <div className={columnClass.mix("operation").toClassName()}>
         <FilterDropdown
           placeholder="Condition"
           value={filter.operator}
-          disabled={types.length === 1}
+          disabled={types.length === 1 || disabled}
           items={availableOperators ? operators.filter((op) => availableOperators.includes(op.value)) : operators}
           onChange={onOperatorSelected}
         />
-      </Elem>
-      <Elem block="filter-line" name="column" mix="value">
+      </div>
+      <div className={columnClass.mix("value").toClassName()}>
         <Input
           {...field}
           key={`${filter.filter.id}-${filter.filter.currentType}`}
           schema={filter.schema}
           filter={filter}
+          multiple={filter.schema?.multiple ?? false}
           value={value}
           onChange={onChange}
           size="small"
+          disabled={disabled}
         />
-      </Elem>
+      </div>
     </>
   ) : null;
 });

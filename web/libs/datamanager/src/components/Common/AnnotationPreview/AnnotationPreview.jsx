@@ -2,13 +2,10 @@ import { inject, observer } from "mobx-react";
 import React from "react";
 import { taskToLSFormat } from "../../../sdk/lsf-utils";
 import { cn } from "../../../utils/bem";
-import { FF_LSDV_4711, isFF } from "../../../utils/feature-flags";
 import { Spinner } from "../Spinner";
 import "./AnnotationPreview.scss";
 
-const imgDefaultProps = {};
-
-if (isFF(FF_LSDV_4711)) imgDefaultProps.crossOrigin = "anonymous";
+const imgDefaultProps = { crossOrigin: "anonymous" };
 
 const wait = (timeout) => new Promise((resolve) => setTimeout(resolve, timeout));
 
@@ -135,7 +132,7 @@ export const AnnotationPreview = injector(
         height={props.height}
       />
     ) : (
-      <div className={cn("annotation-preview").toString()} width={props.width} height={props.height}>
+      <div className={cn("annotation-preview").toClassName()} width={props.width} height={props.height}>
         <Spinner
           size={props.size ?? "default"}
           style={{

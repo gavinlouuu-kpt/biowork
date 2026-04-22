@@ -1,14 +1,17 @@
-import { Button } from "apps/labelstudio/src/components";
+import { buttonVariant, Space } from "@humansignal/ui";
+import { useUpdatePageTitle } from "@humansignal/core";
+import { cn } from "apps/labelstudio/src/utils/bem";
+import { Link } from "react-router-dom";
 import type { Page } from "../../types/Page";
-import { Space } from "apps/labelstudio/src/components/Space/Space";
-import { Block } from "apps/labelstudio/src/utils/bem";
 import { EmptyList } from "./@components/EmptyList";
 
 export const ModelsPage: Page = () => {
+  useUpdatePageTitle("Models");
+
   return (
-    <Block name="prompter">
+    <div className={cn("prompter").toClassName()}>
       <EmptyList />
-    </Block>
+    </div>
   );
 };
 
@@ -19,9 +22,9 @@ ModelsPage.path = "/models";
 ModelsPage.context = () => {
   return (
     <Space size="small">
-      <Button to="/prompt/settings" size="compact" look="primary">
+      <Link to="/prompt/settings" className={buttonVariant({ size: "small" })}>
         Create Model
-      </Button>
+      </Link>
     </Space>
   );
 };

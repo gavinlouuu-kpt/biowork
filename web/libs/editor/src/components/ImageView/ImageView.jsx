@@ -1,5 +1,5 @@
-import { Component, createRef, forwardRef, Fragment, memo, useEffect, useRef, useState } from "react";
-import { Group, Layer, Line, Rect, Stage } from "react-konva";
+import { Component, createRef, forwardRef, Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import { Group, Layer, Line, Rect, Stage, Image as KonvaImage, Circle } from "react-konva";
 import { observer } from "mobx-react";
 import { getEnv, getRoot, isAlive } from "mobx-state-tree";
 
@@ -17,47 +17,42 @@ import { ImageViewProvider } from "./ImageViewContext";
 import { Hotkey } from "../../core/Hotkey";
 import { useObserver } from "mobx-react";
 import ResizeObserver from "../../utils/resize-observer";
-import { debounce } from "../../utils/debounce";
+import { debounce } from "@humansignal/core/lib/utils/debounce";
 import Constants from "../../core/Constants";
-import { fixRectToFit } from "../../utils/image";
-import {
-  FF_DEV_1442,
-  FF_DEV_3077,
-  FF_DEV_3793,
-  FF_LSDV_4583_6,
-  FF_LSDV_4711,
-  FF_LSDV_4930,
-  FF_ZOOM_OPTIM,
-  isFF,
-} from "../../utils/feature-flags";
+import { fixRectToFit, mapKonvaBrightness } from "../../utils/image";
+import { FF_DEV_1442, FF_LSDV_4930, FF_ZOOM_OPTIM, isFF } from "../../utils/feature-flags";
 import { Pagination } from "../../common/Pagination/Pagination";
 import { Image } from "./Image";
 
 Konva.showWarnings = false;
 
 const hotkeys = Hotkey("Image");
-const imgDefaultProps = {};
+const imgDefaultProps = { crossOrigin: "anonymous" };
 
-if (isFF(FF_LSDV_4711)) imgDefaultProps.crossOrigin = "anonymous";
-
-const splitRegions = (regions) => {
+export const splitRegions = (regions) => {
   const brushRegions = [];
   const shapeRegions = [];
-  const l = regions.length;
-  let i = 0;
+  const bitmaskRegions = [];
+  const vectorRegions = [];
 
-  for (i; i < l; i++) {
-    const region = regions[i];
-
-    if (region.type === "brushregion") {
-      brushRegions.push(region);
-    } else {
-      shapeRegions.push(region);
+  for (const region of regions) {
+    switch (region.type) {
+      case "brushregion":
+        brushRegions.push(region);
+        break;
+      case "bitmaskregion":
+        bitmaskRegions.push(region);
+        break;
+      default:
+        shapeRegions.push(region);
+        break;
     }
   }
 
   return {
     brushRegions,
+    bitmaskRegions,
+    vectorRegions,
     shapeRegions,
   };
 };
@@ -66,27 +61,38 @@ const Region = memo(({ region, showSelected = false }) => {
   return useObserver(() => Tree.renderItem(region, region.annotation, true));
 });
 
-const RegionsLayer = memo(({ regions, name, useLayers, showSelected = false }) => {
-  const content = regions.map((el) => <Region key={`region-${el.id}`} region={el} showSelected={showSelected} />);
+const RegionsLayer = memo(({ regions, name, useLayers, showSelected = false, smoothing = true }) => {
+  const content = regions.map((el) => {
+    return <Region key={`region-${el.id}`} region={el} showSelected={showSelected} />;
+  });
 
-  return useLayers === false ? content : <Layer name={name}>{content}</Layer>;
-});
-
-const Regions = memo(({ regions, useLayers = true, chunkSize = 15, suggestion = false, showSelected = false }) => {
-  return (
-    <ImageViewProvider value={{ suggestion }}>
-      {(chunkSize ? chunks(regions, chunkSize) : regions).map((chunk, i) => (
-        <RegionsLayer
-          key={`chunk-${i}`}
-          name={`chunk-${i}`}
-          regions={chunk}
-          useLayers={useLayers}
-          showSelected={showSelected}
-        />
-      ))}
-    </ImageViewProvider>
+  return useLayers === false ? (
+    content
+  ) : (
+    <Layer name={name} imageSmoothingEnabled={smoothing}>
+      {content}
+    </Layer>
   );
 });
+
+const Regions = memo(
+  ({ regions, useLayers = true, chunkSize = 15, suggestion = false, showSelected = false, smoothing = true }) => {
+    return (
+      <ImageViewProvider value={{ suggestion }}>
+        {(chunkSize ? chunks(regions, chunkSize) : regions).map((chunk, i) => (
+          <RegionsLayer
+            key={`chunk-${i}`}
+            name={`chunk-${i}`}
+            regions={chunk}
+            useLayers={useLayers}
+            showSelected={showSelected}
+            smoothing={smoothing}
+          />
+        ))}
+      </ImageViewProvider>
+    );
+  },
+);
 
 const DrawingRegion = observer(({ item }) => {
   const { drawingRegion } = item;
@@ -94,9 +100,14 @@ const DrawingRegion = observer(({ item }) => {
   if (!drawingRegion) return null;
   if (item.multiImage && item.currentImage !== drawingRegion.item_index) return null;
 
-  const Wrapper = drawingRegion && drawingRegion.type === "brushregion" ? Fragment : Layer;
+  const isBrush = drawingRegion.type === "brushregion";
+  const Wrapper = drawingRegion && isBrush ? Fragment : Layer;
 
-  return <Wrapper>{drawingRegion ? <Region key={"drawing"} region={drawingRegion} /> : drawingRegion}</Wrapper>;
+  return (
+    <Wrapper imageSmoothingEnabled={item.smoothingEnabled}>
+      {drawingRegion ? <Region key={"drawing"} region={drawingRegion} /> : drawingRegion}
+    </Wrapper>
+  );
 });
 
 const SELECTION_COLOR = "#40A9FF";
@@ -108,13 +119,6 @@ const SELECTION_DASH = [3, 3];
  */
 const SelectionBorders = observer(({ item, selectionArea }) => {
   const { selectionBorders: bbox } = selectionArea;
-
-  if (!isFF(FF_DEV_3793)) {
-    bbox.left = bbox.left * item.stageScale;
-    bbox.right = bbox.right * item.stageScale;
-    bbox.top = bbox.top * item.stageScale;
-    bbox.bottom = bbox.bottom * item.stageScale;
-  }
 
   const points = bbox
     ? [
@@ -136,7 +140,7 @@ const SelectionBorders = observer(({ item, selectionArea }) => {
         },
       ]
     : [];
-  const ANCHOR_SIZE = isFF(FF_DEV_3793) ? 6 / item.stageScale : 6;
+  const ANCHOR_SIZE = 6 / item.stageScale;
 
   return (
     <>
@@ -287,7 +291,7 @@ const SelectedRegions = observer(({ item, selectedRegions }) => {
 });
 
 const SelectionLayer = observer(({ item, selectionArea }) => {
-  const scale = isFF(FF_DEV_3793) ? 1 : 1 / (item.zoomScale || 1);
+  const scale = 1;
   const [isMouseWheelClick, setIsMouseWheelClick] = useState(false);
   const [shift, setShift] = useState(false);
   const isPanTool = item.getToolsManager().findSelectedTool()?.fullName === "ZoomPanTool";
@@ -435,6 +439,58 @@ const Crosshair = memo(
   }),
 );
 
+const PixelGridLayer = observer(({ item }) => {
+  const ZOOM_THRESHOLD = 20;
+
+  const visible = item.zoomScale > ZOOM_THRESHOLD;
+  const { naturalWidth, naturalHeight } = item.currentImageEntity ?? {};
+  const { stageWidth, stageHeight } = item;
+  const imageSmallerThanStage = naturalWidth < stageWidth || naturalHeight < stageHeight;
+
+  const step = item.stageZoom; // image pixel
+
+  const { verticalPoints, horizontalPoints } = useMemo(() => {
+    const vPts = [];
+    const hPts = [];
+
+    // Grid starts from image origin (0, 0)
+    for (let x = 0; x <= stageWidth; x += step) {
+      vPts.push(x, 0, x, stageHeight, x, 0);
+    }
+
+    for (let y = 0; y <= stageHeight; y += step) {
+      hPts.push(0, y, stageWidth, y, 0, y);
+    }
+
+    return { verticalPoints: vPts, horizontalPoints: hPts };
+  }, [stageWidth, stageHeight]);
+
+  return (
+    <Layer listening={false} visible={visible}>
+      <Line
+        points={verticalPoints}
+        stroke="white"
+        strokeWidth={1}
+        strokeScaleEnabled={false}
+        perfectDrawEnabled={false}
+        opacity={0.2}
+        listening={false}
+        visible={visible}
+      />
+      <Line
+        points={horizontalPoints}
+        stroke="white"
+        strokeWidth={1}
+        strokeScaleEnabled={false}
+        perfectDrawEnabled={false}
+        opacity={0.2}
+        listening={false}
+        visible={visible}
+      />
+    </Layer>
+  );
+});
+
 /**
  * Component that creates an overlay on top
  * of the image to support Magic Wand tool
@@ -471,11 +527,13 @@ export default observer(
     skipNextClick = false;
     skipNextMouseUp = false;
     mouseDownPoint = null;
+    mouseDown = false;
 
     constructor(props) {
       super(props);
 
-      if (typeof props.item.smoothing === "boolean") props.store.settings.setSmoothing(props.item.smoothing);
+      if (typeof props.item.smoothingEnabled === "boolean")
+        props.store.settings.setSmoothing(props.item.smoothingEnabled);
     }
 
     handleOnClick = (e) => {
@@ -504,6 +562,28 @@ export default observer(
           this.mouseDownPoint = null;
           return;
         }
+      }
+
+      // We can only handle Bitmask selection here because the way it works -- it overlays an
+      // entire stage with a single image that is not click-through, and there is no particular
+      // shape we can click on. Here we're relying on cursor position and non-transparent pixels
+      // of the mask to detect cursor-region collision.
+      const allowedHoverTypes = /bitmask|vector/i;
+      const hasSelected = item.selectedRegions.some((r) => r.type.match(allowedHoverTypes) !== null);
+      const tool = item.getToolsManager().findSelectedTool();
+      const isAllowedTool = tool?.toolName?.match?.(allowedHoverTypes) !== null ?? false;
+
+      const hoveredRegion = item.regs.find((reg) => {
+        if (reg.selected || tool?.mode === "drawing") return false;
+
+        return reg.isHovered?.() ?? false;
+      });
+
+      if (hoveredRegion && !evt.defaultPrevented) {
+        tool?.disable();
+        hoveredRegion.onClickRegion(e);
+        tool?.enable();
+        return;
       }
       return item.event("click", evt, x, y);
     };
@@ -538,6 +618,7 @@ export default observer(
     };
 
     handleMouseDown = (e) => {
+      this.mouseDown = true;
       const { item } = this.props;
       const isPanTool = item.getToolsManager().findSelectedTool()?.fullName === "ZoomPanTool";
       const isMoveTool = item.getToolsManager().findSelectedTool()?.fullName === "MoveTool";
@@ -561,15 +642,21 @@ export default observer(
         }
 
         const isRightElementToCatchToolInteractions = (el) => {
+          // Bitmask is like Brush, so treat it the same
+          // The only difference is that Bitmask doesn't have a group inside
+          if (el.nodeType === "Layer" && !isMoveTool && el.attrs?.name === "bitmask") {
+            return true;
+          }
+
           // It could be ruler ot segmentation
           if (el.nodeType === "Group") {
-            if ("ruler" === el?.attrs?.name) {
+            if (el?.attrs?.name === "ruler") {
               return true;
             }
             // segmentation is specific for Brushes
             // but click interaction on the region covers the case of the same MoveTool interaction here,
             // so it should ignore move tool interaction to prevent conflicts
-            if (!isMoveTool && "segmentation" === el?.attrs?.name) {
+            if (!isMoveTool && el?.attrs?.name === "segmentation") {
               return true;
             }
           }
@@ -666,6 +753,7 @@ export default observer(
      * Mouse up on Stage
      */
     handleMouseUp = (e) => {
+      this.mouseDown = false;
       const { item } = this.props;
 
       if (isFF(FF_DEV_1442)) {
@@ -716,6 +804,38 @@ export default observer(
       } else {
         item.event("mousemove", e, e.evt.offsetX, e.evt.offsetY);
       }
+
+      if (!e.evt.ctrlKey && !e.evt.shiftKey && !this.mouseDown) {
+        const allowedTypes = /bitmask/;
+        const tool = item.getToolsManager().findSelectedTool();
+
+        if (item.regs.some((r) => r.isDrawing)) return;
+        if (!item.regs.some((r) => r.type.match(allowedTypes) !== null)) return;
+
+        // Exclusive to Vector but can be leveraged by other region types
+        if (item.regs.some((r) => r.isTransforming?.())) return;
+
+        requestAnimationFrame(() => {
+          tool?.enable();
+          for (const region of item.regs) {
+            region.setHighlight(false);
+            region.updateCursor(false);
+          }
+
+          for (const region of item.regs) {
+            if (region.type.match(allowedTypes) === null) continue;
+
+            const checkHover = !region.selected && !region.isDrawing;
+            const hovered = (checkHover && region.isHovered?.()) ?? false;
+
+            if (hovered) {
+              tool?.disable();
+              region.updateCursor(true);
+              break;
+            }
+          }
+        });
+      }
     };
 
     updateCrosshair = (e) => {
@@ -746,26 +866,45 @@ export default observer(
     };
 
     /**
-     * Handle to zoom
+     * Handle zoom and pan events from mouse wheel and trackpad
+     * Supports:
+     * - Ctrl/Cmd + mouse wheel: Smooth zoom in/out
+     * - Ctrl/Cmd + trackpad pinch: Smooth pinch-to-zoom
+     * - Two-finger scroll: Pan the image when zoomed in
      */
     handleZoom = (e) => {
-      /**
-       * Disable if user doesn't use ctrl
-       */
-      if (e.evt && !e.evt.ctrlKey) {
-        return;
-      }
-      if (e.evt && e.evt.ctrlKey) {
-        /**
-         * Disable scrolling page
-         */
+      if (e.evt?.ctrlKey || e.evt?.metaKey) {
         e.evt.preventDefault();
-      }
-      if (e.evt) {
+
         const { item } = this.props;
         const stage = item.stageRef;
 
-        item.handleZoom(e.evt.deltaY, stage.getPointerPosition());
+        // Unified smooth zoom behavior for both trackpad and mouse wheel
+        item.handleZoom(e.evt.deltaY, stage.getPointerPosition(), e.evt.ctrlKey);
+      } else if (e.evt) {
+        // Two fingers scroll (panning) - only when zoomed in
+        const { item } = this.props;
+
+        const maxScrollX = Math.round(item.stageWidth * item.zoomScale) - item.stageWidth;
+        const maxScrollY = Math.round(item.stageHeight * item.zoomScale) - item.stageHeight;
+
+        const newPos = {
+          x: Math.min(0, Math.ceil(item.zoomingPositionX - e.evt.deltaX)),
+          y: Math.min(0, Math.ceil(item.zoomingPositionY - e.evt.deltaY)),
+        };
+
+        // Calculate scroll boundaries to allow scrolling the page when reaching stage edges
+        const withinX = newPos.x !== 0 && newPos.x > -maxScrollX && item.zoomScale !== 1;
+        const withinY = newPos.y !== 0 && newPos.y > -maxScrollY && item.zoomScale !== 1;
+
+        // Detect scroll direction
+        const scrollingX = Math.abs(e.evt.deltaX) > Math.abs(e.evt.deltaY);
+        const scrollingY = Math.abs(e.evt.deltaY) > Math.abs(e.evt.deltaX);
+
+        if (withinX && scrollingX) e.evt.preventDefault();
+        if (withinY && scrollingY) e.evt.preventDefault();
+
+        item.setZoomPosition(newPos.x, newPos.y);
       }
     };
 
@@ -912,9 +1051,9 @@ export default observer(
 
       if (paginationEnabled) wrapperClasses.push(styles.withPagination);
 
-      const [toolsReady, stageLoading] = isFF(FF_LSDV_4583_6) ? [true, false] : [item.hasTools, item.stageWidth <= 1];
+      const [toolsReady, stageLoading] = [true, false];
 
-      const imageIsLoaded = item.imageIsLoaded || !isFF(FF_LSDV_4583_6);
+      const imageIsLoaded = item.imageIsLoaded;
       const isViewingAll = store.annotationStore.viewingAll;
 
       return (
@@ -958,40 +1097,18 @@ export default observer(
               style={{ width: "100%", marginTop: item.fillerHeight }}
             />
 
-            {isFF(FF_LSDV_4583_6) ? (
-              <Image
-                ref={(ref) => {
-                  item.setImageRef(ref);
-                  this.imageRef.current = ref;
-                }}
-                usedValue={item.usedValue}
-                imageEntity={item.currentImageEntity}
-                imageTransform={item.imageTransform}
-                updateImageSize={item.updateImageSize}
-                size={item.canvasSize}
-                overlay={<CanvasOverlay item={item} />}
-              />
-            ) : (
-              <div className={[styles.frame, ...imagePositionClassnames].join(" ")} style={item.canvasSize}>
-                <img
-                  ref={(ref) => {
-                    item.setImageRef(ref);
-                    this.imageRef.current = ref;
-                  }}
-                  loading={isFF(FF_DEV_3077) && !item.lazyoff ? "lazy" : "false"}
-                  style={item.imageTransform}
-                  src={item.currentSrc}
-                  onLoad={(e) => {
-                    item.updateImageSize(e);
-                    item.currentImageEntity.setImageLoaded(true);
-                  }}
-                  onError={this.handleError}
-                  crossOrigin={item.imageCrossOrigin}
-                  alt="LS"
-                />
-                <CanvasOverlay item={item} />
-              </div>
-            )}
+            <Image
+              ref={(ref) => {
+                item.setImageRef(ref);
+                this.imageRef.current = ref;
+              }}
+              usedValue={item.usedValue}
+              imageEntity={item.currentImageEntity}
+              imageTransform={item.imageTransform}
+              updateImageSize={item.updateImageSize}
+              size={item.canvasSize}
+              overlay={<CanvasOverlay item={item} />}
+            />
             {/* @todo this is dirty hack; rewrite to proper async waiting for data to load */}
             {stageLoading || !toolsReady ? (
               <div className={styles.loading}>
@@ -1127,41 +1244,185 @@ const EntireStage = observer(
   },
 );
 
+const ImageLayer = observer(({ item }) => {
+  const imageEntity = item.currentImageEntity;
+  const konvaImageRef = useRef();
+  const currentSrc = imageEntity?.currentSrc;
+  const [loadedImage, setLoadedImage] = useState(null);
+
+  useEffect(() => {
+    if (!imageEntity?.downloaded || !currentSrc) {
+      setLoadedImage(null);
+      return;
+    }
+
+    let cancelled = false;
+    const img = new window.Image();
+
+    if (item.imageCrossOrigin) img.crossOrigin = item.imageCrossOrigin;
+
+    img.onload = () => {
+      if (!cancelled) setLoadedImage(img);
+    };
+    img.onerror = () => {
+      if (!cancelled) setLoadedImage(null);
+    };
+    img.src = currentSrc;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imageEntity?.downloaded, currentSrc, item.imageCrossOrigin]);
+
+  const { width, height } = useMemo(() => {
+    return {
+      width: imageEntity.naturalWidth,
+      height: imageEntity.naturalHeight,
+    };
+  }, [imageEntity.naturalWidth, imageEntity.naturalHeight, item.stageWidth, item.stageHeight]);
+
+  const brightness = mapKonvaBrightness(imageEntity.brightnessGrade);
+  const contrast = imageEntity.contrastGrade - 100;
+
+  useEffect(() => {
+    const node = konvaImageRef.current;
+    if (node && loadedImage) {
+      try {
+        // Force Konva cache reset and redraw when source/filters change.
+        node.clearCache();
+        node.cache({ pixelRatio: 1 });
+        node.filters([Konva.Filters.Brighten, Konva.Filters.Contrast]);
+        node.brightness(brightness);
+        node.contrast(contrast);
+      } catch {
+        // Fallback to plain image draw if cache/filter pipeline fails.
+        node.clearCache();
+        node.filters([]);
+      }
+      node.getLayer()?.batchDraw();
+    }
+  }, [loadedImage, brightness, contrast, currentSrc]);
+
+  return loadedImage ? (
+    <Layer imageSmoothingEnabled={item.smoothingEnabled} scale={{ x: item.stageZoom, y: item.stageZoom }}>
+      <KonvaImage
+        key={currentSrc ?? "image-source"}
+        ref={konvaImageRef}
+        image={loadedImage}
+        width={width}
+        height={height}
+        listening={false}
+      />
+    </Layer>
+  ) : null;
+});
+
+const CursorLayer = observer(({ item, tool }) => {
+  const [[x, y], setCursorPosition] = useState([0, 0]);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!item.stageRef) return;
+    const stage = item.stageRef;
+    const onMouseMove = (e) => {
+      const { x, y } = stage.getPointerPosition();
+      const { x: deltaX, y: deltaY } = stage.position();
+      const { x: scaleX, y: scaleY } = stage.scale();
+      setCursorPosition([(x - deltaX) / scaleX, (y - deltaY) / scaleY]);
+    };
+    const onMouseEnter = () => {
+      setVisible(true);
+    };
+    const onMouseLeave = () => {
+      setVisible(false);
+    };
+
+    stage.on("mousemove", onMouseMove);
+    stage.on("mouseenter", onMouseEnter);
+    stage.on("mouseleave", onMouseLeave);
+
+    return () => {
+      stage.off("mousemove", onMouseMove);
+      stage.off("mouseenter", onMouseEnter);
+      stage.off("mouseleave", onMouseLeave);
+    };
+  }, [item.stageRef]);
+
+  const size = useMemo(() => {
+    return tool.strokeWidth * item.stageZoom;
+  }, [tool.strokeWidth, item.stageZoom]);
+
+  return visible ? (
+    <Layer listening={false}>
+      {tool.strokeWidth <= 2 ? (
+        <>
+          <Rect
+            x={x - size / 2}
+            y={y - size / 2}
+            width={size}
+            height={size}
+            stroke="black"
+            strokeWidth={3}
+            strokeScaleEnabled={false}
+          />
+          <Rect
+            x={x - size / 2}
+            y={y - size / 2}
+            width={size}
+            height={size}
+            stroke="white"
+            strokeWidth={1}
+            strokeScaleEnabled={false}
+          />
+        </>
+      ) : (
+        <>
+          <Circle x={x} y={y} radius={size} stroke="black" strokeWidth={3} strokeScaleEnabled={false} />
+          <Circle x={x} y={y} radius={size} stroke="white" strokeWidth={1} strokeScaleEnabled={false} />
+        </>
+      )}
+    </Layer>
+  ) : null;
+});
+
 const StageContent = observer(({ item, store, state, crosshairRef }) => {
   if (!isAlive(item)) return null;
   if (!store.task || !item.currentSrc) return null;
 
-  const regions = item.regs;
+  // Keep selected or highlighted region on top
+  const regions = [...item.regs].sort((r) => (r.highlighted || r.selected ? 1 : -1));
   const paginationEnabled = !!item.isMultiItem;
   const wrapperClasses = [styles.wrapperComponent, item.images.length > 1 ? styles.withGallery : styles.wrapper];
+  const tool = item.getToolsManager().findSelectedTool();
 
   if (paginationEnabled) wrapperClasses.push(styles.withPagination);
 
-  const { brushRegions, shapeRegions } = splitRegions(regions);
+  const { brushRegions, shapeRegions, bitmaskRegions } = splitRegions(regions);
 
-  const { brushRegions: suggestedBrushRegions, shapeRegions: suggestedShapeRegions } = splitRegions(item.suggestions);
+  const {
+    brushRegions: suggestedBrushRegions,
+    shapeRegions: suggestedShapeRegions,
+    bitmaskRegions: suggestedBitmaskRegions,
+  } = splitRegions(item.suggestions);
 
   const renderableRegions = Object.entries({
     brush: brushRegions,
     shape: shapeRegions,
+    bitmask: bitmaskRegions,
     suggestedBrush: suggestedBrushRegions,
+    suggestedBismask: suggestedBitmaskRegions,
     suggestedShape: suggestedShapeRegions,
   });
 
   return (
     <>
-      {/* Hack to keep stage in place when there's no regions */}
-      {regions.length === 0 && (
-        <Layer>
-          <Line points={[0, 0, 0, 1]} stroke="rgba(0,0,0,0)" />
-        </Layer>
-      )}
+      <ImageLayer item={item} />
       {item.grid && item.sizeUpdated && <ImageGrid item={item} />}
 
       {isFF(FF_LSDV_4930) ? <TransformerBack item={item} /> : null}
 
       {renderableRegions.map(([groupName, list]) => {
-        const isBrush = groupName.match(/brush/i) !== null;
+        const useLayers = groupName.match(/brush/i) === null;
         const isSuggestion = groupName.match("suggested") !== null;
 
         return list.length > 0 ? (
@@ -1169,8 +1430,9 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
             key={groupName}
             name={groupName}
             regions={list}
-            useLayers={isBrush === false}
+            useLayers={useLayers}
             suggestion={isSuggestion}
+            smoothing={item.smoothingEnabled}
           />
         ) : (
           <Fragment key={groupName} />
@@ -1178,6 +1440,7 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
       })}
       <Selection item={item} isPanning={state.isPanning} />
       <DrawingRegion item={item} />
+      {item.smoothingEnabled === false && <PixelGridLayer item={item} />}
 
       {item.crosshair && (
         <Crosshair
@@ -1186,6 +1449,8 @@ const StageContent = observer(({ item, store, state, crosshairRef }) => {
           height={isFF(FF_ZOOM_OPTIM) ? item.containerHeight : item.stageHeight}
         />
       )}
+
+      {tool && tool.toolName?.match(/bitmask/i) && <CursorLayer item={item} tool={tool} />}
     </>
   );
 });

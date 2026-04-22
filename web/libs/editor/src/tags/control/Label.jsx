@@ -72,18 +72,23 @@ const Model = types
     type: "label",
     visible: types.optional(types.boolean, true),
     _value: types.optional(types.string, ""),
-    parentTypes: Types.tagsTypes([
-      "Labels",
-      "EllipseLabels",
-      "RectangleLabels",
-      "PolygonLabels",
-      "KeyPointLabels",
-      "BrushLabels",
-      "HyperTextLabels",
-      "TimelineLabels",
-      "TimeSeriesLabels",
-      "ParagraphLabels",
-    ]),
+    parentTypes: types.late(() =>
+      Types.tagsTypes([
+        "Labels",
+        "EllipseLabels",
+        "RectangleLabels",
+        "PolygonLabels",
+        "KeyPointLabels",
+        "BrushLabels",
+        "HyperTextLabels",
+        "TimelineLabels",
+        "TimeSeriesLabels",
+        "ParagraphLabels",
+        "BitmaskLabels",
+        "VectorLabels",
+        ...Registry.customTags.map((t) => t.tag).filter((tag) => tag.endsWith("Labels")),
+      ]),
+    ),
   })
   .volatile((self) => {
     return {
@@ -190,29 +195,17 @@ const Model = types
 
       // if we are going to select label and it would be the first in this labels group
       if (!labels.selectedLabels.length && !self.selected) {
-        // prefer smart tool when auto-annotation is enabled
+        // unselect other tools if they exist and selected
         const manager = ToolsManager.getInstance({ name: self.parent.toname });
-        const store = self.annotation?.store;
-        const preferSmart = store?.autoAnnotation && self.parent?.smartEnabled;
+        const tool = Object.values(self.parent?.tools || {})[0];
 
-        if (preferSmart) {
-          const selected = manager.findSelectedTool();
-          const sameControl = selected?.control?.name === self.parent?.name;
-          if (!sameControl || selected?.dynamic !== true) {
-            manager.selectSmartDefault(self.parent?.name);
-          }
-        } else {
-          // fall back to base/default tool selection logic
-          const tool = Object.values(self.parent?.tools || {})[0];
+        const selectedTool = manager.findSelectedTool();
+        const sameType = tool && selectedTool ? getType(selectedTool).name === getType(tool).name : false;
+        const sameLabel = selectedTool ? tool?.control?.name === selectedTool?.control?.name : false;
+        const isNotSameTool = selectedTool && (!sameType || !sameLabel);
 
-          const selectedTool = manager.findSelectedTool();
-          const sameType = tool && selectedTool ? getType(selectedTool).name === getType(tool).name : false;
-          const sameLabel = selectedTool ? tool?.control?.name === selectedTool?.control?.name : false;
-          const isNotSameTool = selectedTool && (!sameType || !sameLabel);
-
-          if (tool && (isNotSameTool || !selectedTool)) {
-            manager.selectTool(tool, true);
-          }
+        if (tool && (isNotSameTool || !selectedTool)) {
+          manager.selectTool(tool, true);
         }
       }
 

@@ -1,7 +1,7 @@
-import { type AudioDecoderWorker, getAudioDecoderWorker } from "@martel/audio-file-decoder";
+import { type AudioDecoderWorker, getAudioDecoderWorker } from "@humansignal/audio-file-decoder";
 // eslint-disable-next-line
 // @ts-ignore
-import DecodeAudioWasm from "@martel/audio-file-decoder/decode-audio.wasm";
+import DecodeAudioWasm from "@humansignal/audio-file-decoder/decode-audio.wasm";
 import { BaseAudioDecoder } from "./BaseAudioDecoder";
 import { clamp, info } from "../Common/Utils";
 import { SplitChannel } from "./SplitChannel";
@@ -72,7 +72,7 @@ export class AudioDecoder extends BaseAudioDecoder {
     // This is a shared promise which will be observed by all instances of the same source
     this.decodingPromise = new Promise((resolve) => (this.decodingResolve = resolve as any));
 
-    let splitChannels: SplitChannel | undefined = undefined;
+    let splitChannels: SplitChannel | undefined;
 
     try {
       // Set the worker instance and resolve the decoder promise

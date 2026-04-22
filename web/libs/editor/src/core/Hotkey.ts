@@ -4,7 +4,7 @@ import { observer } from "mobx-react";
 import { createElement, Fragment } from "react";
 import { Tooltip } from "@humansignal/ui";
 import Hint from "../components/Hint/Hint";
-import { Block, Elem } from "../utils/bem";
+import { cn } from "../utils/bem";
 import { FF_MULTI_OBJECT_HOTKEYS, isFF } from "../utils/feature-flags";
 import { isDefined, isMacOS } from "../utils/utilities";
 import defaultKeymap from "./settings/keymap.json";
@@ -24,12 +24,12 @@ if (!isFF(FF_MULTI_OBJECT_HOTKEYS)) {
 }
 
 // Validate keymap integrity
-const allowedKeympaKeys = ["key", "mac", "description", "modifier", "modifierDescription"];
+const allowedKeymapKeys = ["key", "mac", "description", "modifier", "modifierDescription", "active"];
 
 const validateKeymap = (keymap: Keymap) => {
   Object.entries(keymap).forEach(([name, settings]) => {
     Object.keys(settings).forEach((key) => {
-      if (!allowedKeympaKeys.includes(key)) {
+      if (!allowedKeymapKeys.includes(key)) {
         throw new Error(`Unknown keymap property ${key} for key ${name}`);
       }
     });
@@ -83,7 +83,7 @@ keymaster.filter = (event) => {
   if (keymaster.getScope() === "__none__") return false;
 
   const tag = (event.target || event.srcElement)?.tagName;
-  const inNumberPadCodeRange = event.keyCode >= 96 && event.keyCode <= 105;
+  const inNumberPadCodeRange = (event as any).keyCode >= 96 && (event as any).keyCode <= 105;
 
   if (inNumberPadCodeRange) translateNumpad(event);
   if (tag) {
@@ -93,7 +93,7 @@ keymaster.filter = (event) => {
   return true;
 };
 
-const ALIASES = {
+const ALIASES: Record<string, string> = {
   plus: "=", // "ctrl plus" is actually a "ctrl =" because shift is not used
   minus: "-",
   // Here is a magic trick. Keymaster doesn't work with comma correctly (it breaks down everything upon unbinding), but the key code for comma it expects is 188
@@ -272,7 +272,7 @@ export const Hotkey = (namespace = "global", description = "Hotkeys") => {
      * Add hotkey from keymap
      */
     addNamed(name: string, func: keymaster.KeyHandler, scope?: string) {
-      const hotkey = Hotkey.keymap[name];
+      const hotkey = Hotkey.keymap[name as keyof Keymap];
 
       if (isDefined(hotkey)) {
         const shortcut = isMacOS() ? (hotkey.mac ?? hotkey.key) : hotkey.key;
@@ -287,11 +287,18 @@ export const Hotkey = (namespace = "global", description = "Hotkeys") => {
       }
     },
 
+    lookupKey(name: string) {
+      const hotkey = Hotkey.keymap[name as keyof Keymap];
+      if (isDefined(hotkey)) {
+        return isMacOS() ? (hotkey.mac ?? hotkey.key) : hotkey.key;
+      }
+    },
+
     /**
      * Removed named hotkey
      */
     removeNamed(name: string, scope?: string) {
-      const hotkey = Hotkey.keymap[name];
+      const hotkey = Hotkey.keymap[name as keyof Keymap];
 
       if (isDefined(hotkey)) {
         const shortcut = isMacOS() ? (hotkey.mac ?? hotkey.key) : hotkey.key;
@@ -313,7 +320,7 @@ export const Hotkey = (namespace = "global", description = "Hotkeys") => {
      * @param {DEFAULT_SCOPE | INPUT_SCOPE} scope
      */
     overwriteNamed(name: string, func: keymaster.KeyHandler, scope?: string) {
-      const hotkey = Hotkey.keymap[name];
+      const hotkey = Hotkey.keymap[name as keyof Keymap];
 
       if (isDefined(hotkey)) {
         const shortcut = isMacOS() ? (hotkey.mac ?? hotkey.key) : hotkey.key;
@@ -334,6 +341,28 @@ export const Hotkey = (namespace = "global", description = "Hotkeys") => {
       const keyName = key.toLowerCase();
 
       return isDefined(_hotkeys_map[keyName]);
+    },
+
+    hasKeyByName(name: string) {
+      if (!isDefined(name)) return;
+
+      const hotkey = Hotkey.keymap[name as keyof Keymap];
+
+      if (!isDefined(hotkey)) {
+        return false;
+      }
+
+      const shortcut = isMacOS() ? (hotkey.mac ?? hotkey.key) : hotkey.key;
+
+      return this.hasKey(shortcut);
+    },
+
+    hasName(name: string) {
+      if (!isDefined(name)) return;
+
+      const keyName = name.toLowerCase();
+
+      return isDefined(keyName in Hotkey.keymap);
     },
 
     getKeys() {
@@ -377,7 +406,7 @@ export const Hotkey = (namespace = "global", description = "Hotkeys") => {
         if (prefix) comb = `${prefix}+${combs[i]}`;
         else comb = combs[i];
 
-        if (!{}.hasOwnProperty.call(_hotkeys_map, comb)) return comb;
+        if (!Object.hasOwn(_hotkeys_map, comb)) return comb;
       }
 
       return null;
@@ -422,7 +451,7 @@ Hotkey.setScope = (scope: string) => {
  */
 Hotkey.Tooltip = inject("store")(
   observer(({ store, name, children, ...props }: any) => {
-    const hotkey = Hotkey.keymap[name as string];
+    const hotkey = Hotkey.keymap[name as keyof Keymap];
     const enabled = store.settings.enableTooltips && store.settings.enableHotkeys;
 
     if (isDefined(hotkey)) {
@@ -432,24 +461,28 @@ Hotkey.Tooltip = inject("store")(
       const hotkeys: JSX.Element[] = [];
 
       if (enabled) {
-        shortcut.split(",").forEach((combination) => {
-          const keys = combination.split("+").map((key) =>
-            createElement(
-              Elem,
-              {
-                tag: "kbd",
-                name: "key",
-              },
-              key,
-            ),
-          );
+        shortcut.split(",").forEach((combination: string) => {
+          const keyParts = combination.split("+");
+          const keys: JSX.Element[] = [];
+
+          keyParts.forEach((key: string, i: number) => {
+            keys.push(
+              createElement(
+                "kbd",
+                {
+                  className: cn("key-group").elem("key").toClassName(),
+                  key: `key-${i}`,
+                },
+                key,
+              ),
+            );
+          });
 
           hotkeys.push(
             createElement(
-              Block,
+              "span",
               {
-                name: "key-group",
-                tag: "span",
+                className: cn("key-group").toClassName(),
                 style: { marginLeft: 5 },
               },
               ...keys,
@@ -478,7 +511,7 @@ Hotkey.Tooltip = inject("store")(
  */
 Hotkey.Hint = inject("store")(
   observer(({ store, name }: any) => {
-    const hotkey = Hotkey.keymap[name];
+    const hotkey = Hotkey.keymap[name as keyof Keymap];
     const enabled = store.settings.enableTooltips && store.settings.enableHotkeys;
 
     if (isDefined(hotkey) && enabled) {
@@ -490,6 +523,8 @@ Hotkey.Hint = inject("store")(
     return null;
   }),
 );
+
+export type HotkeyList = keyof typeof Hotkey.keymap;
 
 export default {
   DEFAULT_SCOPE,

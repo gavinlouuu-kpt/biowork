@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 import factory
 from core.utils.common import load_func
 from django.conf import settings
+from django.utils import timezone
 from faker import Faker
-from tasks.models import Annotation, AnnotationDraft, Prediction, Task
+from tasks.models import Annotation, AnnotationDraft, FailedPrediction, Prediction, Task, TaskLock
 
 
 class TaskFactory(factory.django.DjangoModelFactory):
@@ -12,6 +15,7 @@ class TaskFactory(factory.django.DjangoModelFactory):
         }
     )
     project = factory.SubFactory(load_func(settings.PROJECT_FACTORY))
+    overlap = factory.LazyAttribute(lambda obj: obj.project.maximum_annotations if obj.project else 1)
 
     class Meta:
         model = Task
@@ -68,6 +72,27 @@ class AnnotationDraftFactory(factory.django.DjangoModelFactory):
 class PredictionFactory(factory.django.DjangoModelFactory):
     task = factory.SubFactory(TaskFactory)
     project = factory.SelfAttribute('task.project')
+    result = [{}]
 
     class Meta:
         model = Prediction
+
+
+class FailedPredictionFactory(factory.django.DjangoModelFactory):
+    task = factory.SubFactory(TaskFactory)
+    project = factory.SelfAttribute('task.project')
+    message = factory.Faker('sentence')
+    error_type = factory.Faker('word')
+    model_version = factory.Faker('word')
+
+    class Meta:
+        model = FailedPrediction
+
+
+class TaskLockFactory(factory.django.DjangoModelFactory):
+    task = factory.SubFactory(TaskFactory)
+    user = factory.SubFactory(load_func(settings.USER_FACTORY))
+    expire_at = factory.LazyFunction(lambda: timezone.now() + timedelta(seconds=10))
+
+    class Meta:
+        model = TaskLock

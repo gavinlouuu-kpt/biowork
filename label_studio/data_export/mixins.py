@@ -1,5 +1,4 @@
 import hashlib
-import io
 import json
 import logging
 import pathlib
@@ -7,8 +6,8 @@ import shutil
 from datetime import datetime
 from functools import reduce
 
-import django_rq
-from core.redis import redis_connected
+from core.feature_flags import flag_set
+from core.redis import redis_connected, start_job_async_or_sync
 from core.utils.common import batch
 from core.utils.io import (
     SerializableGenerator,
@@ -151,9 +150,21 @@ class ExportMixin:
         return options
 
     def get_task_queryset(self, ids, annotation_filter_options):
+        from core.feature_flags import flag_set
+
         annotations_qs = self._get_filtered_annotations_queryset(annotation_filter_options=annotation_filter_options)
 
-        return (
+        # Only annotate FSM state if both feature flags are enabled
+        # This prevents unnecessary query annotations when state won't be serialized
+        user = getattr(self, 'created_by', None)
+        if (
+            flag_set('fflag_feat_fit_568_finite_state_management', user=user)
+            and flag_set('fflag_feat_fit_710_fsm_state_fields', user=user)
+            and hasattr(annotations_qs, 'with_state')
+        ):
+            annotations_qs = annotations_qs.with_state()
+
+        qs = (
             Task.objects.filter(id__in=ids)
             .select_related('file_upload')  # select_related more efficient for regular foreign-key relationship
             .prefetch_related(
@@ -162,6 +173,16 @@ class ExportMixin:
                 'comment_authors',
             )
         )
+
+        # Add FSM state annotation to tasks as well to avoid N+1 queries during export
+        if (
+            flag_set('fflag_feat_fit_568_finite_state_management', user=user)
+            and flag_set('fflag_feat_fit_710_fsm_state_fields', user=user)
+            and hasattr(qs, 'with_state')
+        ):
+            qs = qs.with_state()
+
+        return qs
 
     def get_export_data(self, task_filter_options=None, annotation_filter_options=None, serialization_options=None):
         """
@@ -197,14 +218,19 @@ class ExportMixin:
             self.counters = {'task_number': 0}
             all_tasks = self.project.tasks
             logger.debug('Tasks filtration')
-            task_ids = (
+            task_ids = list(
                 self._get_filtered_tasks(all_tasks, task_filter_options=task_filter_options)
                 .distinct()
                 .values_list('id', flat=True)
             )
             base_export_serializer_option = self._get_export_serializer_option(serialization_options)
             i = 0
-            BATCH_SIZE = 1000
+
+            if flag_set('fflag_fix_back_plt_807_batch_size_26062025_short', self.project.organization.created_by):
+                BATCH_SIZE = self.project.get_task_batch_size()
+            else:
+                BATCH_SIZE = settings.BATCH_SIZE
+
             for ids in batch(task_ids, BATCH_SIZE):
                 i += 1
                 tasks = list(self.get_task_queryset(ids, annotation_filter_options))
@@ -297,13 +323,13 @@ class ExportMixin:
         self.save(update_fields=['status'])
 
         if redis_connected():
-            queue = django_rq.get_queue('default')
-            queue.enqueue(
+            start_job_async_or_sync(
                 export_background,
                 self.id,
                 task_filter_options,
                 annotation_filter_options,
                 serialization_options,
+                queue_name='default',
                 on_failure=set_export_background_failure,
                 job_timeout='3h',  # 3 hours
             )
@@ -315,6 +341,17 @@ class ExportMixin:
             )
 
     def convert_file(self, to_format, download_resources=False, hostname=None):
+        logger.info(
+            (
+                'Starting export conversion: export_id=%s project_id=%s '
+                'to_format=%s download_resources=%s hostname=%s'
+            ),
+            self.id,
+            self.project_id,
+            to_format,
+            download_resources,
+            hostname,
+        )
         with get_temp_dir() as tmp_dir:
             OUT = 'out'
             out_dir = pathlib.Path(tmp_dir) / OUT
@@ -332,30 +369,77 @@ class ExportMixin:
             input_name = pathlib.Path(self.file.name).name
             input_file_path = pathlib.Path(tmp_dir) / input_name
 
-            with open(input_file_path, 'wb') as file_:
-                file_.write(self.file.open().read())
+            logger.info(
+                'Staging export input for conversion: export_id=%s input_name=%s input_path=%s',
+                self.id,
+                input_name,
+                input_file_path,
+            )
+            with self.file.open() as file_in, open(input_file_path, 'wb') as file_out:
+                shutil.copyfileobj(file_in, file_out)
+            logger.info(
+                'Input staged for conversion: export_id=%s input_size_bytes=%s',
+                self.id,
+                input_file_path.stat().st_size,
+            )
 
+            logger.info(
+                'Running converter: export_id=%s to_format=%s output_dir=%s',
+                self.id,
+                to_format,
+                out_dir,
+            )
             converter.convert(input_file_path, out_dir, to_format, is_dir=False)
+            logger.info('Converter finished: export_id=%s to_format=%s', self.id, to_format)
 
             files = get_all_files_from_dir(out_dir)
             dirs = get_all_dirs_from_dir(out_dir)
+            logger.info(
+                'Conversion output discovered: export_id=%s files=%s dirs=%s',
+                self.id,
+                len(files),
+                len(dirs),
+            )
 
             if len(files) == 0 and len(dirs) == 0:
+                logger.info('Conversion has no output: export_id=%s to_format=%s', self.id, to_format)
                 return None
             elif len(files) == 1 and len(dirs) == 0:
                 output_file = files[0]
                 filename = pathlib.Path(input_name).stem + pathlib.Path(output_file).suffix
+                output_kind = 'single_file'
             else:
                 shutil.make_archive(out_dir, 'zip', out_dir)
                 output_file = pathlib.Path(tmp_dir) / (str(out_dir.stem) + '.zip')
                 filename = pathlib.Path(input_name).stem + '.zip'
+                output_kind = 'zip_archive'
 
-            # TODO(jo): can we avoid the `f.read()` here?
+            logger.info(
+                (
+                    'Streaming conversion output to temporary file: export_id=%s output_kind=%s '
+                    'output_file=%s output_size_bytes=%s final_name=%s'
+                ),
+                self.id,
+                output_kind,
+                output_file,
+                pathlib.Path(output_file).stat().st_size,
+                filename,
+            )
+            result_file = tempfile.NamedTemporaryFile(
+                suffix=pathlib.Path(filename).suffix,
+                dir=settings.FILE_UPLOAD_TEMP_DIR,
+            )
             with open(output_file, mode='rb') as f:
-                return File(
-                    io.BytesIO(f.read()),
-                    name=filename,
-                )
+                shutil.copyfileobj(f, result_file)
+            result_size = result_file.tell()
+            result_file.seek(0)
+            logger.info(
+                'Conversion file ready: export_id=%s filename=%s size_bytes=%s',
+                self.id,
+                filename,
+                result_size,
+            )
+            return File(result_file, name=filename)
 
 
 def export_background(

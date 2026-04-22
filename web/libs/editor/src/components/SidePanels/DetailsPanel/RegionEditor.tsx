@@ -14,8 +14,7 @@ import {
 } from "react";
 import { IconPropertyAngle } from "@humansignal/icons";
 import { Checkbox, Select } from "@humansignal/ui";
-import { Block, Elem, useBEM } from "../../../utils/bem";
-import { FF_DEV_2715, isFF } from "../../../utils/feature-flags";
+import { cn } from "../../../utils/bem";
 import { TimeDurationControl } from "../../TimeDurationControl/TimeDurationControl";
 import { TimelineRegionEditor } from "./TimelineRegionEditor";
 import "./RegionEditor.scss";
@@ -53,14 +52,14 @@ const IconMapping = {
 };
 
 const RegionEditorComponent: FC<RegionEditorProps> = ({ region }) => {
-  const isAudioRegion = isFF(FF_DEV_2715) && region.type === "audioregion";
+  const isAudioRegion = region.type === "audioregion";
   const isTimelineRegion = region.type === "timelineregion";
   const Component = isTimelineRegion ? TimelineRegionEditor : isAudioRegion ? AudioRegionProperties : RegionProperties;
 
   return (
-    <Block name="region-editor" mod={{ disabled: region.isReadOnly() }}>
+    <div className={cn("region-editor").mod({ disabled: region.isReadOnly() }).toClassName()}>
       <Component region={region} />
-    </Block>
+    </div>
   );
 };
 
@@ -68,7 +67,7 @@ const RegionProperties = ({ region }: RegionEditorProps) => {
   const fields = region.editableFields ?? [];
 
   return (
-    <Elem name="wrapper">
+    <div className={cn("region-editor").elem("wrapper").toClassName()}>
       {region.editorEnabled &&
         fields.map((field, i) => {
           return (
@@ -80,7 +79,7 @@ const RegionProperties = ({ region }: RegionEditorProps) => {
             />
           );
         })}
-    </Elem>
+    </div>
   );
 };
 
@@ -94,7 +93,7 @@ const AudioRegionProperties = observer(({ region }: { region: any }) => {
   };
 
   return (
-    <Elem name="wrapper-time-control">
+    <div className={cn("region-editor").elem("wrapper-time-control").toClassName()}>
       <TimeDurationControl
         startTime={region.start}
         endTime={region.end}
@@ -106,7 +105,7 @@ const AudioRegionProperties = observer(({ region }: { region: any }) => {
         showLabels
         showDuration
       />
-    </Elem>
+    </div>
   );
 });
 
@@ -117,7 +116,6 @@ interface RegionPropertyProps {
 }
 
 const RegionProperty: FC<RegionPropertyProps> = ({ property, label, region }) => {
-  const block = useBEM();
   const [value, setValue] = useState(region.getProperty(property));
 
   const propertyType = useMemo(() => {
@@ -153,6 +151,14 @@ const RegionProperty: FC<RegionPropertyProps> = ({ property, label, region }) =>
     return coreType === types.boolean;
   }, [propertyType, isPrimitive]);
 
+  const isString = useMemo(() => {
+    if (!isPrimitive) return false;
+
+    const coreType = isOptionalType(propertyType) ? propertyType.getSubTypes() : propertyType;
+
+    return coreType === types.string || coreType[0] === types.string;
+  }, [propertyType, isPrimitive]);
+
   const onChangeHandler = useCallback(
     (value) => {
       if (value !== region.getProperty(property)) {
@@ -175,13 +181,15 @@ const RegionProperty: FC<RegionPropertyProps> = ({ property, label, region }) =>
   }, [region]);
 
   return (
-    <Elem name="property" tag="label">
+    <label className={cn("region-editor").elem("property").mod({ text: isString }).toClassName()}>
       {isBoolean ? (
         <Checkbox
-          className={block?.elem("input").toClassName()}
+          className={cn("region-editor").elem("input").toClassName()}
           checked={value}
           onChange={(e) => onChangeHandler(e.target.checked)}
         />
+      ) : isString ? (
+        <RegionInput type="text" value={value} onChange={(v) => onChangeHandler(v)} />
       ) : isPrimitive ? (
         <RegionInput
           type={getInputType(propertyType)}
@@ -193,22 +201,21 @@ const RegionProperty: FC<RegionPropertyProps> = ({ property, label, region }) =>
         <Select
           value={value}
           onChange={(val) => onChangeHandler(val)}
-          triggerClassName={block?.elem("select").toClassName()}
+          triggerClassName={cn("region-editor").elem("select").toClassName()}
           options={options}
         />
       ) : null}
       <PropertyLabel label={label} />
-    </Elem>
+    </label>
   );
 };
 
-interface RegionInputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface RegionInputProps extends InputHTMLAttributes<HTMLInputElement | HTMLTextAreaElement> {
   type: HTMLInputTypeAttribute;
   onChange?: (newValue: any) => void;
 }
 
 const RegionInput: FC<RegionInputProps> = ({ onChange: onChangeValue, type, value, step, ...props }) => {
-  const block = useBEM();
   const [currentValue, setValue] = useState(value);
 
   const updateValue = useCallback(
@@ -222,7 +229,7 @@ const RegionInput: FC<RegionInputProps> = ({ onChange: onChangeValue, type, valu
   );
 
   const onChangeHandler = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
+    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       let value: number | string = e.target.value;
       let safeValue = true;
 
@@ -247,7 +254,7 @@ const RegionInput: FC<RegionInputProps> = ({ onChange: onChangeValue, type, valu
   );
 
   const onKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLInputElement>) => {
+    (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       if (type !== "number") return;
 
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
@@ -272,15 +279,18 @@ const RegionInput: FC<RegionInputProps> = ({ onChange: onChangeValue, type, valu
     updateValue(value);
   }, [value]);
 
+  const Tag = type === "text" ? "textarea" : "input";
+
   return (
-    <input
+    <Tag
       {...props}
-      className={block?.elem("input").toClassName()}
+      className={cn("region-editor").elem("input").toClassName()}
       type="text"
       step={step}
       onChange={onChangeHandler}
       onKeyDown={onKeyDown}
       value={currentValue}
+      rows={type === "text" ? 3 : undefined}
     />
   );
 };
@@ -297,9 +307,7 @@ const PropertyLabel: FC<{ label: string }> = ({ label }) => {
   }, [label]);
 
   return (
-    <Elem name="text" tag="span">
-      {IconComponent ? <IconComponent /> : label}
-    </Elem>
+    <span className={cn("region-editor").elem("text").toClassName()}>{IconComponent ? <IconComponent /> : label}</span>
   );
 };
 

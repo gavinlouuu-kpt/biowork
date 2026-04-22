@@ -36,8 +36,10 @@ const Model = types.model({
     "rectanglelabels",
     "ellipselabels",
     "polygonlabels",
+    "vectorlabels",
     "keypointlabels",
     "brushlabels",
+    "bitmasklabels",
     "hypertextlabels",
     "timeserieslabels",
     "text",
@@ -208,4 +210,4 @@ const HtxPagedView = observer(({ item }) => {
 
 Registry.addTag("pagedview", PagedViewModel, HtxPagedView);
 
-export { HtxPagedView, PagedViewModel };
+export { HtxPagedView, PagedViewModel, getStoredPageSize, setStoredPageSize, getQueryPage, updateQueryPage };

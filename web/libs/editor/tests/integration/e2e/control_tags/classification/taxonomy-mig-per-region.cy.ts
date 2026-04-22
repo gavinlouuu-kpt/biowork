@@ -26,8 +26,11 @@ describe("Control Tags - MIG perRegion - Taxonomy", () => {
     Sidebar.findRegionByIndex(0).click();
 
     Taxonomy.open();
-    Taxonomy.findItem("Choice 1").click();
+    Taxonomy.clickItem("Choice 1");
     Taxonomy.close();
+
+    // Wait for selection to be reflected in the UI before asserting on serialized result
+    Taxonomy.hasSelected("Choice 1");
 
     LabelStudio.serialize().then((result) => {
       expect(result.length).to.be.eq(3);
@@ -70,7 +73,7 @@ describe("Control Tags - MIG perRegion - Taxonomy", () => {
 
     ImageView.waitForImage();
 
-    ToolBar.submitBtn.click();
+    ToolBar.updateBtn.click();
     Modals.hasWarning(TAXONOMY_REQUIRED_WARNING);
   });
 
@@ -85,9 +88,9 @@ describe("Control Tags - MIG perRegion - Taxonomy", () => {
 
     Sidebar.findRegionByIndex(0).click();
     Taxonomy.open();
-    Taxonomy.findItem("Choice 1").click();
+    Taxonomy.clickItem("Choice 1");
 
-    ToolBar.submitBtn.click();
+    ToolBar.updateBtn.click();
     Modals.hasWarning(TAXONOMY_REQUIRED_WARNING);
   });
 
@@ -102,14 +105,16 @@ describe("Control Tags - MIG perRegion - Taxonomy", () => {
 
     Sidebar.findRegionByIndex(0).click();
     Taxonomy.open();
-    Taxonomy.findItem("Choice 1").click();
+    Taxonomy.clickItem("Choice 1");
+    Taxonomy.hasSelected("Choice 1");
 
     Sidebar.findRegionByIndex(1).click();
     ImageView.waitForImage();
     Taxonomy.open();
-    Taxonomy.findItem("Choice 2").click();
+    Taxonomy.clickItem("Choice 2");
+    Taxonomy.hasSelected("Choice 2");
 
-    ToolBar.submitBtn.click();
+    ToolBar.updateBtn.click();
     Modals.hasNoWarnings();
   });
 });

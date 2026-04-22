@@ -2,9 +2,8 @@ import { inject, observer } from "mobx-react";
 import React, { useEffect, useRef } from "react";
 import { IconChevronDown } from "@humansignal/icons";
 import { Filters } from "../Filters/Filters";
-import { Badge } from "./Badge/Badge";
-import { Button } from "./Button/Button";
-import { Dropdown } from "./Dropdown/Dropdown";
+import { Badge, Button, Dropdown } from "@humansignal/ui";
+import { Icon } from "./Icon/Icon";
 
 const buttonInjector = inject(({ store }) => {
   const { viewsStore, currentView } = store;
@@ -22,14 +21,22 @@ export const FiltersButton = buttonInjector(
       const hasFilters = activeFiltersNumber > 0;
 
       return (
-        <Button ref={ref} size={size} onClick={() => sidebarEnabled && viewsStore.toggleSidebar()} {...rest}>
+        <Button
+          ref={ref}
+          size="small"
+          variant="neutral"
+          look="outlined"
+          onClick={() => sidebarEnabled && viewsStore.toggleSidebar()}
+          trailing={<Icon icon={IconChevronDown} />}
+          aria-label="Filters"
+          {...rest}
+        >
           Filters{" "}
           {hasFilters && (
-            <Badge size="small" style={{ marginLeft: 5 }}>
+            <Badge size="small" className="ml-tightest">
               {activeFiltersNumber}
             </Badge>
           )}
-          <IconChevronDown style={{ marginLeft: 8, marginRight: -7 }} />
         </Button>
       );
     }),

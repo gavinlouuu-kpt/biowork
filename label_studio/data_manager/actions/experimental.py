@@ -7,8 +7,10 @@ import random
 import ujson as json
 from core.permissions import AllPermissions
 from core.utils.db import fast_first
+from data_manager.actions import DataManagerAction
 from data_manager.functions import DataManagerException
 from django.conf import settings
+from rest_framework.exceptions import ValidationError
 from tasks.models import Annotation, Task
 from tasks.serializers import TaskSerializerBulk
 
@@ -75,7 +77,7 @@ def rename_labels(project, queryset, **kwargs):
 
     labels = project.get_parsed_config()
     if control_tag not in labels:
-        raise Exception('Wrong old label name, it is not from labeling config: ' + old_label_name)
+        raise ValidationError('Wrong old label name, it is not from labeling config: ' + old_label_name)
     label_type = labels[control_tag]['type'].lower()
 
     annotations = Annotation.objects.filter(project=project)
@@ -163,6 +165,10 @@ def add_data_field(project, queryset, **kwargs):
     value = request.data.get('value')
     size = queryset.count()
 
+    # Save a task ID before the update, because queryset filters may no longer
+    # match after we modify the data field (e.g. changing the filtered column value).
+    first_task_id = queryset.values_list('id', flat=True).first()
+
     cast = {'String': str, 'Number': float, 'Expression': str}
     assert value_type in cast.keys()
     value = cast[value_type](value)
@@ -190,7 +196,13 @@ def add_data_field(project, queryset, **kwargs):
                 )
             )
 
-    project.summary.update_data_columns([queryset.first()])
+    # Fetch the task by saved ID since the original queryset filters
+    # may no longer match after the data field was modified.
+    if first_task_id is not None:
+        first_task = Task.objects.filter(id=first_task_id).first()
+        if first_task is not None:
+            project.summary.update_data_columns([first_task])
+
     return {'response_code': 200, 'detail': f'Updated {size} tasks'}
 
 
@@ -265,7 +277,7 @@ def add_expression(queryset, size, value, value_name):
                 task.data[value_name] = task.data[value_name].replace(old_value, new_value)
 
     else:
-        raise Exception('Undefined expression, you can use: ' + add_data_field_examples)
+        raise ValidationError('Undefined expression, you can use: ' + add_data_field_examples)
 
     Task.objects.bulk_update(tasks, fields=['data'], batch_size=1000)
 
@@ -288,7 +300,7 @@ def add_data_field_form(user, project):
     ]
 
 
-actions = [
+actions: list[DataManagerAction] = [
     {
         'entry_point': add_data_field,
         'permission': all_permissions.projects_change,

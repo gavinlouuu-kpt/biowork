@@ -38,13 +38,19 @@ Label Studio is available to everyone as open source software (Label Studio Comm
   <tr>
     <td><b>Role-based workflows</b><br/><a href="https://docs.humansignal.com/guide/project_settings_lse#Annotation">Role-based automated workflows for annotators and reviewers.</a></td>
     <td style="text-align:center">❌</td>
-    <td style="text-align:center">✅</td>
+    <td style="text-align:center">Limited</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
     <td><b>Role-based access control</b><br/><a href="https://docs.humansignal.com/guide/admin_roles">Role-based access control into workspaces and projects: Admin, Manager, Reviewer, and Annotator.</a></td>
     <td style="text-align:center">❌</td>
+    <td style="text-align:center">Limited</td>
     <td style="text-align:center">✅</td>
+  </tr>
+  <tr>
+    <td><b>Customizable permissions</b><br/><a href="https://docs.humansignal.com/guide/admin_permissions">Fine-grained control over which roles can execute specific actions, such as inviting members, managing cloud storage, deleting tasks, and more.</a></td>
+    <td style="text-align:center">❌</td>
+    <td style="text-align:center">❌</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
@@ -68,6 +74,12 @@ Label Studio is available to everyone as open source software (Label Studio Comm
     <td style="text-align:center">✅</td>
     <td style="text-align:center">✅</td>
   </tr>
+    <tr>
+    <td><b>Advanced cloud storage integrations</b><br/><a href="storage.html">Databricks Unity Catalog, IAM for AWS S3, Azure Blob Storage with Service Principal, and WIF for Google Cloud Storage connections.</a></td>
+    <td style="text-align:center">❌</td>
+    <td style="text-align:center">❌</td>
+    <td style="text-align:center">✅</td>
+  </tr>
   <tr>
     <td><b>Import pre-annotated data</b><br/><a href="predictions.html">Import pre-annotated data (predictions) into Label Studio for further refinement and assessment.</a></td>
     <td style="text-align:center">✅</td>
@@ -84,6 +96,12 @@ Label Studio is available to everyone as open source software (Label Studio Comm
     <td><b>Sync data</b><br/><a href="storage.html">Synchronize new and labeled data between projects and your external data storage.</a></td>
     <td style="text-align:center">✅</td>
     <td style="text-align:center">✅</td>
+    <td style="text-align:center">✅</td>
+  </tr>
+  <tr>
+    <td><b>Chat</b><br/><a href="/tags/chat.html">Generate and label conversation data. Interact live with an LLM of your choice.</a></td>
+    <td style="text-align:center">❌</td>
+    <td style="text-align:center">Limited</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
@@ -128,13 +146,13 @@ Label Studio is available to everyone as open source software (Label Studio Comm
   <tr>
     <td><b>Project-level roles</b><br/><a href="https://docs.humansignal.com/guide/project_settings_lse#Members">Annotator and Reviewer can be assigned to Annotator/Reviewer roles at a per-project level. </a></td>
     <td style="text-align:center">❌</td>
-    <td style="text-align:center">✅</td>
+    <td style="text-align:center">Limited</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
     <td><b>Project-level user settings</b><br/><a href="https://docs.humansignal.com/guide/project_settings_lse#Annotation">Multiple configuration options for how Annotators and Reviewers interact with tasks and what information they can see.</a></td>
     <td style="text-align:center">❌</td>
-    <td style="text-align:center">✅</td>
+    <td style="text-align:center">Limited</td>
     <td style="text-align:center">✅</td>
   </tr>
 
@@ -168,6 +186,12 @@ Label Studio is available to everyone as open source software (Label Studio Comm
    <tr>
     <td colspan="4" style="text-align:center"><b>Customization & Development</b></td>
   </tr>
+ <tr>
+    <td><b>Programmable & embeddable interfaces</b><br/><a href="https://docs.humansignal.com/tags/reactcode">Build fully customized labeling and evaluation interfaces with React. Embed into your own applications.</a></td>
+    <td style="text-align:center">❌</td>
+    <td style="text-align:center">❌</td>
+    <td style="text-align:center">✅</td>
+  </tr>
   <tr>
     <td><b>Tag library</b><br/><a href="/tags">Use our tag library to customize the labeling interface by modifying pre-built templates or by building your own templates.</a></td>
     <td style="text-align:center">✅</td>
@@ -187,7 +211,7 @@ Label Studio is available to everyone as open source software (Label Studio Comm
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
-    <td><b>API/SDK & webhooks</b><br/><a href = "https://labelstud.io/guide/api.html"> APIs, SDK, and webhooks for programmatically accessing and managing Label Studio.</a></td>
+    <td><b>API/SDK & webhooks</b><br/><a href="api.html"> APIs, SDK, and webhooks for programmatically accessing and managing Label Studio.</a></td>
     <td style="text-align:center">✅</td>
     <td style="text-align:center">✅</td>
     <td style="text-align:center">✅</td>
@@ -196,21 +220,21 @@ Label Studio is available to everyone as open source software (Label Studio Comm
     <td colspan="4" style="text-align:center"><b>Prompts</b></td>
   </tr>
    <tr>
-    <td><b>Automated labeling</b><br/><a href="https://docs.humansignal.com/guide/prompts_overview">Fully automated data labeling using GenAI.</a></td>
+    <td><b>Automated pre-labeling</b><br/><a href="https://docs.humansignal.com/guide/prompts_overview">Rapidly pre-label tasks using LLMs.</a></td>
     <td style="text-align:center">❌</td>
-    <td style="text-align:center">✅</td>
+    <td style="text-align:center">❌</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
     <td><b>LLM fine-tuning and evaluation</b><br/><a href="https://docs.humansignal.com/guide/prompts_draft">Evaluate and fine-tune LLM prompts against a ground truth dataset.</a></td>
     <td style="text-align:center">❌</td>
-    <td style="text-align:center">✅</td>
+    <td style="text-align:center">❌</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
-    <td><b>Bootstrap projects</b><br/><a href="https://docs.humansignal.com/guide/prompts_predictions">Bootstrap your labeling project using auto-generated predictions.</a></td>
+    <td><b>Run benchmarks</b><br/><a href="https://docs.humansignal.com/guide/prompts_draft#Evaluation-results">Compare model outputs against ground truth or rubric criteria.</a></td>
     <td style="text-align:center">❌</td>
-    <td style="text-align:center">✅</td>
+    <td style="text-align:center">❌</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
@@ -267,19 +291,25 @@ Label Studio is available to everyone as open source software (Label Studio Comm
   <tr>
     <td><b>Assign reviewers</b><br/><a href="https://docs.humansignal.com/guide/quality.html">Assign reviewers to review, fix and update annotations.</a></td>
     <td style="text-align:center">❌</td>
-    <td style="text-align:center">✅</td>
+    <td style="text-align:center">❌</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
     <td><b>Automatic task reassignment</b><br/><a href="https://docs.humansignal.com/guide/quality.html">Reassign tasks with low agreement scores to new annotators.</a></td>
     <td style="text-align:center">❌</td>
+    <td style="text-align:center">❌</td>
+    <td style="text-align:center">✅</td>
+  </tr>
+  <tr>
+    <td><b>Agreement metrics</b><br/><a href="https://docs.humansignal.com/guide/stats.html">Define how annotator consensus is calculated using pre-defined agreement metrics.</a></td>
+    <td style="text-align:center">❌</td>
     <td style="text-align:center">✅</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
-    <td><b>Agreement metrics</b><br/><a href="https://docs.humansignal.com/guide/stats.html">Define how annotator consensus is calculated. You can choose from pre-defined metrics or customize your own.</a></td>
+    <td><b>Custom agreement metrics</b><br/><a href="https://docs.humansignal.com/guide/custom_metric.html">Write your own custom agreement metric.</a></td>
     <td style="text-align:center">❌</td>
-    <td style="text-align:center">✅</td>
+    <td style="text-align:center">❌</td>
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
@@ -319,7 +349,7 @@ Label Studio is available to everyone as open source software (Label Studio Comm
     <td style="text-align:center">✅</td>
   </tr>
   <tr>
-    <td><b>Label distribution charts</b><br/><a href="hhttps://docs.humansignal.com/guide/dashboard_project#Label-distribution">Identify possible problems with your dataset distribution, such as an unbalanced dataset.</a></td>
+    <td><b>Label distribution charts</b><br/><a href="https://docs.humansignal.com/guide/dashboard_project#Label-distribution">Identify possible problems with your dataset distribution, such as an unbalanced dataset.</a></td>
     <td style="text-align:center">❌</td>
     <td style="text-align:center">❌</td>
     <td style="text-align:center">✅</td>

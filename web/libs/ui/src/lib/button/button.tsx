@@ -11,6 +11,7 @@ const variants = {
   positive: styles["variant-positive"],
   warning: styles["variant-warning"],
   inverted: styles["variant-neutral-interted"],
+  gradient: styles["variant-gradient"],
 };
 
 const looks = {
@@ -68,7 +69,7 @@ export function buttonVariant(
   const buttonStyles = [styles.base, variants[variant], looks[look], sizes[size], alignment[align]];
   return cn(
     "inline-flex items-center rounded-smaller border text-shadow-button box-border border transition-all",
-    "text-label-medium font-medium text-[color:--text-color] bg-[color:--background-color] bg-[image:--background-image] border-[color:--border-color] shadow-[shadow:--emboss-shadow] text-center",
+    "font-medium text-[color:--text-color] bg-[color:--background-color] bg-[image:--background-image] border-[color:--border-color] shadow-[shadow:--emboss-shadow] text-center",
     "hover:text-[color:--text-color] hover:bg-[color:--background-color-hover] hover:border-[color:--border-color-hover]",
     "active:bg-[color:--background-color-active] active:border-[color:--border-color]",
     "[&_svg]:h-full [&_svg]:inline-block [&_svg]:aspect-square",
@@ -160,12 +161,14 @@ const Button = forwardRef(
     const contentClassName = "inline-flex flex-1 whitespace-pre items-center px-tight";
     const clickHandler = waiting && waitingClickable ? (secondaryOnClick ?? onClick) : onClick;
 
+    const isDisabled = buttonProps.disabled || (!waitingClickable && waiting);
+
     const buttonBody = (
       <button
         {...buttonProps}
         onClick={clickHandler}
         ref={(el) => setRef(ref, el)}
-        disabled={buttonProps.disabled ?? (!waitingClickable && waiting)}
+        disabled={isDisabled}
         data-waiting={waiting}
         data-variant={variant}
         data-look={look}
@@ -179,6 +182,7 @@ const Button = forwardRef(
     );
 
     if (tooltip) {
+      // For disabled buttons, wrap in a container that can receive hover events
       return <Tooltip title={tooltip}>{buttonBody}</Tooltip>;
     }
 

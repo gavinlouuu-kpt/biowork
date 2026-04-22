@@ -33,14 +33,14 @@ jobs:
           platform=$(echo $arch | tr '[:upper:]' '[:lower:]' )
           echo "PLATFORM=$platform" >> $GITHUB_ENV
           if [[ "${{ inputs.version }}" == "latest" ]]; then
-            echo "GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')" >> $GITHUB_ENV
+            echo "GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name | sed 's/^v//')" >> $GITHUB_ENV
           else
             echo "GITLEAKS_VERSION=${{ inputs.version }}" >> $GITHUB_ENV
           fi
 
       - name: Cache gitleaks archive
         id: cache_gitleaks
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /usr/local/bin/gitleaks
           key: gitleaks-${{ env.PLATFORM }}-${{ env.GITLEAKS_VERSION }}
@@ -57,9 +57,9 @@ jobs:
           chmod +x /usr/local/bin/gitleaks
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 2147483647
           ref: ${{ inputs.head_sha }}
 
       - name: Run gitleaks
@@ -79,7 +79,7 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: GitLeaks results
           path: results.sarif

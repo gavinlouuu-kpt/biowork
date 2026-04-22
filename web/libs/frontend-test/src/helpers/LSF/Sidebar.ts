@@ -1,3 +1,5 @@
+const metaModifier = window.navigator.platform.toLowerCase().indexOf("mac") >= 0 ? "metaKey" : "ctrlKey";
+
 export const Sidebar = {
   get outliner() {
     return cy.get(".lsf-outliner");
@@ -15,11 +17,8 @@ export const Sidebar = {
     return this.toolBar.get(".lsf-view-controls__sort button");
   },
   toggleOrderByTime() {
-    this.setOrderBy("Order by Time");
-  },
-  setOrderBy(optionLabel: string) {
     this.orderRegionsButton.click();
-    cy.get(".lsf-dropdown").contains(optionLabel).parent().click();
+    cy.get(".lsf-dropdown").contains("Order by Time").parent().click();
     // Cypress is bad at events emitting, so this is a hack to close the panel that
     // would be closed if the same action is done by a real person
     this.orderRegionsButton.click();
@@ -72,17 +71,19 @@ export const Sidebar = {
       // @link https://docs.cypress.io/api/commands/hover#Example-of-clicking-on-a-hidden-element
       .click({ force: true });
   },
-  toggleRegionSelection(selectorOrIndex: string | number) {
+  toggleRegionSelection(selectorOrIndex: string | number, withModifier = false) {
     const regionFinder =
       typeof selectorOrIndex === "number" ? this.findRegionByIndex.bind(this) : this.findRegion.bind(this);
 
-    regionFinder(selectorOrIndex).click();
+    regionFinder(selectorOrIndex).click({ [metaModifier]: withModifier });
   },
   collapseDetailsRightPanel() {
-    cy.get(".lsf-sidepanels__wrapper_align_right .lsf-panel__toggle").should("be.visible").click();
+    // New UI (SideTabsPanels): right-aligned panel has collapse toggle with Collapse tooltip
+    cy.get('.lsf-tabs-panel_alignment_right [data-tooltip="Collapse"]').should("be.visible").first().click();
   },
   expandDetailsRightPanel() {
-    cy.get(".lsf-sidepanels__wrapper_align_right .lsf-panel__header").should("be.visible").click();
+    // New UI (SideTabsPanels): click the right-aligned panel header to expand when collapsed
+    cy.get(".lsf-tabs-panel_alignment_right .lsf-tabs-panel__header").should("be.visible").first().click();
   },
   assertRegionHidden(idx: number, id: string, shouldBeHidden: boolean) {
     const expectation = shouldBeHidden ? "have.class" : "not.have.class";

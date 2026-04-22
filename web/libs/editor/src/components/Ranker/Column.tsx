@@ -6,6 +6,8 @@ import { CollapsedContext } from "./Ranker";
 import { StrictModeDroppable } from "./StrictModeDroppable";
 
 import styles from "./Ranker.module.scss";
+import { Button, Typography } from "@humansignal/ui";
+import { IconChevron, IconChevronDown } from "@humansignal/icons";
 
 interface ColumnProps {
   column: NewColumnData;
@@ -26,12 +28,20 @@ const CollapsibleColumnTitle = ({ items, title }: { items: InputItem[]; title: s
     );
 
   return (
-    <h1 className={[styles.columnTitle, collapsed ? styles.collapsed : styles.expanded].join(" ")}>
-      {title}
-      <button type="button" onClick={toggle}>
-        <span />
-      </button>
-    </h1>
+    <div className={styles.columnTitle}>
+      <Typography variant="title" size="large">
+        {title}
+      </Typography>
+      <Button
+        type="button"
+        onClick={toggle}
+        aria-label={collapsed ? "Expand column" : "Collapse column"}
+        variant="neutral"
+        leading={collapsed ? <IconChevronDown /> : <IconChevron />}
+        look="string"
+        size="small"
+      />
+    </div>
   );
 };
 
@@ -46,7 +56,11 @@ const Column = (props: ColumnProps) => {
   const title = collapsible ? (
     <CollapsibleColumnTitle items={items} title={column.title} />
   ) : (
-    <h1 className={styles.columnTitle}>{column.title}</h1>
+    <div className={styles.columnTitle}>
+      <Typography variant="title" size="medium">
+        {column.title}
+      </Typography>
+    </div>
   );
 
   return (

@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { destroy, detach } from "mobx-state-tree";
-import { toCamelCase, toSnakeCase } from "strman";
+import { camelCase, snakeCase } from "@humansignal/core/lib/utils/string";
 
 /**
  * Internal helper to check if parameter is a string
@@ -50,7 +50,7 @@ export const isStringJSON = (value: string) => {
  */
 export function getUrl(i: number, text: string) {
   const stringToTest = text.slice(i);
-  const myRegexp = /^(https?:\/\/(?:www\.|(?!www))[^\s\.]+\.[^\s]{2,}|www\.[^\s]+\.[^\s]{2,})/g; // eslint-disable-line no-useless-escape
+  const myRegexp = /^(https?:\/\/(?:www\.|(?!www))[^\s.]+\.[^\s]{2,}|www\.[^\s]+\.[^\s]{2,})/g; // eslint-disable-line no-useless-escape
   const match = myRegexp.exec(stringToTest);
 
   return match && match.length ? match[1] : "";
@@ -194,17 +194,6 @@ export const chunks = <T extends any[]>(source: T, chunkSize: number): T[][] => 
   return result;
 };
 
-export const userDisplayName = (user: Record<string, string> = {}) => {
-  const { firstName, lastName } = user;
-
-  return firstName || lastName
-    ? [firstName, lastName]
-        .filter((n) => !!n)
-        .join(" ")
-        .trim()
-    : user.username || user.email;
-};
-
 /**
  * This name supposed to be username, but most likely it's first_name and last_name
  * @param {string} createdBy string like "[<name> ]<email>, <id>"
@@ -219,9 +208,9 @@ export const camelizeKeys = (object: any): Record<string, unknown> => {
   return Object.fromEntries(
     Object.entries(object).map(([key, value]) => {
       if (Object.prototype.toString.call(value) === "[object Object]") {
-        return [toCamelCase(key), camelizeKeys(value)];
+        return [camelCase(key), camelizeKeys(value)];
       }
-      return [toCamelCase(key), value];
+      return [camelCase(key), value];
     }),
   );
 };
@@ -230,9 +219,9 @@ export const snakeizeKeys = (object: any): Record<string, unknown> => {
   return Object.fromEntries(
     Object.entries(object).map(([key, value]) => {
       if (Object.prototype.toString.call(value) === "[object Object]") {
-        return [toSnakeCase(key), snakeizeKeys(value)];
+        return [snakeCase(key), snakeizeKeys(value)];
       }
-      return [toSnakeCase(key), value];
+      return [snakeCase(key), value];
     }),
   );
 };

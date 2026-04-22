@@ -1,21 +1,24 @@
 import { observer } from "mobx-react";
-import { createContext, forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSDK } from "../../../providers/SDKProvider";
 import { isDefined } from "../../../utils/utils";
 import { Icon } from "../Icon/Icon";
 import { modal } from "../Modal/Modal";
-import { IconCode, IconGear, IconGearNewUI, IconCopyOutline } from "@humansignal/icons";
-import { AutoSizerTable, Tooltip, Button } from "@humansignal/ui";
-import { useCopyText } from "@humansignal/core/lib/hooks/useCopyText";
+import { IconBraces, IconChevronDown } from "@humansignal/icons";
+import { AutoSizerTable, Button } from "@humansignal/ui";
 import "./Table.scss";
 import { TableCheckboxCell } from "./TableCheckbox";
 import { tableCN, TableContext } from "./TableContext";
 import { TableHead } from "./TableHead/TableHead";
 import { TableRow } from "./TableRow/TableRow";
+import { RowContextMenu } from "./RowContextMenu";
 import { prepareColumns } from "./utils";
 import { cn } from "../../../utils/bem";
 import { FieldsButton } from "../FieldsButton";
-import { FF_DEV_3873, FF_LOPS_E_3, isFF } from "../../../utils/feature-flags";
+import { FF_LOPS_E_3, isFF } from "../../../utils/feature-flags";
+import { DensityToggle } from "../../DataManager/Toolbar/DensityToggle";
+import { TaskSourceViewer, getTaskSourceViewerStorageKey } from "../TaskSourceViewer";
 
 const Decorator = (decoration) => {
   return {
@@ -47,6 +50,11 @@ export const Table = observer(
     onColumnResize,
     onColumnReset,
     headerExtra,
+    onDensityChange,
+    onRangeSelect,
+    onViewAnalytics,
+    onViewReviewerAnalytics,
+    RowContextMenuComponent,
     ...props
   }) => {
     const colOrderKey = "dm:columnorder";
@@ -54,7 +62,24 @@ export const Table = observer(
     const [colOrder, setColOrder] = useState(JSON.parse(localStorage.getItem(colOrderKey)) ?? {});
     const listRef = useRef();
     const Decoration = useMemo(() => Decorator(decoration), [decoration]);
-    const { api, type } = useSDK();
+    const { api, type, projectId } = useSDK();
+    const toolbarHeight = 41;
+    const isQuickView = view.root.isLabeling;
+    const [toolbarVisible, setToolbarVisible] = useState(true);
+    // Track last clicked row ID for shift-click range selection
+    const lastClickedId = useRef(null);
+
+    // Global context menu state
+    const [contextMenu, setContextMenu] = useState(null);
+    // Maintain hover appearance on row while its context menu is open for better visual feedback
+    const contextMenuRowId = contextMenu?.row?.id ?? null;
+
+    // Reset virtualizer cache when rowHeight changes
+    useEffect(() => {
+      if (listRef.current?._listRef) {
+        listRef.current._listRef.resetAfterIndex(0);
+      }
+    }, [props.rowHeight]);
 
     const headerCheckboxCell = useCallback(() => {
       return (
@@ -69,17 +94,39 @@ export const Table = observer(
     }, [props.onSelectAll, selectedItems]);
 
     const rowCheckBoxCell = useCallback(
-      ({ data }) => {
-        const isChecked = selectedItems.isSelected(data.id);
+      ({ data: rowData }) => {
+        const isChecked = selectedItems.isSelected(rowData.id);
         return (
           <TableCheckboxCell
             checked={isChecked}
-            onChange={() => props.onSelectRow(data.id)}
-            ariaLabel={`${isChecked ? "Unselect" : "Select"} Task ${data.id}`}
+            onChange={(checked, shiftKey) => {
+              // Handle shift-click for range selection (works for both select and unselect)
+              if (shiftKey && lastClickedId.current !== null && onRangeSelect) {
+                const lastClickedIndex = data.findIndex((item) => item.id === lastClickedId.current);
+                const currentIndex = data.findIndex((item) => item.id === rowData.id);
+
+                if (lastClickedIndex !== -1 && currentIndex !== -1) {
+                  const startIndex = Math.min(lastClickedIndex, currentIndex);
+                  const endIndex = Math.max(lastClickedIndex, currentIndex);
+                  const rangeIds = data.slice(startIndex, endIndex + 1).map((item) => item.id);
+
+                  // Pass the select state: true = select range, false = unselect range
+                  onRangeSelect(rangeIds, checked);
+                  lastClickedId.current = rowData.id;
+                  return;
+                }
+              }
+
+              // Normal single-item toggle
+              props.onSelectRow(rowData.id);
+              // Always remember last clicked for shift-click range
+              lastClickedId.current = rowData.id;
+            }}
+            ariaLabel={`${isChecked ? "Unselect" : "Select"} Task ${rowData.id}`}
           />
         );
       },
-      [props.onSelectRow, selectedItems],
+      [props.onSelectRow, selectedItems, data, onRangeSelect],
     );
 
     const columns = prepareColumns(props.columns, props.hiddenColumns);
@@ -101,14 +148,15 @@ export const Table = observer(
     columns.push({
       id: "show-source",
       cellClassName: "show-source",
+      headerClassName: "show-source",
       style: {
-        width: 40,
-        maxWidth: 40,
+        width: 44,
+        maxWidth: 44,
         justifyContent: "center",
       },
       onClick: (e) => e.stopPropagation(),
       Header() {
-        return <div style={{ width: 40 }} />;
+        return <div style={{ width: 44 }} />;
       },
       Cell({ data }) {
         let out = JSON.parse(data.source ?? "{}");
@@ -120,30 +168,44 @@ export const Table = observer(
           predictions: out?.predictions,
         };
 
-        const onTaskLoad = async () => {
+        const onTaskLoad = async (options = {}) => {
           if (isFF(FF_LOPS_E_3) && type === "DE") {
             return new Promise((resolve) => resolve(out));
           }
-          const response = await api.task({ taskID: out.id });
+          const response = await api.task({
+            taskID: out.id,
+            resolve_uri: options.resolveUri ?? false,
+          });
 
           return response ?? {};
         };
 
         return (
-          <Tooltip title="Show task source">
-            <Button
-              look="string"
-              className="w-6 h-6 p-0 text-primary-content hover:text-primary-content-hover"
-              onClick={() => {
-                modal({
-                  title: `Source for task ${out?.id}`,
-                  style: { width: 800 },
-                  body: <TaskSourceView content={out} onTaskLoad={onTaskLoad} sdkType={type} />,
-                });
-              }}
-              leading={<Icon icon={IconCode} />}
-            />
-          </Tooltip>
+          <Button
+            look="string"
+            className="w-6 h-6 p-0 text-primary-content hover:text-primary-content-hover"
+            onClick={() => {
+              const modalInstance = modal({
+                title: `Source for task ${out?.id}`,
+                style: { width: 900 },
+                header: null, // Will be set by renderToggle
+                body: (
+                  <TaskSourceViewer
+                    content={out}
+                    onTaskLoad={onTaskLoad}
+                    sdkType={type}
+                    storageKey={getTaskSourceViewerStorageKey(projectId)}
+                    renderToggle={(toggle) => {
+                      // Update modal header with toggle
+                      modalInstance?.update({ header: toggle });
+                    }}
+                  />
+                ),
+              });
+            }}
+            leading={<Icon icon={IconBraces} />}
+            tooltip="View Task Source"
+          />
         );
       },
     });
@@ -157,13 +219,84 @@ export const Table = observer(
       localStorage.setItem(colOrderKey, JSON.stringify(colOrder));
     }, [colOrder]);
 
+    // Store columns in a ref to avoid recreating handleContextMenu
+    const columnsRef = useRef(columns);
+    columnsRef.current = columns;
+
+    // Handle context menu - defined after columns are initialized
+    const handleContextMenu = useCallback((e, row) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Find which column was clicked (actual class: lsf-table__cell)
+      const cell = e.target.closest(".lsf-table__cell");
+      const cellIndex = cell ? Array.from(cell.parentElement.children).indexOf(cell) : -1;
+      const column = cellIndex >= 0 ? columnsRef.current[cellIndex] : null;
+
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        row,
+        column,
+      });
+    }, []); // Empty deps - stable callback
+
+    // Close context menu on click outside or escape
+    useEffect(() => {
+      if (!contextMenu) return;
+
+      const handleClose = (e) => {
+        // Don't close if clicking inside the menu
+        if (e.target.closest("[data-context-menu]")) return;
+        setContextMenu(null);
+      };
+
+      const handleEscape = (e) => {
+        if (e.key === "Escape") {
+          setContextMenu(null);
+        }
+      };
+
+      // Use capture phase and add slight delay to prevent immediate closing
+      const timerId = setTimeout(() => {
+        document.addEventListener("click", handleClose, true);
+        document.addEventListener("contextmenu", handleClose, true);
+        document.addEventListener("keydown", handleEscape);
+      }, 0);
+
+      return () => {
+        clearTimeout(timerId);
+        document.removeEventListener("click", handleClose, true);
+        document.removeEventListener("contextmenu", handleClose, true);
+        document.removeEventListener("keydown", handleEscape);
+      };
+    }, [contextMenu]);
+
     const contextValue = {
       columns,
       data,
       cellViews,
+      contextMenuRowId,
     };
 
     const headerHeight = 43;
+
+    const renderTableToolbar = useCallback(() => {
+      return (
+        <div className={cn("table-toolbar").mod({ visible: toolbarVisible }).toClassName()}>
+          <FieldsButton
+            className={cn("table-toolbar").elem("customize-button").toClassName()}
+            wrapper={FieldsButton.Checkbox}
+            title={"Columns"}
+            size="small"
+            trailingIcon={<Icon icon={IconChevronDown} />}
+            tooltip={"Customize Columns"}
+            data-testid="columns-picker-quickview"
+          />
+          <DensityToggle size="small" onChange={onDensityChange} data-testid="density-toggle-quickview" />
+        </div>
+      );
+    }, [toolbarVisible, onDensityChange]);
 
     const renderTableHeader = useCallback(
       ({ style }) => (
@@ -199,22 +332,47 @@ export const Table = observer(
 
     const renderRow = useCallback(
       ({ style, index }) => {
-        const row = data[index - 1];
-        const isEven = index % 2 === 0;
+        // Both QuickView and Regular mode: Index 0 is header (sticky), Index 1+ are data rows
+        const dataIndex = index - 1;
+        const row = data[dataIndex];
+        const isEven = dataIndex % 2 === 0;
+
+        if (isQuickView) {
+          return (
+            <TableRow
+              key={row.id}
+              data={row}
+              even={isEven}
+              onClick={(row, e) => props.onRowClick(row, e)}
+              stopInteractions={stopInteractions}
+              wrapperStyle={{ ...style, height: props.rowHeight }}
+              style={{
+                height: props.rowHeight,
+                width: props.fitContent ? "fit-content" : "auto",
+              }}
+              decoration={Decoration}
+              onContextMenu={handleContextMenu}
+            />
+          );
+        }
+
+        // Invert for visual consistency in Regular mode: we want odd rows (2nd, 4th, etc.) to have background
+        const shouldApplyBackground = !isEven;
 
         return (
           <TableRow
             key={row.id}
             data={row}
-            even={isEven}
+            even={shouldApplyBackground}
             onClick={(row, e) => props.onRowClick(row, e)}
             stopInteractions={stopInteractions}
-            wrapperStyle={style}
+            wrapperStyle={{ ...style, height: props.rowHeight }}
             style={{
               height: props.rowHeight,
               width: props.fitContent ? "fit-content" : "auto",
             }}
             decoration={Decoration}
+            onContextMenu={handleContextMenu}
           />
         );
       },
@@ -228,6 +386,9 @@ export const Table = observer(
         view,
         view.selected.list,
         view.selected.all,
+        isQuickView,
+        Decoration,
+        handleContextMenu,
       ],
     );
 
@@ -240,21 +401,24 @@ export const Table = observer(
 
     const cachedScrollOffset = useRef();
 
-    const initialScrollOffset = useCallback((height) => {
-      if (isDefined(cachedScrollOffset.current)) {
-        return cachedScrollOffset.current;
-      }
+    const initialScrollOffset = useCallback(
+      (height) => {
+        if (isDefined(cachedScrollOffset.current)) {
+          return cachedScrollOffset.current;
+        }
 
-      const { rowHeight: h } = props;
-      const index = data.indexOf(focusedItem);
+        const h = props.rowHeight;
+        const index = data.indexOf(focusedItem);
 
-      if (index >= 0) {
-        const scrollOffset = index * h - height / 2 + h / 2; // + headerHeight
+        if (index >= 0) {
+          const scrollOffset = index * h - height / 2 + h / 2; // + headerHeight
 
-        return (cachedScrollOffset.current = scrollOffset);
-      }
-      return 0;
-    }, []);
+          return (cachedScrollOffset.current = scrollOffset);
+        }
+        return 0;
+      },
+      [props.rowHeight, data, focusedItem],
+    );
 
     const itemKey = useCallback(
       (index) => {
@@ -275,45 +439,19 @@ export const Table = observer(
     }, [data]);
     const tableWrapper = useRef();
 
-    const right =
-      tableWrapper.current?.firstChild?.firstChild.offsetWidth -
-        tableWrapper.current?.firstChild?.firstChild?.firstChild.offsetWidth || 0;
+    const handleScroll = useCallback(
+      ({ scrollOffset }) => {
+        if (isQuickView && scrollOffset >= 0) {
+          setToolbarVisible(scrollOffset === 0);
+        }
+      },
+      [isQuickView, toolbarHeight],
+    );
 
-    const columnsSelectorCN = cn("columns__selector");
     return (
       <>
-        {view.root.isLabeling && (
-          <div
-            className={columnsSelectorCN.toString()}
-            style={{
-              right,
-            }}
-          >
-            {isFF(FF_DEV_3873) ? (
-              <FieldsButton
-                className={columnsSelectorCN.elem("button-new").toString()}
-                wrapper={FieldsButton.Checkbox}
-                icon={<IconGearNewUI />}
-                style={{ padding: "0" }}
-                tooltip={"Customize Columns"}
-              />
-            ) : (
-              <FieldsButton
-                wrapper={FieldsButton.Checkbox}
-                icon={<IconGear />}
-                style={{
-                  padding: 0,
-                  zIndex: 1000,
-                  borderRadius: 0,
-                  height: "45px",
-                  width: "45px",
-                  margin: "-1px",
-                }}
-              />
-            )}
-          </div>
-        )}
-        <div ref={tableWrapper} className={tableCN.mod({ fit: props.fitToContent }).toString()}>
+        <div ref={tableWrapper} className={tableCN.mod({ fit: props.fitToContent }).toClassName()}>
+          {isQuickView && renderTableToolbar()}
           <TableContext.Provider value={contextValue}>
             <StickyList
               ref={listRef}
@@ -329,11 +467,29 @@ export const Table = observer(
               initialScrollOffset={initialScrollOffset}
               isItemLoaded={isItemLoaded}
               loadMore={props.loadMore}
+              toolbarHeight={toolbarHeight}
+              headerHeight={headerHeight}
+              isQuickView={isQuickView}
+              onScroll={handleScroll}
+              toolbarVisible={toolbarVisible}
             >
               {renderRow}
             </StickyList>
           </TableContext.Provider>
         </div>
+        {contextMenu &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <ContextMenuPortal
+              contextMenu={contextMenu}
+              view={view}
+              onViewAnalytics={onViewAnalytics}
+              onViewReviewerAnalytics={onViewReviewerAnalytics}
+              RowContextMenuComponent={RowContextMenuComponent}
+              onClose={() => setContextMenu(null)}
+            />,
+            document.body,
+          )}
       </>
     );
   },
@@ -364,6 +520,12 @@ const StickyList = observer(
       isItemLoaded,
       loadMore,
       initialScrollOffset,
+      toolbarHeight,
+      headerHeight,
+      isQuickView,
+      onScroll,
+      headerTopOffset,
+      toolbarVisible,
       ...rest
     } = props;
 
@@ -372,14 +534,42 @@ const StickyList = observer(
       StickyComponent: stickyComponent,
       stickyItems,
       stickyItemsHeight,
+      headerTopOffset,
+      isQuickView,
+      toolbarHeight,
     };
 
     const itemSize = (index) => {
-      if (stickyItems.includes(index)) {
-        return stickyItemsHeight[index] ?? rest.itemHeight;
+      if (isQuickView) {
+        if (stickyItems.includes(index)) {
+          return headerHeight;
+        }
+      } else {
+        // Regular mode: Index 0 is sticky header
+        if (stickyItems.includes(index)) {
+          return headerHeight;
+        }
       }
+      // All other indices are data rows
       return rest.itemHeight;
     };
+
+    // Calculate height adjustment for QuickView mode
+    // Subtract toolbar height (when visible) and app header height
+    const heightAdjustment = useMemo(() => {
+      if (!isQuickView) return 0;
+
+      // Get app header height from CSS variable
+      const appHeaderHeight = Number.parseInt(
+        getComputedStyle(document.documentElement).getPropertyValue("--header-height") || "0",
+        10,
+      );
+
+      // Add toolbar height only when toolbar is visible
+      const adjustment = appHeaderHeight + (toolbarVisible ? toolbarHeight : 0);
+
+      return adjustment;
+    }, [isQuickView, toolbarVisible, toolbarHeight]);
 
     return (
       <StickyListContext.Provider value={itemData}>
@@ -391,7 +581,9 @@ const StickyList = observer(
           itemData={itemData}
           itemSize={itemSize}
           initialScrollOffset={initialScrollOffset}
-          className={tableCN.elem("auto-size").toString()}
+          className={tableCN.elem("auto-size").mod({ "quick-view": isQuickView }).toClassName()}
+          onScroll={onScroll}
+          heightAdjustment={heightAdjustment}
           {...rest}
         >
           {ItemWrapper}
@@ -406,79 +598,63 @@ StickyList.displayName = "StickyList";
 const innerElementType = forwardRef(({ children, ...rest }, ref) => {
   return (
     <StickyListContext.Consumer>
-      {({ stickyItems, stickyItemsHeight, StickyComponent }) => (
-        <div ref={ref} {...rest}>
-          {stickyItems.map((index) => (
-            <StickyComponent
-              className={tableCN.elem("sticky-header").toString()}
-              key={index}
-              index={index}
-              style={{
-                height: stickyItemsHeight[index],
-                top: index * stickyItemsHeight[index],
-              }}
-            />
-          ))}
+      {({ stickyItems, stickyItemsHeight, StickyComponent, headerTopOffset, isQuickView, toolbarHeight }) => {
+        // Ensure top position is always between 0 and toolbarHeight in QuickView
+        const topPosition = isQuickView ? Math.max(0, Math.min(toolbarHeight, headerTopOffset ?? 0)) : 0;
 
-          {children}
-        </div>
-      )}
+        // In QuickView mode, children[0] is the toolbar, children[1+] are data rows
+        const childrenArray = Array.isArray(children) ? children : children ? [children] : [];
+        const toolbar = isQuickView && childrenArray.length > 0 ? childrenArray[0] : null;
+        const bodyRows = isQuickView && childrenArray.length > 0 ? childrenArray.slice(1) : children;
+
+        return (
+          <div ref={ref} {...rest}>
+            {stickyItems.map((index) => (
+              <StickyComponent
+                className={tableCN.elem("sticky-header").toClassName()}
+                key={index}
+                index={index}
+                style={{
+                  height: stickyItemsHeight[index],
+                  top: topPosition,
+                }}
+              />
+            ))}
+
+            {isQuickView ? (
+              <>
+                {toolbar}
+                <div className={tableCN.elem("body-rows").toClassName()}>{bodyRows}</div>
+              </>
+            ) : (
+              children
+            )}
+          </div>
+        );
+      }}
     </StickyListContext.Consumer>
   );
 });
 
-const TaskSourceView = ({ content, onTaskLoad, sdkType }) => {
-  const [source, setSource] = useState(content);
+// Context menu portal component - positioning now handled by Dropdown component
+const ContextMenuPortal = memo(
+  ({ contextMenu, view, onViewAnalytics, onViewReviewerAnalytics, onClose, RowContextMenuComponent }) => {
+    const MenuComponent = RowContextMenuComponent || RowContextMenu;
+    const { api, type, projectId } = useSDK();
 
-  useEffect(() => {
-    onTaskLoad().then((response) => {
-      const formatted = {
-        id: response.id,
-        data: response.data,
-      };
-
-      if (sdkType !== "DE") {
-        formatted.annotations = response.annotations ?? [];
-        formatted.predictions = response.predictions ?? [];
-      }
-      setSource(formatted);
-    });
-  }, []);
-
-  const jsonString = useMemo(() => {
-    return source ? JSON.stringify(source, null, 2) : "";
-  }, [source]);
-
-  const [handleCopy, copied] = useCopyText(jsonString);
-
-  return (
-    <div
-      className="bg-neutral-surface rounded-small font-mono text-body-small leading-body-small overflow-auto max-h-[500px]"
-      style={{ position: "relative" }}
-    >
-      <div style={{ padding: "16px", paddingTop: "16px" }}>
-        <Tooltip title={copied ? "Copied!" : "Copy JSON"}>
-          <Button
-            look="string"
-            variant="neutral"
-            style={{
-              position: "absolute",
-              top: "8px",
-              right: "8px",
-              width: 32,
-              height: 32,
-              padding: 0,
-              zIndex: 10,
-              color: "var(--color-neutral-content-subtle)",
-            }}
-            onClick={handleCopy}
-            leading={<Icon icon={IconCopyOutline} style={{ color: "var(--color-neutral-content-subtle)" }} />}
-          />
-        </Tooltip>
-        <pre className="m-0 whitespace-pre-wrap break-words max-w-full" style={{ marginRight: "40px" }}>
-          {jsonString}
-        </pre>
-      </div>
-    </div>
-  );
-};
+    return (
+      <MenuComponent
+        row={contextMenu.row}
+        column={contextMenu.column}
+        view={view}
+        api={api}
+        sdkType={type}
+        projectId={projectId}
+        onViewAnalytics={onViewAnalytics}
+        onViewReviewerAnalytics={onViewReviewerAnalytics}
+        cursorPosition={{ x: contextMenu.x, y: contextMenu.y }}
+        onClose={onClose}
+      />
+    );
+  },
+);

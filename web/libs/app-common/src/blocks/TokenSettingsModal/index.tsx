@@ -1,19 +1,12 @@
-import { useAtomValue } from "jotai";
 import { settingsAtom, TOKEN_SETTINGS_KEY } from "@humansignal/app-common/pages/AccountSettings/atoms";
-import { queryClientAtom } from "jotai-tanstack-query";
-
-import { Form, Input, Toggle } from "apps/labelstudio/src/components/Form";
-import { Button } from "apps/labelstudio/src/components/Button/Button";
 import type { AuthTokenSettings } from "@humansignal/app-common/pages/AccountSettings/types";
+import { Button } from "@humansignal/ui";
+import { Form, Input, Toggle } from "apps/labelstudio/src/components/Form";
+import { useAtomValue } from "jotai";
+import { queryClientAtom } from "jotai-tanstack-query";
 import { type ChangeEvent, useState } from "react";
 
-export const TokenSettingsModal = ({
-  showTTL,
-  onSaved,
-}: {
-  showTTL?: boolean;
-  onSaved?: () => void;
-}) => {
+export const TokenSettingsModal = ({ showTTL, onSaved }: { showTTL?: boolean; onSaved?: () => void }) => {
   const settings = useAtomValue(settingsAtom);
   if (!settings.isSuccess || settings.isError || "error" in settings.data) {
     return <div>Error loading settings.</div>;
@@ -32,7 +25,11 @@ function TokenSettingsModalView({
   settings,
   showTTL,
   onSaved,
-}: { settings: AuthTokenSettings; showTTL?: boolean; onSaved?: () => void }) {
+}: {
+  settings: AuthTokenSettings;
+  showTTL?: boolean;
+  onSaved?: () => void;
+}) {
   const [enableTTL, setEnableTTL] = useState(settings.api_tokens_enabled);
   const queryClient = useAtomValue(queryClientAtom);
   const reloadSettings = () => {
@@ -46,7 +43,7 @@ function TokenSettingsModalView({
           label="Personal Access Tokens"
           name="api_tokens_enabled"
           description="Enable increased token authentication security"
-          checked={settings.api_tokens_enabled ?? false}
+          checked={settings.api_tokens_enabled ?? true}
           onChange={(e: ChangeEvent<HTMLInputElement>) => setEnableTTL(e.target.checked)}
         />
       </Form.Row>
@@ -55,7 +52,7 @@ function TokenSettingsModalView({
           label="Legacy Tokens"
           name="legacy_api_tokens_enabled"
           description="Enable legacy access tokens, these do not expire"
-          checked={settings.legacy_api_tokens_enabled ?? true}
+          checked={settings.legacy_api_tokens_enabled ?? false}
         />
       </Form.Row>
       {showTTL === true && (
@@ -77,7 +74,9 @@ function TokenSettingsModalView({
         </Form.Row>
       )}
       <Form.Actions>
-        <Button type="submit">Save</Button>
+        <Button variant="primary" look="filled" type="submit">
+          Save Changes
+        </Button>
       </Form.Actions>
     </Form>
   );

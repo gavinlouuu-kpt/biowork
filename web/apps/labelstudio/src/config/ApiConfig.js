@@ -7,6 +7,8 @@ export const API_CONFIG = {
     updateUserAvatar: "POST:/users/:pk/avatar",
     deleteUserAvatar: "DELETE:/users/:pk/avatar",
     me: "/current-user/whoami",
+    hotkeys: "GET:/current-user/hotkeys/",
+    updateHotkeys: "PATCH:/current-user/hotkeys/",
 
     // Organization
     memberships: "/organizations/:pk/memberships",
@@ -48,6 +50,7 @@ export const API_CONFIG = {
     updateStorage: "PATCH:/storages/:target?/:type/:pk",
     syncStorage: "POST:/storages/:target?/:type/:pk/sync",
     validateStorage: "POST:/storages/:target?/:type/validate",
+    storageFiles: "POST:/storages/:target?/:type/files",
 
     // ML
     mlBackends: "GET:/ml",
@@ -95,6 +98,9 @@ export const API_CONFIG = {
     createCheckout: "POST:/billing/checkout",
     createPortal: "POST:/billing/portal",
     syncBillingStatus: "POST:/billing/sync",
+
+    // FSM
+    fsmStateHistory: "GET:/fsm/entities/:entityType/:entityId/history",
   },
   alwaysExpectJSON: false,
 };

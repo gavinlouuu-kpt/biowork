@@ -1,62 +1,62 @@
 import { IconInfoOutline, IconSettings } from "@humansignal/icons";
-import { Tooltip } from "@humansignal/ui";
-import { Button } from "../../common/Button/Button";
-import { Elem } from "../../utils/bem";
-import { isSelfServe } from "../../utils/billing";
-import { FF_BULK_ANNOTATION } from "../../utils/feature-flags";
-import { EditingHistory } from "./HistoryActions";
-import { DynamicPreannotationsToggle } from "../AnnotationTab/DynamicPreannotationsToggle";
+import { Button } from "@humansignal/ui";
+import { isStarterCloudPlan } from "@humansignal/core";
+import { cn } from "../../utils/bem";
+import { FF_BULK_ANNOTATION, isFF } from "../../utils/feature-flags";
 import { AutoAcceptToggle } from "../AnnotationTab/AutoAcceptToggle";
+import { DynamicPreannotationsToggle } from "../AnnotationTab/DynamicPreannotationsToggle";
 import { GroundTruth } from "../CurrentEntity/GroundTruth";
+import { EditingHistory } from "./HistoryActions";
+import "./Actions.scss";
 
 export const Actions = ({ store }) => {
   const annotationStore = store.annotationStore;
   const entity = annotationStore.selected;
   const isPrediction = entity?.type === "prediction";
   const isViewAll = annotationStore.viewingAll === true;
-  const isBulkMode = isFF(FF_BULK_ANNOTATION) && !isSelfServe() && store.hasInterface("annotation:bulk");
+  const isBulkMode = isFF(FF_BULK_ANNOTATION) && !isStarterCloudPlan() && store.hasInterface("annotation:bulk");
 
   return (
-    <Elem name="section">
+    <div className={cn("bottombar").elem("section").toClassName()}>
       {!isPrediction && !isViewAll && store.hasInterface("edit-history") && <EditingHistory entity={entity} />}
 
-      {store.description && store.hasInterface("instruction") && (
-        <Tooltip alignment="top-left" title="Show instructions">
+      <div className={cn("action-buttons").toClassName()}>
+        {store.description && store.hasInterface("instruction") && (
           <Button
-            icon={<IconInfoOutline style={{ width: 20, height: 20 }} />}
             type="text"
             aria-label="Instructions"
+            size="small"
+            variant="neutral"
+            look="string"
+            tooltip="Show instructions"
             onClick={() => store.toggleDescription()}
-            style={{
-              height: 36,
-              width: 36,
-              padding: 0,
-            }}
+            className="aspect-square"
+            leading={<IconInfoOutline />}
+            data-testid="bottombar-instructions-button"
           />
-        </Tooltip>
-      )}
-      <Tooltip alignment="top-left" title="Settings">
+        )}
         <Button
-          icon={<IconSettings />}
           type="text"
           aria-label="Settings"
+          size="small"
+          look="string"
+          variant="neutral"
           onClick={() => store.toggleSettings()}
-          style={{
-            height: 36,
-            width: 36,
-            padding: 0,
-          }}
+          tooltip="Settings"
+          className="aspect-square"
+          leading={<IconSettings />}
+          data-testid="bottombar-settings-button"
         />
-      </Tooltip>
+      </div>
 
       {store.hasInterface("ground-truth") && !isBulkMode && <GroundTruth entity={entity} />}
 
       {!isViewAll && (
-        <Elem name="section">
+        <div className={cn("model-actions").toClassName()}>
           <DynamicPreannotationsToggle />
           <AutoAcceptToggle />
-        </Elem>
+        </div>
       )}
-    </Elem>
+    </div>
   );
 };

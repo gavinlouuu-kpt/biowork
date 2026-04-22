@@ -5,7 +5,8 @@ import { isDefined } from "../../utils/utils";
 import { Assignee } from "../Assignee";
 import { DynamicModel, registerModel } from "../DynamicModel";
 import { CustomJSON } from "../types";
-import { FF_DEV_2536, FF_LOPS_E_3, isFF } from "../../utils/feature-flags";
+import { FF_DEV_2536, FF_DISABLE_GLOBAL_USER_FETCHING, FF_LOPS_E_3, isFF } from "../../utils/feature-flags";
+import { isActive, FF_FIT_720_LAZY_LOAD_ANNOTATIONS } from "@humansignal/core/lib/utils/feature-flags";
 
 const SIMILARITY_UPPER_LIMIT_PRECISION = 1000;
 const fileAttributes = types.model({
@@ -29,13 +30,23 @@ export const create = (columns) => {
     drafts: types.frozen(),
     source: types.maybeNull(types.string),
     was_cancelled: false,
+    overlap_reached: types.maybeNull(types.boolean),
+    overlap_reached_message: types.maybeNull(types.string),
     assigned_task: false,
     queue: types.optional(types.maybeNull(types.string), null),
     // annotation to select on rejected queue
     default_selected_annotation: types.maybeNull(types.number),
     allow_postpone: types.maybeNull(types.boolean),
+    allow_skip: types.optional(types.maybeNull(types.boolean), true),
     unique_lock_id: types.maybeNull(types.string),
     updated_by: types.optional(types.array(Assignee), []),
+    ...(isFF(FF_DISABLE_GLOBAL_USER_FETCHING)
+      ? {
+          annotators_count: types.optional(types.maybeNull(types.number), 0),
+          reviewers_count: types.optional(types.maybeNull(types.number), 0),
+          comment_authors_count: types.optional(types.maybeNull(types.number), 0),
+        }
+      : {}),
     ...(isFF(FF_LOPS_E_3)
       ? {
           _additional: types.optional(fileAttributes, {}),
@@ -126,16 +137,16 @@ export const create = (columns) => {
   })
     .actions((self) => ({
       loadTaskHistory: flow(function* (props) {
-        let taskHistory = yield self.root.apiCall("taskHistory", props);
+        const taskHistory = yield self.root.apiCall("taskHistory", props);
 
-        taskHistory = taskHistory.map((task) => {
-          return {
-            taskId: task.taskId,
-            annotationId: task.annotationId?.toString(),
-          };
-        });
+        if (!Array.isArray(taskHistory)) {
+          return [];
+        }
 
-        return taskHistory;
+        return taskHistory.map((task) => ({
+          taskId: task.taskId,
+          annotationId: task.annotationId?.toString(),
+        }));
       }),
       loadTask: flow(function* (taskID, { select = true } = {}) {
         if (!isDefined(taskID)) {
@@ -145,14 +156,38 @@ export const create = (columns) => {
 
         self.setLoading(taskID);
 
-        const taskData = yield self.root.apiCall("task", { taskID });
+        // Pass label stream mode context to the backend API call
+        const isLabelStream = getRoot(self).SDK?.mode === "labelstream";
+        const taskParams = { taskID };
+        if (isLabelStream) {
+          taskParams.interaction = "labelstream";
+        }
+        // FIT-720: Lazy load annotations - use stubs for both label stream and quick view modes
+        // Hydration happens in lsf-sdk.js when the annotation is selected
+        if (isActive(FF_FIT_720_LAZY_LOAD_ANNOTATIONS)) {
+          taskParams.annotations_stub = true;
+        }
 
-        if (taskData.status === 404) {
+        const taskData = yield self.root.apiCall("task", taskParams);
+
+        const taskStatusCode =
+          taskData?.status ??
+          taskData?.$meta?.status ??
+          taskData?.status_code ??
+          taskData?.response?.status ??
+          taskData?.response?.status_code;
+
+        if (taskStatusCode === 404) {
           self.finishLoading(taskID);
           getRoot(self).SDK.invoke("crash", {
             error: `Task ID: ${taskID} does not exist or is no longer available`,
             redirect: true,
           });
+          return null;
+        }
+
+        if (!taskData || taskData.error) {
+          self.finishLoading(taskID);
           return null;
         }
         const task = self.applyTaskSnapshot(taskData, taskID);
@@ -174,6 +209,12 @@ export const create = (columns) => {
           return null;
         }
 
+        const responseStatus = taskData?.$meta?.status;
+
+        if (!taskData || taskData.error || (responseStatus && responseStatus >= 400)) {
+          return null;
+        }
+
         const labelStreamModeChanged =
           self.selected && self.selected.assigned_task !== taskData.assigned_task && taskData.assigned_task === false;
 
@@ -185,7 +226,27 @@ export const create = (columns) => {
           getRoot(self).SDK.invoke("assignedStreamFinished");
         }
 
+        const isLabelStream = getRoot(self).SDK?.mode === "labelstream";
+        if (isLabelStream) {
+          const selectedAnnotationID = getRoot(self).annotationStore.selected?.id;
+          if (task && selectedAnnotationID) {
+            console.log(
+              `[LABEL STREAM] ${task.queue}, task ${task.id}, project ${getRoot(self)?.SDK?.project?.id}, user ${getRoot(self).LSF.lsf.user.id}${selectedAnnotationID ? `, annotation ${selectedAnnotationID}` : ""}`,
+            );
+          }
+        }
+
         return task;
+      }),
+
+      /**
+       * Load a single annotation by ID (for lazy loading - FIT-720)
+       * @param {number} annotationID - The annotation ID to fetch
+       * @returns {Promise<Object>} The full annotation data
+       */
+      loadAnnotation: flow(function* (annotationID) {
+        const annotationData = yield self.root.apiCall("fetchAnnotation", { annotationID });
+        return annotationData;
       }),
 
       applyTaskSnapshot(taskData, taskID) {

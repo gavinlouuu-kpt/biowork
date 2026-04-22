@@ -1,48 +1,53 @@
 import { observer } from "mobx-react";
-import { IconRedo, IconRemove, IconUndo } from "@humansignal/icons";
-import { Tooltip } from "@humansignal/ui";
-import { Button } from "../../common/Button/Button";
-import { Block, Elem } from "../../utils/bem";
+import { IconRedo, IconReset, IconUndo } from "@humansignal/icons";
+import { Tooltip, Button } from "@humansignal/ui";
+import { cn } from "../../utils/bem";
 import "./HistoryActions.scss";
 
 export const EditingHistory = observer(({ entity }) => {
   const { history } = entity;
 
   return (
-    <Block name="history-buttons">
+    <div className={cn("history-buttons").toClassName()}>
       <Tooltip title="Undo">
-        <Elem
-          tag={Button}
-          name="action"
-          type="text"
+        <Button
+          variant="neutral"
+          size="small"
           aria-label="Undo"
+          look="string"
           disabled={!history?.canUndo}
           onClick={() => entity.undo()}
-          icon={<IconUndo />}
+          className="aspect-square"
+          leading={<IconUndo />}
+          data-testid="bottombar-undo-button"
         />
       </Tooltip>
       <Tooltip title="Redo">
-        <Elem
-          tag={Button}
-          name="action"
-          type="text"
+        <Button
+          variant="neutral"
+          size="small"
+          look="string"
           aria-label="Redo"
           disabled={!history?.canRedo}
           onClick={() => entity.redo()}
-          icon={<IconRedo />}
+          className="aspect-square"
+          leading={<IconRedo />}
+          data-testid="bottombar-redo-button"
         />
       </Tooltip>
       <Tooltip title="Reset">
-        <Elem
-          tag={Button}
-          name="action"
-          type="text"
+        <Button
+          variant="negative"
+          look="string"
+          size="small"
           aria-label="Reset"
           disabled={!history?.canUndo}
           onClick={() => history?.reset()}
-          icon={<IconRemove />}
+          className="aspect-square"
+          leading={<IconReset />}
+          data-testid="bottombar-reset-button"
         />
       </Tooltip>
-    </Block>
+    </div>
   );
 });

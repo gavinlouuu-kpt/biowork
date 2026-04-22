@@ -16,9 +16,7 @@ MIDDLEWARE.append('core.middleware.UpdateLastActivityMiddleware')
 if INACTIVITY_SESSION_TIMEOUT_ENABLED:
     MIDDLEWARE.append('core.middleware.InactivitySessionTimeoutMiddleWare')
 
-ADD_DEFAULT_ML_BACKENDS = get_bool_env('ADD_DEFAULT_ML_BACKENDS', False)
-DEFAULT_ML_BACKEND_URL = get_env('DEFAULT_ML_BACKEND_URL', '')
-DEFAULT_ML_BACKEND_TITLE = get_env('DEFAULT_ML_BACKEND_TITLE', 'Default ML Backend')
+ADD_DEFAULT_ML_BACKENDS = False
 
 LOGGING['root']['level'] = get_env('LOG_LEVEL', 'WARNING')
 
@@ -29,8 +27,6 @@ DEBUG_PROPAGATE_EXCEPTIONS = get_bool_env('DEBUG_PROPAGATE_EXCEPTIONS', False)
 SESSION_COOKIE_SECURE = get_bool_env('SESSION_COOKIE_SECURE', False)
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
-
-RQ_QUEUES = {}
 
 SENTRY_DSN = get_env('SENTRY_DSN', 'https://68b045ab408a4d32a910d339be8591a4@o227124.ingest.sentry.io/5820521')
 SENTRY_ENVIRONMENT = get_env('SENTRY_ENVIRONMENT', 'opensource')

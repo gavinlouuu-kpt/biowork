@@ -1,7 +1,6 @@
 import { inject, observer } from "mobx-react";
 import { useCallback } from "react";
 import { Draggable } from "react-beautiful-dnd";
-import { IconPlus } from "@humansignal/icons";
 import { cn } from "../../utils/bem";
 import { Interface } from "../Common/Interface";
 import { Space } from "../Common/Space/Space";
@@ -38,7 +37,7 @@ const switchInjector = inject(({ store }) => {
   return {
     sdk: store.SDK,
     views: store.viewsStore,
-    tabs: Array.from(store.viewsStore?.all ?? []),
+    tabs: store.viewsStore?.all ?? [],
     selectedKey: store.viewsStore?.selected?.key,
   };
 });
@@ -85,17 +84,17 @@ const TabsSwitch = switchInjector(
         onChange={(key) => views.setSelected(key)}
         onDragEnd={onDragEnd}
         tabBarExtraContent={<ProjectSummary />}
-        addIcon={<IconPlus />}
         allowedActions={editable}
       >
         {tabs.map((tab, index) => (
           <Draggable key={tab.key} draggableId={tab.key} index={index}>
             {(provided, snapshot) => (
               <div
-                className={tabContentCN.elem("draggable").toString()}
+                className={tabContentCN.elem("draggable").toClassName()}
                 ref={provided.innerRef}
                 {...provided.draggableProps}
                 {...provided.dragHandleProps}
+                tabIndex={-1}
                 style={{
                   background: snapshot.isDragging,
                   ...provided.draggableProps.style,
@@ -128,8 +127,8 @@ const TabsSwitch = switchInjector(
 
 export const DataManager = injector(({ shrinkWidth }) => {
   return (
-    <div className={tabContentCN.toString()}>
-      <div className={tabContentCN.elem("tab").mod({ shrink: shrinkWidth }).toString()}>
+    <div className={tabContentCN.toClassName()}>
+      <div className={tabContentCN.elem("tab").mod({ shrink: shrinkWidth }).toClassName()}>
         <Interface name="tabs">
           <TabsSwitch />
         </Interface>

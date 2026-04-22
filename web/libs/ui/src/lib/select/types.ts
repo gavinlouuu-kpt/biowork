@@ -6,7 +6,15 @@ export type SelectOptionData<T = any> = {
   hidden?: boolean;
   disabled?: boolean;
   children?: SelectOptionData<T>[];
+  /** Custom row height (px) for virtual-list mode; defaults to VARIABLE_LIST_ITEM_HEIGHT (40). */
+  height?: number;
 };
+
+export enum SelectSize {
+  SMALL = "small",
+  MEDIUM = "medium",
+  LARGE = "large",
+}
 
 export type SelectOption<T> = string | number | SelectOptionData<T>;
 
@@ -35,7 +43,7 @@ export type ExtractValue<T, A extends SelectOption<T>[]> = A[number] extends { v
 export type SelectProps<T, A extends SelectOption<T>[]> = {
   label?: string;
   description?: string;
-  options: A[];
+  options: A;
   value?: ExtractOption<A[number]> | null;
   defaultValue?: ExtractOption<A[number]> | null;
   validate?: any;
@@ -53,6 +61,8 @@ export type SelectProps<T, A extends SelectOption<T>[]> = {
   autoSelectFirst?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
+  /** Initial value for the search input field. Useful for restoring a previous search state. */
+  defaultSearchValue?: string;
   ref?: React.Ref<HTMLSelectElement>;
   selectedValueRenderer?: FC<{ option: A[number]; index: number }>;
   optionRenderer?: FC<{ option: A[number]; index: number }>;
@@ -62,16 +72,30 @@ export type SelectProps<T, A extends SelectOption<T>[]> = {
   onChange?: (value: any) => void | false;
   setValue?: (value: ExtractOption<A>) => void;
   header?: string | FC | JSX.Element;
+  footer?: ReactNode;
   multiple?: boolean;
   disabled?: boolean;
   triggerProps?: any;
   isInline?: boolean;
   isLoading?: boolean;
   dataTestid?: string;
-  size?: "small" | "medium" | "large";
+  size?: SelectSize | undefined;
   onSearch?: (value: string) => void;
   selectFirstIfEmpty?: boolean;
   renderSelected?: (selectedOptions?: A[number][], placeholder?: string) => React.ReactNode | string;
+  isVirtualList?: boolean;
+  /** Max visible items in the virtual list before scrolling (default: 5) */
+  virtualListMaxVisible?: number;
+  loadMore?: () => void;
+  pageSize?: number;
+  page?: number;
+  itemCount?: number;
+  onClose?: () => void;
+  onOpen?: () => void;
+  /** Controlled open state. When provided, the dropdown open/close state is driven externally. */
+  open?: boolean;
+  alwaysShowSelectedGroup?: boolean;
+  onSelectAllClick?: () => void;
 } & SelectVirtualizedProps &
   Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "value" | "placeholder">;
 

@@ -15,7 +15,6 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from organizations.forms import OrganizationSignupForm
 from organizations.models import Organization
 from rest_framework.authtoken.models import Token
-from turnstile.decorators import require_turnstile
 from users import forms
 from users.functions import login, proceed_registration
 
@@ -38,7 +37,6 @@ def logout(request):
 
 
 @enforce_csrf_checks
-@require_turnstile
 def user_signup(request):
     """Sign up page"""
     user = request.user
@@ -60,17 +58,13 @@ def user_signup(request):
 
     # make a new user
     if request.method == 'POST':
-        # Validate invitation token if provided
-        if token:
-            try:
-                organization = Organization.objects.get(token=token)
-            except Organization.DoesNotExist:
-                raise PermissionDenied("Invalid invitation token")
+        organization = Organization.objects.first()
+        if settings.DISABLE_SIGNUP_WITHOUT_LINK is True:
+            if not (token and organization and token == organization.token):
+                raise PermissionDenied()
         else:
-            # No token provided
-            if getattr(settings, 'DISABLE_SIGNUP_WITHOUT_LINK', False):
-                raise PermissionDenied("Signup without invitation link is disabled")
-            organization = None
+            if token and organization and token != organization.token:
+                raise PermissionDenied()
 
         user_form = forms.UserSignupForm(request.POST)
         organization_form = OrganizationSignupForm(request.POST)
@@ -107,7 +101,6 @@ def user_signup(request):
 
 
 @enforce_csrf_checks
-@require_turnstile
 def user_login(request):
     """Login page"""
     user = request.user
@@ -149,7 +142,29 @@ def user_login(request):
 
 
 @login_required
-def user_account(request):
+def user_account(request, sub_path=None):
+    """
+    Handle user account view and profile updates.
+
+    This view displays the user's profile information and allows them to update
+    it. It requires the user to be authenticated and have an active organization
+    or an organization_pk in the session.
+
+    Args:
+        request (HttpRequest): The request object.
+        sub_path (str, optional): A sub-path parameter for potential URL routing.
+            Defaults to None.
+
+    Returns:
+        HttpResponse: Renders the user account template with user profile form,
+            or redirects to 'main' if no active organization is found,
+            or redirects back to user-account after successful profile update.
+
+    Notes:
+        - Authentication is required (enforced by @login_required decorator)
+        - Retrieves the user's API token for display in the template
+        - Form validation happens on POST requests
+    """
     user = request.user
 
     if user.active_organization is None and 'organization_pk' not in request.session:

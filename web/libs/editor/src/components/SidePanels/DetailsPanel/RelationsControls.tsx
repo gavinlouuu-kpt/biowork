@@ -1,16 +1,16 @@
-import { type FC, useCallback } from "react";
+import { Button } from "@humansignal/ui";
 import { observer } from "mobx-react";
-import { Block, Elem } from "../../../utils/bem";
-import { Button } from "../../../common/Button/Button";
+import { type FC, useCallback } from "react";
+import { cn } from "../../../utils/bem";
 import "./RelationsControls.scss";
-import { IconOutlinerEyeClosed, IconOutlinerEyeOpened, IconSortUp, IconSortDown } from "@humansignal/icons";
+import { IconOutlinerEyeClosed, IconOutlinerEyeOpened, IconSortDown, IconSortUp } from "@humansignal/icons";
 
 const RelationsControlsComponent: FC<any> = ({ relationStore }) => {
   return (
-    <Block name="relation-controls">
+    <div className={cn("relation-controls").toClassName()}>
       <ToggleRelationsVisibilityButton relationStore={relationStore} />
       <ToggleRelationsOrderButton relationStore={relationStore} />
-    </Block>
+    </div>
   );
 };
 
@@ -31,13 +31,16 @@ const ToggleRelationsVisibilityButton = observer<FC<ToggleRelationsVisibilityBut
   const isDisabled = !relationStore?.relations?.length;
   const isAllHidden = !(!isDisabled && relationStore.isAllHidden);
 
+  // This comes from an Elem tag that was set without a name. The CSS was fixed to make it work,
+  // but this is clearly bad CSS usage.
   return (
-    <Elem
-      tag={Button}
-      type="text"
+    <Button
+      className={cn("relation-controls").mod({ hidden: isAllHidden }).toClassName()}
+      variant="neutral"
+      look="string"
+      size="small"
       disabled={isDisabled}
       onClick={toggleRelationsVisibility}
-      mod={{ hidden: isAllHidden }}
       aria-label={isAllHidden ? "Show all" : "Hide all"}
       icon={
         isAllHidden ? (
@@ -69,13 +72,16 @@ const ToggleRelationsOrderButton = observer<FC<ToggleRelationsOrderButtonProps>>
   const isDisabled = !relationStore?.relations?.length;
   const isAsc = relationStore.order === "asc";
 
+  // This comes from an Elem tag that was set without a name. The CSS was fixed to make it work,
+  // but this is clearly bad CSS usage.
   return (
-    <Elem
-      tag={Button}
-      type="text"
+    <Button
+      className={cn("relation-controls").mod({ order: relationStore.order }).toClassName()}
+      variant="neutral"
+      look="string"
+      size="small"
       onClick={toggleRelationsOrder}
       disabled={isDisabled}
-      mod={{ order: relationStore.order }}
       aria-label={isAsc ? "Order by oldest" : "Order by newest"}
       icon={isAsc ? <IconSortUp /> : <IconSortDown />}
       tooltip={isAsc ? "Order by oldest" : "Order by newest"}

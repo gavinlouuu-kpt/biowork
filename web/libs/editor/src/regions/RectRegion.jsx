@@ -1,3 +1,4 @@
+import Konva from "konva";
 import { getRoot, isAlive, types } from "mobx-state-tree";
 import { useContext } from "react";
 import { Rect } from "react-konva";
@@ -13,126 +14,11 @@ import NormalizationMixin from "../mixins/Normalization";
 import RegionsMixin from "../mixins/Regions";
 import { ImageModel } from "../tags/object/Image";
 import { rotateBboxCoords } from "../utils/bboxCoords";
-import { FF_DEV_3793, isFF } from "../utils/feature-flags";
 import { createDragBoundFunc } from "../utils/image";
 import { AliveRegion } from "./AliveRegion";
 import { EditableRegion } from "./EditableRegion";
 import { RegionWrapper } from "./RegionWrapper";
 import { RELATIVE_STAGE_HEIGHT, RELATIVE_STAGE_WIDTH } from "../components/ImageView/Image";
-
-const RectRegionAbsoluteCoordsDEV3793 = types
-  .model({
-    coordstype: types.optional(types.enumeration(["px", "perc"]), "perc"),
-  })
-  .volatile(() => ({
-    relativeX: 0,
-    relativeY: 0,
-
-    relativeWidth: 0,
-    relativeHeight: 0,
-  }))
-  .actions((self) => ({
-    afterCreate() {
-      switch (self.coordstype) {
-        case "perc": {
-          self.relativeX = self.x;
-          self.relativeY = self.y;
-          self.relativeWidth = self.width;
-          self.relativeHeight = self.height;
-          break;
-        }
-        case "px": {
-          const { stageWidth, stageHeight } = self.parent;
-
-          if (stageWidth && stageHeight) {
-            self.setPosition(self.x, self.y, self.width, self.height, self.rotation);
-          }
-          break;
-        }
-      }
-      self.checkSizes();
-      self.updateAppearenceFromState();
-    },
-    setPosition(x, y, width, height, rotation) {
-      self.x = x;
-      self.y = y;
-      self.width = width;
-      self.height = height;
-
-      self.relativeX = (x / self.parent?.stageWidth) * RELATIVE_STAGE_WIDTH;
-      self.relativeY = (y / self.parent?.stageHeight) * RELATIVE_STAGE_HEIGHT;
-
-      self.relativeWidth = (width / self.parent?.stageWidth) * RELATIVE_STAGE_WIDTH;
-      self.relativeHeight = (height / self.parent?.stageHeight) * RELATIVE_STAGE_HEIGHT;
-
-      self.rotation = (rotation + 360) % 360;
-    },
-    setPositionInternal(x, y, width, height, rotation) {
-      return self.setPosition(x, y, width, height, rotation);
-    },
-    updateImageSize(wp, hp, sw, sh) {
-      if (self.coordstype === "px") {
-        self.x = (sw * self.relativeX) / RELATIVE_STAGE_WIDTH;
-        self.y = (sh * self.relativeY) / RELATIVE_STAGE_HEIGHT;
-        self.width = (sw * self.relativeWidth) / RELATIVE_STAGE_WIDTH;
-        self.height = (sh * self.relativeHeight) / RELATIVE_STAGE_HEIGHT;
-      } else if (self.coordstype === "perc") {
-        self.x = (sw * self.x) / RELATIVE_STAGE_WIDTH;
-        self.y = (sh * self.y) / RELATIVE_STAGE_HEIGHT;
-        self.width = (sw * self.width) / RELATIVE_STAGE_WIDTH;
-        self.height = (sh * self.height) / RELATIVE_STAGE_HEIGHT;
-        self.coordstype = "px";
-      }
-    },
-
-    draw(x, y, points) {
-      const oldHeight = self.height;
-
-      if (points.length === 1) {
-        self.width = self.getDistanceBetweenPoints({ x, y }, self);
-        self.rotation = self.rotationAtCreation = Math.atan2(y - self.y, x - self.x) * (180 / Math.PI);
-      } else if (points.length === 2) {
-        const { y: firstPointY, x: firstPointX } = points[0];
-        const { y: secondPointY, x: secondPointX } = points[1];
-
-        if (self.isAboveTheLine(points[0], points[1], { x, y })) {
-          self.x = secondPointX;
-          self.y = secondPointY;
-          self.rotation = self.rotationAtCreation + 180;
-        } else {
-          self.x = firstPointX;
-          self.y = firstPointY;
-          self.rotation = self.rotationAtCreation;
-        }
-        self.height = self.getHeightOnPerpendicular(points[0], points[1], { x, y });
-      }
-
-      self.setPosition(self.x, self.y, self.width, self.height, self.rotation);
-
-      const areaBBoxCoords = self?.bboxCoords;
-
-      if (
-        areaBBoxCoords?.left < 0 ||
-        areaBBoxCoords?.top < 0 ||
-        areaBBoxCoords?.right > self.parent.stageWidth ||
-        areaBBoxCoords?.bottom > self.parent.stageHeight
-      ) {
-        self.height = oldHeight;
-      }
-    },
-    getHeightOnPerpendicular(pointA, pointB, cursor) {
-      const dx1 = pointB.x - pointA.x;
-      const dy1 = pointB.y - pointA.y;
-      const dy2 = pointB.y - cursor.y;
-      const dx2 = (dy2 / dx1) * dy1; // dx2 / dy1 = dy2 / dx1 (triangle is rotated)
-      const dx3 = cursor.x - pointB.x - dx2;
-      const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-      const d3 = (dx3 / d2) * dx2; // dx3 / d2 = d3 / dx2 (triangle is inverted)
-      const h = d2 + d3;
-
-      return Math.abs(h);
-    },
-  }));
 
 /**
  * Rectangle object for Bounding Box
@@ -211,16 +97,16 @@ const Model = types
       return rotateBboxCoords(bboxCoords, self.rotation, { x: self.x, y: self.y }, self.parent.whRatio);
     },
     get canvasX() {
-      return isFF(FF_DEV_3793) ? self.parent?.internalToCanvasX(self.x) : self.x;
+      return self.parent?.internalToCanvasX(self.x);
     },
     get canvasY() {
-      return isFF(FF_DEV_3793) ? self.parent?.internalToCanvasY(self.y) : self.y;
+      return self.parent?.internalToCanvasY(self.y);
     },
     get canvasWidth() {
-      return isFF(FF_DEV_3793) ? self.parent?.internalToCanvasX(self.width) : self.width;
+      return self.parent?.internalToCanvasX(self.width);
     },
     get canvasHeight() {
-      return isFF(FF_DEV_3793) ? self.parent?.internalToCanvasY(self.height) : self.height;
+      return self.parent?.internalToCanvasY(self.height);
     },
   }))
   .actions((self) => ({
@@ -292,7 +178,13 @@ const Model = types
 
         self.height = self.parent.canvasToInternalY(canvasHeight);
       }
-      self.setPositionInternal(self.x, self.y, self.width, self.height, self.rotation);
+      self.setPosition(
+        self.parent.internalToCanvasX(self.x),
+        self.parent.internalToCanvasY(self.y),
+        self.parent.internalToCanvasX(self.width),
+        self.parent.internalToCanvasY(self.height),
+        self.rotation,
+      );
 
       const areaBBoxCoords = self?.bboxCoords;
 
@@ -327,6 +219,34 @@ const Model = types
       self.rotation = (rotation + 360) % 360;
     },
 
+    beforeSetPosition(x, y, width, height, rotation) {
+      // Konva flipping fix
+      if (height < 0) {
+        let flippedBack;
+        // If height is negative, it means it was flipped. We need to correct it
+        // Negative height also means that it was changed.
+        // In that case the difference between rotation and current rotation may be only 0 (or 360) and 180 degrees.
+        // However, as it's not an integer value, we had to check the difference to be sure,
+        // so 90 and 270 degrees are the safest values to check
+        const deltaRotation = Math.abs(rotation - self.rotation) % 360;
+        if (deltaRotation > 90 && deltaRotation < 270) {
+          // when rotation changes involved, it's a horizontal flip
+          flippedBack = self.flipBack({ x, y, width, height, rotation }, true);
+        } else {
+          // vertical flip
+          flippedBack = self.flipBack({ x, y, width, height, rotation });
+        }
+        [x, y, width, height, rotation] = [
+          flippedBack.x,
+          flippedBack.y,
+          flippedBack.width,
+          flippedBack.height,
+          flippedBack.rotation,
+        ];
+      }
+      return [x, y, width, height, rotation];
+    },
+
     /**
      * Bounding Box set position on canvas
      * @param {number} x
@@ -336,13 +256,40 @@ const Model = types
      * @param {number} rotation
      */
     setPosition(x, y, width, height, rotation) {
-      self.setPositionInternal(
-        self.parent.canvasToInternalX(x),
-        self.parent.canvasToInternalY(y),
-        self.parent.canvasToInternalX(width),
-        self.parent.canvasToInternalY(height),
-        rotation,
-      );
+      [x, y, width, height, rotation] = self.beforeSetPosition(x, y, width, height, rotation);
+      const internalX = self.parent.canvasToInternalX(x);
+      const internalY = self.parent.canvasToInternalY(y);
+      const internalWidth = self.parent.canvasToInternalX(width);
+      const internalHeight = self.parent.canvasToInternalY(height);
+
+      // Apply snap to pixel if enabled
+      if (self.control?.snap === "pixel") {
+        // Snap top-left corner
+        const topLeftPoint = self.control.getSnappedPoint({
+          x: internalX,
+          y: internalY,
+        });
+
+        // Snap bottom-right corner
+        const bottomRightPoint = self.control.getSnappedPoint({
+          x: internalX + internalWidth,
+          y: internalY + internalHeight,
+        });
+
+        // Calculate snapped dimensions
+        let snappedWidth = bottomRightPoint.x - topLeftPoint.x;
+        let snappedHeight = bottomRightPoint.y - topLeftPoint.y;
+
+        // Ensure at least 1 pixel in size after snapping
+        const minPixelWidth = self.parent?.zoomedPixelSize?.x ?? 1;
+        const minPixelHeight = self.parent?.zoomedPixelSize?.y ?? 1;
+        if (snappedWidth < minPixelWidth) snappedWidth = minPixelWidth;
+        if (snappedHeight < minPixelHeight) snappedHeight = minPixelHeight;
+
+        self.setPositionInternal(topLeftPoint.x, topLeftPoint.y, snappedWidth, snappedHeight, rotation);
+      } else {
+        self.setPositionInternal(internalX, internalY, internalWidth, internalHeight, rotation);
+      }
     },
 
     setScale(x, y) {
@@ -369,27 +316,39 @@ const Model = types
      * - when the region is flipped horizontally with no rotation, we fix the rotation back to 0.
      * - when the region is flipped vertically, rotation is still 0, we just flip the height.
      */
-    flipRegion() {
-      const height = -self.height;
+    flipBack(attrs, isHorizontalFlip = false) {
+      // To make it calculable, we need to avoid relative coordinates
+      let { x, y, width, height, rotation } = attrs;
+      const radiansRotation = (rotation * Math.PI) / 180;
+      const transform = new Konva.Transform();
+      transform.rotate(radiansRotation);
+      let targetCorner;
 
-      // the most common case, when the region is flipped horizontally with no rotation,
-      // for this case we are fixing rotation back to 0, that's more intuitive for the user.
-      if (self.rotation === 180) {
-        self.height = height;
-        self.x -= self.width;
-        self.rotation = 0;
+      if (isHorizontalFlip) {
+        // When it flips horizontally, it turns the height negative and rotates the region by 180°.
+        // In general, we want to return a top-right corner to the top-left corner and rotate back
+        targetCorner = {
+          x: width,
+          y: 0,
+        };
+        rotation = (rotation + 180) % 360;
       } else {
-        // we need to invert the height and swap top-left and bottom-left corners, but with respect to rotation.
-        // we'll use tranform from Konva.js to not fight aspect ratio and rotation.
-        // transform is calculated in canvas coords, so we need to convert coords back and forth.
-        const transform = self.shapeRef.getAbsoluteTransform();
-        // bottom-left corner; it's "above" the top-left corner because of inverted height
-        const { x, y } = transform.point({ x: 0, y: -self.parent.internalToCanvasY(height) });
-
-        self.height = height;
-        self.x = self.parent.canvasToInternalX(x);
-        self.y = self.parent.canvasToInternalY(y);
+        // In a vertical flipping case it affects only the height.
+        // It means that we want to return a bottom-left corner to the top-left corner
+        targetCorner = {
+          x: 0,
+          y: height,
+        };
       }
+      const offset = transform.point(targetCorner);
+
+      return {
+        x: x + offset.x,
+        y: y + offset.y,
+        width,
+        height: -height,
+        rotation,
+      };
     },
 
     /**
@@ -423,11 +382,10 @@ const Model = types
      */
     serialize() {
       const value = {
-        x: self.parent.stageWidth > 1 && !isFF(FF_DEV_3793) ? self.convertXToPerc(self.x) : self.x,
-        y: self.parent.stageWidth > 1 && !isFF(FF_DEV_3793) ? self.convertYToPerc(self.y) : self.y,
-        width: self.parent.stageWidth > 1 && !isFF(FF_DEV_3793) ? self.convertHDimensionToPerc(self.width) : self.width,
-        height:
-          self.parent.stageWidth > 1 && !isFF(FF_DEV_3793) ? self.convertVDimensionToPerc(self.height) : self.height,
+        x: self.x,
+        y: self.y,
+        width: self.width,
+        height: self.height,
         rotation: self.rotation,
       };
 
@@ -443,7 +401,6 @@ const RectRegionModel = types.compose(
   KonvaRegionMixin,
   EditableRegion,
   Model,
-  ...(isFF(FF_DEV_3793) ? [] : [RectRegionAbsoluteCoordsDEV3793]),
 );
 
 const HtxRectangleView = ({ item, setShapeRef }) => {
@@ -466,6 +423,7 @@ const HtxRectangleView = ({ item, setShapeRef }) => {
     };
     eventHandlers.onTransformEnd = (e) => {
       const t = e.target;
+      const isFlipped = t.getAttr("scaleY") < 0;
 
       item.setPosition(
         t.getAttr("x"),
@@ -477,6 +435,24 @@ const HtxRectangleView = ({ item, setShapeRef }) => {
 
       t.setAttr("scaleX", 1);
       t.setAttr("scaleY", 1);
+
+      if (item.control?.snap === "pixel") {
+        // If snap is enabled, we need to snap the coordinates to the pixel grid -
+        // Sync Konva shape attributes back to computed canvas coordinates to cause a re-render
+        // Canvas coordinates are updated in the setPosition method
+        t.position({
+          x: item.canvasX,
+          y: item.canvasY,
+          width: item.canvasWidth,
+          height: item.canvasHeight,
+        });
+      }
+
+      if (isFlipped) {
+        // Somehow react-konva caches rotation, most probably as a controllable state,
+        // so we need to set it manually if it able to be reverted to the previous value
+        t.setAttr("rotation", item.rotation);
+      }
 
       item.notifyDrawingFinished();
     };
@@ -494,6 +470,19 @@ const HtxRectangleView = ({ item, setShapeRef }) => {
 
       item.setPosition(t.getAttr("x"), t.getAttr("y"), t.getAttr("width"), t.getAttr("height"), t.getAttr("rotation"));
       item.setScale(t.getAttr("scaleX"), t.getAttr("scaleY"));
+
+      if (item.control?.snap === "pixel") {
+        // If snap is enabled, we need to snap the coordinates to the pixel grid -
+        // Sync Konva shape attributes back to computed canvas coordinates to cause a re-render
+        // Canvas coordinates are updated in the setPosition method
+        t.position({
+          x: item.canvasX,
+          y: item.canvasY,
+          width: item.canvasWidth,
+          height: item.canvasHeight,
+        });
+      }
+
       item.annotation.history.unfreeze(item.id);
 
       item.notifyDrawingFinished();

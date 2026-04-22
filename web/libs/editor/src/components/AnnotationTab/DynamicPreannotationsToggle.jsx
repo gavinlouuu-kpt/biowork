@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Space } from "../../common/Space/Space";
 import { Toggle } from "@humansignal/ui";
 import ToolsManager from "../../tools/Manager";
-import { Block, Elem } from "../../utils/bem";
+import { cn } from "../../utils/bem";
 import "./DynamicPreannotationsToggle.scss";
 
 export const DynamicPreannotationsToggle = inject("store")(
@@ -15,8 +15,8 @@ export const DynamicPreannotationsToggle = inject("store")(
     }, [enabled]);
 
     return enabled ? (
-      <Block name="dynamic-preannotations">
-        <Elem name="wrapper">
+      <div className={cn("dynamic-preannotations").toClassName()}>
+        <div className={cn("dynamic-preannotations").elem("wrapper").toClassName()}>
           <Space spread>
             <Toggle
               checked={store.autoAnnotation}
@@ -25,23 +25,16 @@ export const DynamicPreannotationsToggle = inject("store")(
 
                 store.setAutoAnnotation(checked);
 
-                if (checked) {
-                  // when enabling auto-annotation prefer smart tools for managers with an active selection
-                  ToolsManager.allInstances().forEach((inst) => {
-                    if (inst.findSelectedTool()) inst.selectSmartDefault();
-                  });
-                } else {
-                  // when disabling auto-annotation, only revert managers that currently have a smart tool selected
-                  ToolsManager.allInstances().forEach((inst) => {
-                    if (inst.findSelectedTool()?.dynamic === true) inst.selectDefault();
-                  });
+                if (!checked) {
+                  ToolsManager.allInstances().forEach((inst) => inst.selectDefault());
                 }
               }}
               label="Auto-Annotation"
+              data-testid="bottombar-auto-annotation-toggle"
             />
           </Space>
-        </Elem>
-      </Block>
+        </div>
+      </div>
     ) : null;
   }),
 );

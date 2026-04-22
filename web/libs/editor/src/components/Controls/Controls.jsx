@@ -4,8 +4,8 @@ import { CheckCircleOutlined, CheckOutlined } from "@ant-design/icons";
 import Hint from "../Hint/Hint";
 import { DraftPanel } from "../Annotations/Annotations";
 import styles from "./Controls.module.scss";
-import { Button } from "../../common/Button/Button";
-import { Tooltip } from "@humansignal/ui";
+import { Button, Tooltip } from "@humansignal/ui";
+import { IconInfoOutline } from "@humansignal/icons";
 import { cn } from "../../utils/bem";
 
 export default inject("store")(
@@ -52,53 +52,71 @@ export default inject("store")(
     /**
      * Check for Predict Menu
      */
+    // Manager roles that can force-skip unskippable tasks (OW=Owner, AD=Admin, MA=Manager)
+    const MANAGER_ROLES = ["OW", "AD", "MA"];
+
     if (!store.annotationStore.predictSelect || store.explore) {
       const disabled = store.isSubmitting;
+      const task = store.task;
+      const isEnterprise = window.APP_SETTINGS?.billing?.enterprise;
+      const skipDisabled = isEnterprise ? task?.allow_skip === false : false;
+      const userRole = window.APP_SETTINGS?.user?.role;
+      const hasForceSkipPermission = MANAGER_ROLES.includes(userRole);
+      const canSkip = !skipDisabled || hasForceSkipPermission;
+      const skipButtonDisabled = disabled || !canSkip;
+
+      const skipTooltip = canSkip ? "Cancel (skip) task: [ Ctrl+Space ]" : "This task cannot be skipped";
+
+      const showInfoIcon = skipButtonDisabled && hasForceSkipPermission;
 
       if (store.hasInterface("skip")) {
         skipButton = (
-          <Tooltip title="Cancel (skip) task: [ Ctrl+Space ]">
+          <>
+            {showInfoIcon && (
+              <Tooltip title="Annotators and Reviewers will not be able to skip this task">
+                <IconInfoOutline width={20} height={20} className="text-neutral-content ml-auto cursor-pointer" />
+              </Tooltip>
+            )}
             <Button
-              disabled={disabled}
+              disabled={skipButtonDisabled}
               look="danger"
-              onClick={store.skipTask}
+              onClick={canSkip ? store.skipTask : undefined}
+              tooltip={skipTooltip}
               className={`${styles.skip} ${skipButtonClassName}`}
             >
               Skip {buttons.skip}
             </Button>
-          </Tooltip>
+          </>
         );
       }
 
       if ((userGenerate && !sentUserGenerate) || (store.explore && !userGenerate && store.hasInterface("submit"))) {
         submitButton = (
-          <Tooltip title="Save results: [ Ctrl+Enter ]">
-            <Button
-              disabled={disabled}
-              look="primary"
-              icon={<CheckOutlined />}
-              onClick={store.submitAnnotation}
-              className={`${styles.submit} ${submitButtonClassName}`}
-            >
-              Submit {buttons.submit}
-            </Button>
-          </Tooltip>
+          <Button
+            disabled={disabled}
+            look="primary"
+            icon={<CheckOutlined />}
+            onClick={store.submitAnnotation}
+            tooltip="Save results: [ Ctrl+Enter ]"
+            className={`${styles.submit} ${submitButtonClassName}`}
+          >
+            Submit {buttons.submit}
+          </Button>
         );
       }
 
       if ((userGenerate && sentUserGenerate) || (!userGenerate && store.hasInterface("update"))) {
         updateButton = (
-          <Tooltip title="Update this task: [ Alt+Enter ]">
-            <Button
-              disabled={disabled}
-              look="primary"
-              icon={<CheckCircleOutlined />}
-              onClick={store.updateAnnotation}
-              className={updateButtonClassName}
-            >
-              {sentUserGenerate || versions.result ? "Update" : "Submit"} {buttons.update}
-            </Button>
-          </Tooltip>
+          <Button
+            disabled={disabled}
+            look="primary"
+            icon={<CheckCircleOutlined />}
+            onClick={store.updateAnnotation}
+            tooltip="Update this task: [ Alt+Enter ]"
+            className={updateButtonClassName}
+          >
+            {sentUserGenerate || versions.result ? "Update" : "Submit"} {buttons.update}
+          </Button>
         );
       }
 

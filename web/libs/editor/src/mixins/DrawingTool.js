@@ -1,9 +1,10 @@
 import { types } from "mobx-state-tree";
 
 import Utils from "../utils";
-import throttle from "lodash.throttle";
+import { throttle } from "@humansignal/core/lib/utils/lodash-replacements";
 import { MIN_SIZE } from "../tools/Base";
-import { FF_DEV_3793, isFF } from "../utils/feature-flags";
+import { FF_DEV_3391, isFF } from "../utils/feature-flags";
+import { ff } from "@humansignal/core";
 import { RELATIVE_STAGE_HEIGHT, RELATIVE_STAGE_WIDTH } from "../components/ImageView/Image";
 
 const DrawingTool = types
@@ -56,16 +57,9 @@ const DrawingTool = types
         return {};
       },
       get MIN_SIZE() {
-        if (isFF(FF_DEV_3793)) {
-          return {
-            X: (MIN_SIZE.X / self.obj.stageScale / self.obj.stageWidth) * RELATIVE_STAGE_WIDTH,
-            Y: (MIN_SIZE.Y / self.obj.stageScale / self.obj.stageHeight) * RELATIVE_STAGE_HEIGHT,
-          };
-        }
-
         return {
-          X: MIN_SIZE.X / self.obj.stageScale,
-          Y: MIN_SIZE.Y / self.obj.stageScale,
+          X: (MIN_SIZE.X / self.obj.stageScale / self.obj.stageWidth) * RELATIVE_STAGE_WIDTH,
+          Y: (MIN_SIZE.Y / self.obj.stageScale / self.obj.stageHeight) * RELATIVE_STAGE_HEIGHT,
         };
       },
       /**
@@ -75,6 +69,9 @@ const DrawingTool = types
        * @return {boolean} Returns true if the interaction is allowed, otherwise false.
        */
       isAllowedInteraction(ev) {
+        if (isFF(FF_DEV_3391) && !self.annotation.editable) {
+          return false;
+        }
         if (self.group !== "segmentation") return true;
         if (ev.offsetX > self.obj.canvasSize.width) return false;
         if (ev.offsetY > self.obj.canvasSize.height) return false;
@@ -137,6 +134,9 @@ const DrawingTool = types
         self.annotation.setIsDrawing(true);
         self.annotation.regionStore.selection.drawingSelect(self.currentArea);
         self.listenForClose?.();
+        if (self.manager.findSelectedTool() !== self) {
+          self.manager.selectTool(self, true);
+        }
       },
       commitDrawingRegion() {
         const { currentArea, control, obj } = self;
@@ -148,7 +148,7 @@ const DrawingTool = types
             value[key] = source[key];
             return value;
           },
-          { coordstype: "px", dynamic: self.dynamic },
+          { coordstype: "px", dynamic: self.dynamic, converted: true },
         );
 
         const [main, ...rest] = currentArea.results;
@@ -165,9 +165,23 @@ const DrawingTool = types
       createRegion(opts, skipAfterCreate = false) {
         const control = self.control;
         const resultValue = control.getResultValue();
+        const activeStates = self.obj.activeStates();
+        // Remove the main control from additional states to avoid duplication
+        const additionalStates = activeStates.filter((state) => state !== control);
 
-        self.currentArea = self.annotation.createResult(opts, resultValue, control, self.obj, skipAfterCreate);
-        self.applyActiveStates(self.currentArea);
+        if (ff.isActive(ff.FF_MULTIPLE_LABELS_REGIONS)) {
+          self.currentArea = self.annotation.createResult(
+            opts,
+            resultValue,
+            control,
+            self.obj,
+            skipAfterCreate,
+            additionalStates,
+          );
+        } else {
+          self.currentArea = self.annotation.createResult(opts, resultValue, control, self.obj, skipAfterCreate);
+          self.applyActiveStates(self.currentArea);
+        }
         return self.currentArea;
       },
       deleteRegion() {
@@ -187,7 +201,13 @@ const DrawingTool = types
       },
 
       canStartDrawing() {
-        return !self.isIncorrectControl() && !self.isIncorrectLabel() && self.canStart() && !self.annotation.isDrawing;
+        return (
+          !self.disabled &&
+          !self.isIncorrectControl() &&
+          !self.isIncorrectLabel() &&
+          self.canStart() &&
+          !self.annotation.isDrawing
+        );
       },
 
       startDrawing(x, y) {
@@ -211,6 +231,16 @@ const DrawingTool = types
       _resetState() {
         self.annotation.setIsDrawing(false);
         self.annotation.history.unfreeze();
+        self.mode = "viewing";
+      },
+      /**
+       * Release the tool's in-progress drawing state without touching the
+       * region itself (it belongs to the outgoing annotation). Called by
+       * ToolsManager during annotation switches.
+       */
+      resetBeforeAnnotationSwitch() {
+        self.stopListening?.();
+        self.currentArea = null;
         self.mode = "viewing";
       },
     };
@@ -248,8 +278,8 @@ const TwoPointsDrawingTool = DrawingTool.named("TwoPointsDrawingTool")
 
         if (!shape) return;
         const isEllipse = shape.type.includes("ellipse");
-        const maxStageWidth = isFF(FF_DEV_3793) ? RELATIVE_STAGE_WIDTH : self.obj.stageWidth;
-        const maxStageHeight = isFF(FF_DEV_3793) ? RELATIVE_STAGE_HEIGHT : self.obj.stageHeight;
+        const maxStageWidth = RELATIVE_STAGE_WIDTH;
+        const maxStageHeight = RELATIVE_STAGE_HEIGHT;
 
         let { x1, y1, x2, y2 } = isEllipse
           ? {
@@ -337,13 +367,8 @@ const TwoPointsDrawingTool = DrawingTool.named("TwoPointsDrawingTool")
         if (!self.canStartDrawing()) return;
         if (!self.isAllowedInteraction(ev)) return;
 
-        let dX = self.defaultDimensions.width;
-        let dY = self.defaultDimensions.height;
-
-        if (isFF(FF_DEV_3793)) {
-          dX = self.obj.canvasToInternalX(dX);
-          dY = self.obj.canvasToInternalY(dY);
-        }
+        const dX = self.obj.canvasToInternalX(self.defaultDimensions.width);
+        const dY = self.obj.canvasToInternalY(self.defaultDimensions.height);
 
         if (currentMode === DEFAULT_MODE) {
           self.startDrawing(x, y);
@@ -461,13 +486,8 @@ const MultipleClicksDrawingTool = DrawingTool.named("MultipleClicksMixin")
 
       drawDefault() {
         const { x, y } = startPoint;
-        let dX = self.defaultDimensions.length;
-        let dY = self.defaultDimensions.length;
-
-        if (isFF(FF_DEV_3793)) {
-          dX = self.obj.canvasToInternalX(dX);
-          dY = self.obj.canvasToInternalY(dY);
-        }
+        const dX = self.obj.canvasToInternalX(self.defaultDimensions.length);
+        const dY = self.obj.canvasToInternalY(self.defaultDimensions.length);
 
         self.nextPoint(x + dX, y);
         self.nextPoint(x + dX / 2, y + Math.sin(Math.PI / 3) * dY);
@@ -520,8 +540,8 @@ const ThreePointsDrawingTool = DrawingTool.named("ThreePointsDrawingTool")
         const shape = self.getCurrentArea();
 
         if (!shape) return;
-        const maxStageWidth = isFF(FF_DEV_3793) ? RELATIVE_STAGE_WIDTH : self.obj.stageWidth;
-        const maxStageHeight = isFF(FF_DEV_3793) ? RELATIVE_STAGE_HEIGHT : self.obj.stageHeight;
+        const maxStageWidth = RELATIVE_STAGE_WIDTH;
+        const maxStageHeight = RELATIVE_STAGE_HEIGHT;
 
         let { x1, y1, x2, y2 } = Utils.Image.reverseCoordinates({ x: shape.startX, y: shape.startY }, { x, y });
 
@@ -600,13 +620,8 @@ const ThreePointsDrawingTool = DrawingTool.named("ThreePointsDrawingTool")
         if (!self.canStartDrawing()) return;
         if (!self.isAllowedInteraction(ev)) return;
 
-        let dX = self.defaultDimensions.width;
-        let dY = self.defaultDimensions.height;
-
-        if (isFF(FF_DEV_3793)) {
-          dX = self.obj.canvasToInternalX(dX);
-          dY = self.obj.canvasToInternalY(dY);
-        }
+        const dX = self.obj.canvasToInternalX(self.defaultDimensions.width);
+        const dY = self.obj.canvasToInternalY(self.defaultDimensions.height);
 
         if (currentMode === DEFAULT_MODE) {
           self.startDrawing(x, y);

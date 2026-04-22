@@ -2,10 +2,10 @@ import React, { useCallback, useContext, useEffect, useRef, useState } from "rea
 import { shallowEqualObjects } from "shallow-equal";
 import { ApiProvider } from "../../providers/ApiProvider";
 import { MultiProvider } from "../../providers/MultiProvider";
-import { Block, cn, Elem } from "../../utils/bem";
-import { debounce } from "../../utils/debounce";
+import { cn } from "../../utils/bem";
+import { debounce } from "@humansignal/core/lib/utils/debounce";
 import { isDefined, objectClean } from "../../utils/helpers";
-import { Button } from "../Button/Button";
+import { Button } from "@humansignal/ui";
 import { Oneof } from "../Oneof/Oneof";
 import { Space } from "../Space/Space";
 import { Counter, Input, Select, Toggle } from "./Elements";
@@ -74,7 +74,7 @@ export default class Form extends React.Component {
       <MultiProvider providers={providers}>
         <form
           ref={this.formElement}
-          className={cn("form")}
+          className={cn("form").toClassName()}
           action={this.props.action}
           onSubmit={this.onFormSubmitted}
           onChange={this.onFormChanged}
@@ -357,12 +357,12 @@ const ValidationRenderer = ({ validation }) => {
   return (
     <div className={rootClass}>
       {Array.from(validation).map(([name, result]) => (
-        <div key={name} className={rootClass.elem("group")} onClick={() => result.field.focus()}>
-          <div className={rootClass.elem("field")}>{result.label}</div>
+        <div key={name} className={rootClass.elem("group").toClassName()} onClick={() => result.field.focus()}>
+          <div className={rootClass.elem("field").toClassName()}>{result.label}</div>
 
-          <div className={rootClass.elem("messages")}>
+          <div className={rootClass.elem("messages").toClassName()}>
             {result.messages.map((message, i) => (
-              <div key={`${name}-${i}`} className={rootClass.elem("message")}>
+              <div key={`${name}-${i}`} className={rootClass.elem("message").toClassName()}>
                 {message}
               </div>
             ))}
@@ -382,7 +382,7 @@ Form.Row = ({ columnCount, rowGap, children, style, spread = false }) => {
   if (rowGap) styles["--row-gap"] = rowGap;
 
   return (
-    <div className={cn("form").elem("row").mod({ spread })} style={{ ...(style ?? {}), ...styles }}>
+    <div className={cn("form").elem("row").mod({ spread }).toClassName()} style={{ ...(style ?? {}), ...styles }}>
       {children}
     </div>
   );
@@ -467,7 +467,7 @@ Form.Builder = React.forwardRef(
 
     const renderColumns = (columns) => {
       return columns.map((col, index) => (
-        <div className={cn("form").elem("column")} key={index} style={{ width: col.width }}>
+        <div className={cn("form").elem("column").toClassName()} key={index} style={{ width: col.width }}>
           {renderFields(col.fields)}
         </div>
       ));
@@ -524,7 +524,7 @@ Form.Builder = React.forwardRef(
         {children}
         {props.autosubmit !== true && withActions === true && (
           <Form.Actions>
-            <Button type="submit" look="primary" style={{ width: 120 }}>
+            <Button type="submit" className="w-[120px]" aria-label="Submit form">
               Save
             </Button>
           </Form.Actions>
@@ -538,8 +538,8 @@ Form.Actions = ({ children, valid, extra, size }) => {
   const rootClass = cn("form");
 
   return (
-    <div className={rootClass.elem("submit").mod({ size })}>
-      <div className={rootClass.elem("info").mod({ valid })}>{extra}</div>
+    <div className={rootClass.elem("submit").mod({ size }).toClassName()}>
+      <div className={rootClass.elem("info").mod({ valid }).toClassName()}>{extra}</div>
 
       <Space>{children}</Space>
     </div>
@@ -550,13 +550,13 @@ Form.Indicator = () => {
   const state = React.useContext(FormStateContext);
 
   return (
-    <Block name="form-indicator">
+    <div className={cn("form-indicator").toClassName()}>
       <Oneof value={state}>
-        <Elem tag="span" mod={{ type: state }} name="item" case="success">
+        <span className={cn("form-indicator").elem("item").mod({ type: state }).toClassName()} case="success">
           Saved!
-        </Elem>
+        </span>
       </Oneof>
-    </Block>
+    </div>
   );
 };
 

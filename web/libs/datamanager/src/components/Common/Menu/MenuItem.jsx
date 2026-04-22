@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "../../../utils/bem";
 import { MenuContext } from "./MenuContext";
+import { Tooltip } from "@humansignal/ui";
 
 export const MenuItem = ({
   name,
@@ -10,11 +11,15 @@ export const MenuItem = ({
   to,
   className,
   href,
-  danger,
+  danger, // deprecated, use variant="negative" instead
+  variant,
   exact = false,
   forceReload = false,
   active = false,
   onClick,
+  disabled,
+  tooltip,
+  tooltipAlignment = "bottom-center",
   ...rest
 }) => {
   const { selected } = React.useContext(MenuContext);
@@ -34,30 +39,46 @@ export const MenuItem = ({
 
   const linkContent = (
     <>
-      {icon && <span className={rootClass.elem("item-icon")}>{icon}</span>}
+      {icon && <span className={rootClass.elem("item-icon").toClassName()}>{icon}</span>}
       {children ?? label}
     </>
   );
+
+  // Support both deprecated danger prop and new variant prop
+  const isNegative = danger || variant === "negative";
+
+  const handleClick = (e) => {
+    if (disabled) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    onClick?.(e);
+  };
 
   const linkAttributes = {
     className: rootClass
       .mod({
         active: isActive || active,
-        look: danger && "danger",
+        look: isNegative && "danger", // Keep existing CSS class for compatibility
       })
       .mix(className),
-    onClick,
+    onClick: handleClick,
+    disabled: disabled || undefined,
+    "aria-disabled": disabled || undefined,
     ...rest,
   };
 
-  if (forceReload) {
-    linkAttributes.onClick = () => (window.location.href = to ?? href);
+  if (forceReload && !disabled) {
+    linkAttributes.onClick = () => {
+      window.location.href = to ?? href;
+    };
   }
 
-  return (
+  const menuItem = (
     <li>
       {href ? (
-        <a href={href ?? "#"} {...linkAttributes}>
+        <a href={disabled ? undefined : (href ?? "#")} {...linkAttributes}>
           {linkContent}
         </a>
       ) : (
@@ -65,4 +86,15 @@ export const MenuItem = ({
       )}
     </li>
   );
+
+  // Only wrap in tooltip if tooltip prop is provided and should be shown
+  if (tooltip) {
+    return (
+      <Tooltip title={tooltip} alignment={tooltipAlignment}>
+        {menuItem}
+      </Tooltip>
+    );
+  }
+
+  return menuItem;
 };

@@ -3,7 +3,7 @@ title: Audio Classification
 type: templates
 category: Audio/Speech Processing
 cat: audio-speech-processing
-order: 307
+order: 330
 meta_title: Audio Classification Data Labeling Template
 meta_description: Template for classifying audio and intent using Label Studio for your data science and machine learning projects.
 ---
@@ -11,6 +11,11 @@ meta_description: Template for classifying audio and intent using Label Studio f
 <img src="/images/templates-misc/audio-classification.png" alt="" class="gif-border" width="482px" height="282px" />
 
 If you want to perform audio classification tasks, such as intent or sentiment classification, you can use this template to listen to an audio file and classify the topic of the clip.
+
+!!! error Enterprise
+    If you're managing more complex or high-volume audio labeling projects, Label Studio Enterprise includes an advanced audio transcription interface built to support faster, more precise annotation at scale.
+
+    See our new [Multi-Channel Audio Transcription](react_audio) template and learn more in [A New Audio Transcription UI for Speed and Quality at Scale](https://humansignal.com/blog/building-a-better-ui-for-audio-transcription-at-scale/) (blog post).
 
 ## Interactive Template Preview
 

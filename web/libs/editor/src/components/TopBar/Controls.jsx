@@ -3,10 +3,9 @@
  */
 
 import { inject, observer } from "mobx-react";
-import { Button } from "../../common/Button/Button";
-import { IconBan } from "@humansignal/icons";
-import { Tooltip } from "@humansignal/ui";
-import { Block, Elem } from "../../utils/bem";
+import { IconBan, IconInfoOutline } from "@humansignal/icons";
+import { Button, Tooltip } from "@humansignal/ui";
+import { cn } from "../../utils/bem";
 import { isDefined } from "../../utils/utilities";
 
 import "./Controls.scss";
@@ -83,7 +82,7 @@ export const Controls = controlsInjector(
       return (
         <ButtonTooltip key="reject" title="Reject annotation: [ Ctrl+Space ]">
           <Button
-            aria-label="reject-annotation"
+            aria-label="Reject current annotation"
             disabled={disabled}
             look="danger"
             onClick={async (e) => {
@@ -108,7 +107,7 @@ export const Controls = controlsInjector(
       buttons.push(
         <ButtonTooltip key="accept" title="Accept annotation: [ Ctrl+Enter ]">
           <Button
-            aria-label="accept-annotation"
+            aria-label="Accept current annotation"
             disabled={disabled}
             look="primary"
             onClick={async () => {
@@ -116,22 +115,22 @@ export const Controls = controlsInjector(
               store.acceptAnnotation();
             }}
           >
-            {history.canUndo ? "Fix + Accept" : "Accept"}
+            {history.canUndo || annotation.versions.draft ? "Fix + Accept" : "Accept"}
           </Button>
         </ButtonTooltip>,
       );
     } else if (annotation.skipped) {
       buttons.push(
-        <Elem name="skipped-info" key="skipped">
+        <div className={cn("controls").elem("skipped-info").toClassName()} key="skipped">
           <IconBan color="#d00" /> Was skipped
-        </Elem>,
+        </div>,
       );
       buttons.push(
         <ButtonTooltip key="cancel-skip" title="Cancel skip: []">
           <Button
-            aria-label="cancel-skip"
+            aria-label="Cancel skip and return to annotation"
             disabled={disabled}
-            look="primary"
+            look="outlined"
             onClick={async () => {
               await store.commentStore.commentFormSubmit();
               store.unskipTask();
@@ -142,14 +141,40 @@ export const Controls = controlsInjector(
         </ButtonTooltip>,
       );
     } else {
+      // Manager roles that can force-skip unskippable tasks (OW=Owner, AD=Admin, MA=Manager)
+      const MANAGER_ROLES = ["OW", "AD", "MA"];
+
       if (store.hasInterface("skip")) {
+        const task = store.task;
+
+        const isEnterprise = window.APP_SETTINGS?.billing?.enterprise;
+        const skipDisabled = isEnterprise ? task?.allow_skip === false : false;
+        const userRole = window.APP_SETTINGS?.user?.role;
+        const hasForceSkipPermission = MANAGER_ROLES.includes(userRole);
+        const canSkip = !skipDisabled || hasForceSkipPermission;
+        const isDisabled = disabled || !canSkip;
+
+        const tooltip = canSkip ? "Cancel (skip) task: [ Ctrl+Space ]" : "This task cannot be skipped";
+
+        const showInfoIcon = skipDisabled && hasForceSkipPermission;
+
+        if (showInfoIcon) {
+          buttons.push(
+            <Tooltip key="skip-info" title="Annotators and Reviewers will not be able to skip this task">
+              <IconInfoOutline width={20} height={20} className="text-neutral-content ml-auto cursor-pointer" />
+            </Tooltip>,
+          );
+        }
+
         buttons.push(
-          <ButtonTooltip key="skip" title="Cancel (skip) task: [ Ctrl+Space ]">
+          <ButtonTooltip key="skip" title={tooltip}>
             <Button
-              aria-label="skip-task"
-              disabled={disabled}
-              look="danger"
+              aria-label="Skip current task"
+              disabled={isDisabled}
+              variant="negative"
+              look="outlined"
               onClick={async (e) => {
+                if (!canSkip) return;
                 if (store.hasInterface("comments:skip") ?? true) {
                   buttonHandler(e, () => store.skipTask({}), "Please enter a comment before skipping");
                 } else {
@@ -170,9 +195,9 @@ export const Controls = controlsInjector(
 
         buttons.push(
           <ButtonTooltip key="submit" title={title}>
-            <Elem name="tooltip-wrapper">
+            <div className={cn("controls").elem("tooltip-wrapper").toClassName()}>
               <Button
-                aria-label="submit"
+                aria-label="Submit current annotation"
                 disabled={disabled || submitDisabled}
                 look="primary"
                 onClick={async () => {
@@ -182,7 +207,7 @@ export const Controls = controlsInjector(
               >
                 Submit
               </Button>
-            </Elem>
+            </div>
           </ButtonTooltip>,
         );
       }
@@ -192,7 +217,7 @@ export const Controls = controlsInjector(
         const button = (
           <ButtonTooltip key="update" title="Update this task: [ Alt+Enter ]">
             <Button
-              aria-label="submit"
+              aria-label="Update current annotation"
               disabled={disabled || submitDisabled}
               look="primary"
               onClick={async () => {
@@ -209,6 +234,10 @@ export const Controls = controlsInjector(
       }
     }
 
-    return <Block name="controls">{buttons}</Block>;
+    return (
+      <div className={cn("controls").toClassName()}>
+        <div className="grid grid-flow-col auto-cols-fr gap-tight items-center">{buttons}</div>
+      </div>
+    );
   }),
 );

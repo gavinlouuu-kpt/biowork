@@ -2,7 +2,7 @@
 
 import { destroy, detach, flow, getEnv, getParent, getSnapshot, isRoot, types, walk } from "mobx-state-tree";
 
-import uniqBy from "lodash/uniqBy";
+import { uniqBy } from "@humansignal/core/lib/utils/lodash-replacements";
 import InfoModal from "../components/Infomodal/Infomodal";
 import { Hotkey } from "../core/Hotkey";
 import { destroy as destroySharedStore } from "../mixins/SharedChoiceStore/mixin";
@@ -19,7 +19,6 @@ import { UserExtended } from "./UserStore";
 import { UserLabels } from "./UserLabels";
 import {
   FF_CUSTOM_SCRIPT,
-  FF_DEV_1536,
   FF_LSDV_4620_3_ML,
   FF_LSDV_4998,
   FF_REVIEWER_FLOW,
@@ -129,6 +128,17 @@ export default types
      */
     noAccess: types.optional(types.boolean, false),
     /**
+     * Flag for overlap reached - prevents annotation submission
+     */
+    overlapReached: types.optional(types.boolean, false),
+    /**
+     * Message to show when overlap is reached
+     */
+    overlapReachedMessage: types.optional(
+      types.string,
+      "Annotation overlap has been reached for this task. Your draft is preserved but cannot be submitted.",
+    ),
+    /**
      * Finish of labeling
      */
     labeledSuccess: types.optional(types.boolean, false),
@@ -155,7 +165,7 @@ export default types
 
     users: types.optional(types.array(UserExtended), []),
 
-    userLabels: isFF(FF_DEV_1536) ? types.optional(UserLabels, { controls: {} }) : types.undefined,
+    userLabels: types.optional(UserLabels, { controls: {} }),
 
     queueTotal: types.optional(types.number, 0),
 
@@ -283,6 +293,8 @@ export default types
         "isSubmitting",
         "noTask",
         "noAccess",
+        "overlapReached",
+        "overlapReachedMessage",
         "labeledSuccess",
         "awaitingSuggestions",
       ];
@@ -356,10 +368,17 @@ export default types
           if (annotationStore.viewingAll) return;
           if (isUpdateDisabled) return;
           if (entity.isReadOnly()) return;
+          if (entity.hasIncompletePolygons) return;
 
           entity?.submissionInProgress();
 
-          if (isReview) {
+          if (self.hasInterface("annotation:bulk")) {
+            const customButtons = self.customButtons?.get("_replace");
+            const submitButton = customButtons?.find((btn) => btn.name === "submit");
+            if (submitButton && !submitButton.disabled) {
+              self.handleCustomButton?.(submitButton);
+            }
+          } else if (isReview) {
             self.acceptAnnotation();
           } else if (!isUpdate && self.hasInterface("submit")) {
             self.submitAnnotation();
@@ -439,6 +458,14 @@ export default types
         }
       });
 
+      hotkeys.addNamed("region:lock", () => {
+        const c = self.annotationStore.selected;
+
+        if (c && !c.isLinkingMode) {
+          c.lockSelectedRegions();
+        }
+      });
+
       hotkeys.addNamed("region:visibility-all", () => {
         const { selected } = self.annotationStore;
         selected.regionStore.toggleVisibility();
@@ -447,19 +474,33 @@ export default types
       hotkeys.addNamed("annotation:undo", () => {
         const annotation = self.annotationStore.selected;
 
-        if (!annotation.isDrawing) annotation.undo();
+        // Allow undo even during drawing - the undo() method handles stopping drawing
+        // when appropriate (e.g., when vertices <= 1 for vector regions)
+        // This matches the behavior of the undo button which doesn't check isDrawing
+        annotation.undo();
       });
 
       hotkeys.addNamed("annotation:redo", () => {
         const annotation = self.annotationStore.selected;
 
-        if (!annotation.isDrawing) annotation.redo();
+        // Allow redo even during drawing - matches the behavior of the redo button
+        // which doesn't check isDrawing
+        annotation.redo();
       });
 
-      hotkeys.addNamed("region:exit", () => {
-        const c = self.annotationStore.selected;
+      hotkeys.addNamed("region:exit", (e) => {
+        e.stopImmediatePropagation();
 
-        if (c && c.isLinkingMode) {
+        const c = self.annotationStore.selected;
+        const managers = ToolsManager.allInstances();
+        const tools = managers
+          .map((m) => m.findSelectedTool())
+          .filter(Boolean)
+          .filter((t) => t.isDrawing);
+
+        if (tools.length > 0) {
+          tools.forEach((t) => t.complete?.());
+        } else if (c && c.isLinkingMode) {
           c.stopLinkingMode();
         } else if (!c.isDrawing) {
           c.unselectAll();
@@ -646,6 +687,19 @@ export default types
 
     function skipTask(extraData) {
       if (self.isSubmitting) return;
+      const isEnterprise = window.APP_SETTINGS?.billing?.enterprise;
+
+      // Manager roles that can force-skip unskippable tasks (OW=Owner, AD=Admin, MA=Manager)
+      const MANAGER_ROLES = ["OW", "AD", "MA"];
+      const task = self.task;
+      const skipDisabled = isEnterprise ? task?.allow_skip === false : false;
+      const userRole = window.APP_SETTINGS?.user?.role;
+      const hasForceSkipPermission = MANAGER_ROLES.includes(userRole);
+      const canSkip = !skipDisabled || hasForceSkipPermission;
+      if (!canSkip) {
+        console.warn("Task cannot be skipped: allow_skip is false and user lacks manager role");
+        return;
+      }
       handleSubmittingFlag(() => {
         getEnv(self).events.invoke("skipTask", self, extraData);
         self.incrementQueuePosition();
@@ -674,7 +728,8 @@ export default types
           if (allowedToSave && allowedToSave.some((x) => x === false)) return;
         }
 
-        const isDirty = entity.history.canUndo;
+        // changes in current sessions or saved draft should send the result along with approval
+        const isDirty = entity.history.canUndo || entity.versions.draft;
 
         entity.dropDraft();
         await getEnv(self).events.invoke("acceptAnnotation", self, { isDirty, entity });
@@ -758,6 +813,11 @@ export default types
         destroy(oldAnnotationStore);
       }
 
+      // Do NOT forceClear the image cache on task switch. Destroyed ImageEntities
+      // already call releaseRef(), so old entries have refCount 0. Keeping them
+      // allows instant load when switching back to a previously viewed task.
+      // Cache evicts automatically when it exceeds maxSize (100).
+
       self.annotationStore = AnnotationStore.create({ annotations: [] });
       self.initialized = false;
     }
@@ -787,6 +847,25 @@ export default types
         if (isFF(FF_LSDV_4620_3_ML) && !appControls?.isRendered()) {
           appControls?.render();
         }
+      }
+
+      // Ensure users referenced by annotations exist in the users store
+      // before annotations are created. This prevents MST reference resolution errors
+      // when annotation.user references a user ID not yet present in the store
+      // (e.g. in review stream where annotators' user data isn't pre-loaded).
+      const allItems = [...(completions ?? []), ...(annotations ?? [])];
+      const userStubs = allItems
+        .map((item) => {
+          const userRef = item.user ?? item.completed_by;
+
+          if (typeof userRef === "number") return { id: userRef };
+          if (userRef && typeof userRef === "object" && userRef.id) return userRef;
+          return null;
+        })
+        .filter(Boolean);
+
+      if (userStubs.length) {
+        self.enrichUsers(userStubs);
       }
 
       // goal here is to deserialize everything fast and select only first annotation

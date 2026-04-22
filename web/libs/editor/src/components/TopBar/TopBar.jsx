@@ -1,18 +1,12 @@
 import { observer } from "mobx-react";
 
-import { Button } from "../../common/Button/Button";
-import { IconViewAll, IconPlus } from "@humansignal/icons";
-import { Tooltip } from "@humansignal/ui";
-import { ff } from "@humansignal/core";
-import { Block, Elem } from "../../utils/bem";
-import { isSelfServe } from "../../utils/billing";
-import { FF_BULK_ANNOTATION, FF_DEV_3873, isFF } from "../../utils/feature-flags";
+import { IconPlus } from "@humansignal/icons";
+import { Button } from "@humansignal/ui";
+import { isStarterCloudPlan } from "@humansignal/core";
+import { cn } from "../../utils/bem";
+import { FF_BULK_ANNOTATION, isFF } from "../../utils/feature-flags";
 import { AnnotationsCarousel } from "../AnnotationsCarousel/AnnotationsCarousel";
-import { DynamicPreannotationsToggle } from "../AnnotationTab/DynamicPreannotationsToggle";
-import { Actions } from "./Actions";
-import { Annotations } from "./Annotations";
-import { Controls } from "./Controls";
-import { CurrentTask } from "./CurrentTask";
+import { ViewAllToggle } from "../AnnotationsCarousel/ViewAllToggle";
 
 import "./TopBar.scss";
 
@@ -22,87 +16,41 @@ export const TopBar = observer(({ store }) => {
   const isPrediction = entity?.type === "prediction";
 
   const isViewAll = annotationStore?.viewingAll === true;
-  const isBulkMode = isFF(FF_BULK_ANNOTATION) && !isSelfServe() && store.hasInterface("annotation:bulk");
+  const isBulkMode = isFF(FF_BULK_ANNOTATION) && !isStarterCloudPlan() && store.hasInterface("annotation:bulk");
 
-  if (isFF(FF_DEV_3873) && isBulkMode) return null;
+  if (isBulkMode) return null;
+
+  // Hide TopBar for Labeling Stream (when annotations:view-all interface is not present)
+  // Keep TopBar visible for Review Stream and Quick View
+  if (!store.hasInterface("annotations:view-all")) return null;
 
   return store ? (
-    <Block name="topbar" mod={{ newLabelingUI: isFF(FF_DEV_3873) }}>
-      {isFF(FF_DEV_3873) ? (
-        <Elem name="group">
-          <CurrentTask store={store} />
-          {store.hasInterface("annotations:view-all") && (
-            <Tooltip title="Compare all annotations">
-              <Button
-                className={"topbar__button"}
-                icon={<IconViewAll width={20} height={20} />}
-                type={isViewAll ? undefined : "text"}
-                aria-label="Compare all annotations"
-                onClick={annotationStore.toggleViewingAllAnnotations}
-                primary={isViewAll}
-                size="medium"
-                style={{
-                  height: 28,
-                  width: 28,
-                  padding: 0,
-                  marginRight: "var(--spacing-tight, 8px)",
-                }}
-              />
-            </Tooltip>
-          )}
-          {store.hasInterface("annotations:add-new") && (
-            <Tooltip title="Create a new annotation" style={{ "--offset-x": "11px" }}>
-              <Button
-                icon={<IconPlus />}
-                className={"topbar__button"}
-                type={isViewAll ? undefined : "text"}
-                aria-label="Create an annotation"
-                onClick={(event) => {
-                  event.preventDefault();
-                  const created = store.annotationStore.createAnnotation();
+    <div className={cn("topbar").mod({ newLabelingUI: true }).toClassName()}>
+      <div className={cn("topbar").elem("group").toClassName()}>
+        {store.hasInterface("annotations:view-all") && (
+          <ViewAllToggle isActive={isViewAll} onClick={annotationStore.toggleViewingAllAnnotations} />
+        )}
+        {store.hasInterface("annotations:add-new") && (
+          <Button
+            className={cn("topbar").elem("button").toClassName()}
+            type={isViewAll ? undefined : "text"}
+            aria-label="Create an annotation"
+            variant="neutral"
+            size="small"
+            look="outlined"
+            tooltip="Create a new annotation"
+            onClick={(event) => {
+              event.preventDefault();
+              const created = store.annotationStore.createAnnotation();
 
-                  store.annotationStore.selectAnnotation(created.id);
-                }}
-                style={{
-                  height: 28,
-                  width: 28,
-                  padding: 0,
-                  marginRight: "var(--spacing-tight, 8px)",
-                }}
-              />
-            </Tooltip>
-          )}
-          {(!isViewAll || ff.isActive(ff.FF_SUMMARY)) && (
-            <AnnotationsCarousel
-              store={store}
-              annotationStore={store.annotationStore}
-              commentStore={store.commentStore}
-            />
-          )}
-        </Elem>
-      ) : (
-        <>
-          <Elem name="group">
-            {!isBulkMode && <CurrentTask store={store} />}
-            {!isViewAll && !isBulkMode && (
-              <Annotations store={store} annotationStore={store.annotationStore} commentStore={store.commentStore} />
-            )}
-            <Actions store={store} />
-          </Elem>
-          <Elem name="group">
-            {!isViewAll && (
-              <Elem name="section">
-                <DynamicPreannotationsToggle />
-              </Elem>
-            )}
-            {!isViewAll && store.hasInterface("controls") && (store.hasInterface("review") || !isPrediction) && (
-              <Elem name="section" mod={{ flat: true }} style={{ width: 320, boxSizing: "border-box" }}>
-                <Controls annotation={entity} />
-              </Elem>
-            )}
-          </Elem>
-        </>
-      )}
-    </Block>
+              store.annotationStore.selectAnnotation(created.id, { exitViewAll: true });
+            }}
+          >
+            <IconPlus />
+          </Button>
+        )}
+        <AnnotationsCarousel store={store} annotationStore={store.annotationStore} commentStore={store.commentStore} />
+      </div>
+    </div>
   ) : null;
 });

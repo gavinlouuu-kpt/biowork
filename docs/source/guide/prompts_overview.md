@@ -32,6 +32,7 @@ With Prompts, you can:
 | **Supported data types** | Text <br>Image<br><br>**Note:** Images are only supported when uploaded through cloud storage. |
 | **Supported object tags** | `Text` <br>`HyperText` <br>`Image` |
 | **Supported control tags** | `Choices` (Text and Image)<br>`Labels` (Text)<br>`TextArea` (Text and Image)<br>`Pairwise` (Text and Image)<br>`Number` (Text and Image)<br>`Rating` (Text and Image) |
+| **Supported base models** | See [Supported base models](prompts_keys#Supported-base-models) |
 | **Class selection** | Multi-selection (the LLM can apply multiple labels per task)|
 | **Text compatibility** | Task text must be utf-8 compatible |
 | **Task size** | Total size of each task can be no more than 1MB (approximately 200-500 pages of text) |
@@ -44,22 +45,6 @@ With Prompts, you can:
 
 !!! note
     For information on installing Prompts for on-prem environments, see [Install Prompts](install_prompts).
-
-## Supported base models
-
-<div class="noheader rowheader">
-
-| Provider | Supported models |
-| --- | --- |
-| **OpenAI** | gpt-4 <br>gpt-4-turbo <br>gpt-4o <br>gpt-4o-mini <br>gpt-4.5-preview <br>o3-mini <br>o1  |
-| **Gemini** | gemini-2.5-pro-preview-03-25 <br>gemini-2.0-flash <br>gemini-2.0-flash-lite <br>gemini-1.5-flash <br>gemini-1.5-flash-8b <br>gemini-1.5-pro  |
-| **Vertex AI** | gemini-2.5-pro-preview-03-25 <br>gemini-2.0-flash <br>gemini-2.0-flash-lite <br>gemini-1.5-flash <br>gemini-1.5-pro   |
-| **Anthropic** | claude-3-5-haiku-latest <br>claude-3-5-sonnet-latest <br>claude-3-7-sonnet-latest   |
-| **Azure OpenAI** | [Azure OpenAI chat-based models](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) <br><br>**Note:** We recommend against using GPT 3.5 models, as these can sometimes be prone to rate limit errors and are not compatible with Image data.  |
-| **Azure AI Foundry** | We support all Azure AI Foundry models.   |
-| **Custom** | [Custom LLM](prompts_create#Add-OpenAI-Azure-OpenAI-or-a-custom-model) |
-
-</div>
 
 ## Use cases
 
@@ -77,7 +62,7 @@ By utilizing AI to handle the bulk of the annotation work, you can significantly
     * [Sync data from external storage](storage)
 2. Annotate a subset of tasks, marking as many as possible as ground truth annotations. The more data you have for the prompt evaluation, the more confident you can be with the results.
 
-    If you want to skip this step, see the [bootstrapping use case](#Bootstrapping-projects-with-prompts) outlined below. 
+    If you want to skip this step, see the [bootstrapping use case](#Bootstrapping-projects-with-Prompts) outlined below. 
 
     * [Labeling guide](labeling)
     * [Define ground truth annotations for a project](quality#Define-ground-truth-annotations-for-a-project)

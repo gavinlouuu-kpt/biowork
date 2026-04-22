@@ -3,7 +3,6 @@ import { guidGenerator } from "../core/Helpers";
 import { isDefined } from "../utils/utilities";
 import { AnnotationMixin } from "./AnnotationMixin";
 import { ReadOnlyRegionMixin } from "./ReadOnlyMixin";
-import { RELATIVE_STAGE_HEIGHT, RELATIVE_STAGE_WIDTH } from "../components/ImageView/Image";
 
 const RegionsMixin = types
   .model({
@@ -34,6 +33,7 @@ const RegionsMixin = types
     perRegionFocusRequest: null,
     shapeRef: null,
     drawingTimeout: null,
+    hideable: true,
   }))
   .views((self) => ({
     get perRegionStates() {
@@ -152,6 +152,7 @@ const RegionsMixin = types
       },
 
       setLocked(locked) {
+        if (self.incomplete === true) return;
         if (locked instanceof Function) {
           self.locked = locked(self.locked);
         } else {
@@ -163,23 +164,6 @@ const RegionsMixin = types
         self.dynamic = true;
       },
 
-      // @todo this conversion methods should be removed after removing FF_DEV_3793
-      convertXToPerc(x) {
-        return (x * RELATIVE_STAGE_WIDTH) / self.currentImageEntity.stageWidth;
-      },
-
-      convertYToPerc(y) {
-        return (y * RELATIVE_STAGE_HEIGHT) / self.currentImageEntity.stageHeight;
-      },
-
-      convertHDimensionToPerc(hd) {
-        return (hd * (self.scaleX || 1) * RELATIVE_STAGE_WIDTH) / self.currentImageEntity.stageWidth;
-      },
-
-      convertVDimensionToPerc(vd) {
-        return (vd * (self.scaleY || 1) * RELATIVE_STAGE_HEIGHT) / self.currentImageEntity.stageHeight;
-      },
-
       // update region appearence based on it's current states, for
       // example bbox needs to update its colors when you change the
       // label, becuase it takes color from the label
@@ -189,39 +173,10 @@ const RegionsMixin = types
         console.error("Region class needs to implement serialize");
       },
 
+      /** @abstract */
       selectRegion() {},
 
-      /**
-       * @todo fix "keep selected" setting
-       * Common logic for unselection; specific actions should be in `afterUnselectRegion`
-       * @param {boolean} tryToKeepStates try to keep states selected if such settings enabled
-       */
-      unselectRegion(tryToKeepStates = false) {
-        console.log("UNSELECT REGION", "you should not be here");
-
-        // biome-ignore lint/correctness/noConstantCondition:
-        if (1) return;
-        const annotation = self.annotation;
-        const parent = self.parent;
-        const keepStates = tryToKeepStates && self.store.settings.continuousLabeling;
-
-        if (annotation.isLinkingMode) {
-          annotation.stopLinkingMode();
-        }
-        if (parent.setSelected) {
-          parent.setSelected(undefined);
-        }
-
-        self.selected = false;
-        annotation.setHighlightedNode(null);
-
-        self.afterUnselectRegion();
-
-        if (!keepStates) {
-          annotation.unloadRegionState(self);
-        }
-      },
-
+      /** @abstract */
       afterUnselectRegion() {},
 
       onClickRegion(ev) {
@@ -278,6 +233,10 @@ const RegionsMixin = types
       },
 
       toggleHidden(e, isFiltered = false) {
+        if (self.incomplete === true) {
+          e && e.stopPropagation();
+          return;
+        }
         if (!isFiltered) self.filtered = false;
         self.hidden = !self.hidden;
         e && e.stopPropagation();

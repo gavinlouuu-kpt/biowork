@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from "react";
 import { useHistory } from "react-router";
-import { Button } from "../../../components";
+import { Button } from "@humansignal/ui";
 import { Modal } from "../../../components/Modal/Modal";
 import { Space } from "../../../components/Space/Space";
 import { useAPI } from "../../../providers/ApiProvider";
 import { ProjectProvider, useProject } from "../../../providers/ProjectProvider";
 import { useFixedLocation } from "../../../providers/RoutesProvider";
-import { Elem } from "../../../utils/bem";
+import { cn } from "../../../utils/bem";
 import { useRefresh } from "../../../utils/hooks";
 import { ImportPage } from "./Import";
 import { useImportPage } from "./useImportPage";
@@ -72,15 +72,26 @@ export const Inner = () => {
       bare
     >
       <Modal.Header divided>
-        <Elem block="modal" name="title">
-          Import Data
-        </Elem>
+        <div className={cn("modal").elem("title").toClassName()}>Import Data</div>
 
         <Space>
-          <Button waiting={waiting} onClick={onCancel}>
+          <Button
+            size="small"
+            variant="negative"
+            look="outlined"
+            waiting={waiting}
+            onClick={onCancel}
+            aria-label="Cancel import"
+          >
             Cancel
           </Button>
-          <Button look="primary" onClick={onFinish} waiting={waiting || uploading} disabled={uploadDisabled}>
+          <Button
+            size="small"
+            onClick={onFinish}
+            waiting={waiting || uploading}
+            disabled={uploadDisabled}
+            aria-label="Finish import"
+          >
             Import
           </Button>
         </Space>
@@ -93,7 +104,6 @@ export const Inner = () => {
         openLabelingConfig={() => {
           history.push(`/projects/${project.id}/settings/labeling`);
         }}
-        setReimportExtras={pageProps.setReimportExtras}
         {...pageProps}
       />
     </Modal>

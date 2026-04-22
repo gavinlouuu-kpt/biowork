@@ -1,11 +1,10 @@
+import { useCopyText } from "@humansignal/core";
+import { IconEllipsis, IconLink } from "@humansignal/icons";
+import { Button, ToastType, useToast } from "@humansignal/ui";
 import { observer } from "mobx-react";
-import { useCallback, useMemo, useState, type FC } from "react";
-import { useCopyText } from "@humansignal/core/lib/hooks/useCopyText";
-import { IconLink, IconEllipsis } from "@humansignal/icons";
-import { ToastType, useToast } from "@humansignal/ui";
-import { ContextMenu, type ContextMenuAction, ContextMenuTrigger, type MenuActionOnClick } from "../../ContextMenu";
-import { Button } from "../../../common/Button/Button";
+import { type FC, useCallback, useMemo, useState } from "react";
 import { cn } from "../../../utils/bem";
+import { ContextMenu, type ContextMenuAction, ContextMenuTrigger, type MenuActionOnClick } from "../../ContextMenu";
 
 export const RegionContextMenu: FC<{ item: any }> = observer(({ item }: { item: any }) => {
   const [open, setOpen] = useState(false);
@@ -19,7 +18,7 @@ export const RegionContextMenu: FC<{ item: any }> = observer(({ item }: { item: 
     }
     return url.toString();
   }, [item]);
-  const [copyLink] = useCopyText(regionLink);
+  const [copyLink] = useCopyText({ defaultText: regionLink });
   const toast = useToast();
 
   const onCopyLink = useCallback<MenuActionOnClick>(
@@ -47,14 +46,11 @@ export const RegionContextMenu: FC<{ item: any }> = observer(({ item }: { item: 
 
   return (
     <ContextMenuTrigger
-      className={cn("region-context-menu").toClassName()}
+      className={cn("region-context-menu").mod({ open }).toClassName()}
       content={<ContextMenu actions={actions} />}
       onToggle={(isOpen) => setOpen(isOpen)}
     >
-      <Button
-        type="text"
-        style={{ padding: 0, width: 24, height: 24, ...(open ? { display: "flex !important" } : null) }}
-      >
+      <Button variant="neutral" look="string" size="smaller" aria-label="Region options">
         <IconEllipsis />
       </Button>
     </ContextMenuTrigger>

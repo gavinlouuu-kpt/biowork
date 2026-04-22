@@ -175,15 +175,34 @@ class GCSImportStorageBase(GCSStorageMixin, ImportStorage):
     presign_ttl = models.PositiveSmallIntegerField(
         _('presign_ttl'), default=1, help_text='Presigned URLs TTL (in minutes)'
     )
+    recursive_scan = models.BooleanField(
+        _('recursive scan'),
+        default=False,
+        db_default=False,
+        null=True,
+        help_text=_('Perform recursive scan over the bucket content'),
+    )
 
-    def iterkeys(self):
+    def iter_objects(self):
         return GCS.iter_blobs(
             client=self.get_client(),
             bucket_name=self.bucket,
             prefix=self.prefix,
             regex_filter=self.regex_filter,
-            return_key=True,
+            return_key=False,
+            recursive_scan=bool(self.recursive_scan),
         )
+
+    def iter_keys(self):
+        for obj in self.iter_objects():
+            yield obj.name
+
+    def get_unified_metadata(self, obj):
+        return {
+            'key': obj.name,
+            'last_modified': obj.updated,
+            'size': obj.size,
+        }
 
     def get_data(self, key) -> list[StorageObject]:
         if self.use_blob_urls:
@@ -245,7 +264,14 @@ class GCSExportStorage(GCSStorageMixin, ExportStorage):
         GCSExportStorageLink.create(annotation, self)
 
 
-def async_export_annotation_to_gcs_storages(annotation):
+def async_export_annotation_to_gcs_storages(annotation: 'Annotation | int'):
+    if isinstance(annotation, int):
+        try:
+            annotation = Annotation.objects.get(pk=annotation)
+        except Annotation.DoesNotExist:
+            logger.info(f'Annotation {annotation} no longer exists, skipping GCS export')
+            return
+
     project = annotation.project
     if hasattr(project, 'io_storages_gcsexportstorages'):
         for storage in project.io_storages_gcsexportstorages.all():
@@ -257,7 +283,7 @@ def async_export_annotation_to_gcs_storages(annotation):
 def export_annotation_to_gcs_storages(sender, instance, **kwargs):
     storages = getattr(instance.project, 'io_storages_gcsexportstorages', None)
     if storages and storages.exists():  # avoid excess jobs in rq
-        start_job_async_or_sync(async_export_annotation_to_gcs_storages, instance)
+        start_job_async_or_sync(async_export_annotation_to_gcs_storages, instance.pk)
 
 
 class GCSImportStorageLink(ImportStorageLink):

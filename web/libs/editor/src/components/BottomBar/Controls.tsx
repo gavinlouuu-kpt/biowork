@@ -8,12 +8,12 @@ import { observer } from "mobx-react";
 import type React from "react";
 import { useCallback, useState } from "react";
 
-import { IconBan, IconChevron } from "@humansignal/ui";
-import { Button } from "../../common/Button/Button";
-import { Dropdown } from "../../common/Dropdown/Dropdown";
+import { Button, ButtonGroup, type ButtonProps } from "@humansignal/ui";
+import { IconBan, IconChevronDown } from "@humansignal/icons";
+import { Dropdown } from "@humansignal/ui";
 import type { CustomButtonType } from "../../stores/CustomButton";
-import { Block, cn, Elem } from "../../utils/bem";
-import { FF_REVIEWER_FLOW, isFF } from "../../utils/feature-flags";
+import { cn } from "../../utils/bem";
+import { FF_REVIEWER_FLOW, FF_FIT_1304_STRICT_OVERLAP, isFF } from "../../utils/feature-flags";
 import { isDefined, toArray } from "../../utils/utilities";
 import {
   AcceptButton,
@@ -38,35 +38,34 @@ type CustomButtonsField = Map<
 type ControlButtonProps = {
   button: CustomButtonType;
   disabled: boolean;
+  variant?: ButtonProps["variant"];
+  look?: ButtonProps["look"];
   onClick: (e: React.MouseEvent) => void;
 };
 
 export const EMPTY_SUBMIT_TOOLTIP = "Empty annotations denied in this project";
+export const INCOMPLETE_SUBMIT_TOOLTIP = "Complete all regions before submitting";
+export const INCOMPLETE_UPDATE_TOOLTIP = "Complete all regions before updating";
+export const INCOMPLETE_ACCEPT_TOOLTIP = "Complete all regions before accepting";
 
 /**
  * Custom action button component, rendering buttons from store.customButtons
  */
-const ControlButton = observer(({ button, disabled, onClick }: ControlButtonProps) => {
-  const look = button.disabled || disabled ? "disabled" : button.look;
-
-  const result = (
+const ControlButton = observer(({ button, disabled, onClick, variant, look }: ControlButtonProps) => {
+  return (
     <Button
       {...button.props}
+      variant={button.variant ?? variant}
+      look={button.look ?? look}
+      tooltip={button.tooltip}
+      className="w-[150px]"
       aria-label={button.ariaLabel}
       disabled={button.disabled || disabled}
-      look={look}
       onClick={onClick}
+      data-testid={`bottombar-custom-${button.name}-button`}
     >
       {button.title}
     </Button>
-  );
-  if (!button.tooltip) {
-    return result;
-  }
-  return (
-    <ButtonTooltip title={button.tooltip}>
-      <Elem name="tooltip-wrapper">{result}</Elem>
-    </ButtonTooltip>
   );
 });
 
@@ -78,11 +77,12 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
     const { userGenerate, sentUserGenerate, versions, results, editable: annotationEditable } = annotation;
     const dropdownTrigger = cn("dropdown").elem("trigger").toClassName();
     const customButtons: CustomButtonsField = store.customButtons;
-    const buttons = [];
+    const buttons: React.ReactNode[] = [];
 
     const [isInProgress, setIsInProgress] = useState(false);
     const disabled = !annotationEditable || store.isSubmitting || historySelected || isInProgress;
     const submitDisabled = store.hasInterface("annotations:deny-empty") && results.length === 0;
+    const hasIncompleteRegions = annotation.hasIncompletePolygons;
 
     /** Check all things related to comments and then call the action if all is good */
     const handleActionWithComments = useCallback(
@@ -120,7 +120,7 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
       ],
     );
 
-    if (annotation.isNonEditableDraft) return null;
+    if (annotation.isNonEditableDraft) return <></>;
 
     const buttonsBefore = customButtons.get("_before");
     const buttonsReplacement = customButtons.get("_replace");
@@ -152,11 +152,14 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
     }
 
     if (buttonsReplacement) {
-      // do nothing as all custom buttons are rendered already and we don't need internal buttons
-    } else if (isReview) {
+      return <div className={cn("controls").toClassName()}>{buttons}</div>;
+    }
+
+    if (isReview) {
       const customRejectButtons = toArray(customButtons.get("reject"));
       const hasCustomReject = customRejectButtons.length > 0;
       const originalRejectButton = RejectButtonDefinition;
+
       // @todo implement reuse of internal buttons later (they are set as strings)
       const rejectButtons: CustomButtonType[] = hasCustomReject
         ? customRejectButtons.filter((button) => typeof button !== "string")
@@ -182,9 +185,9 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
       buttons.push(<AcceptButton key="review-accept" disabled={disabled} history={history} store={store} />);
     } else if (annotation.skipped) {
       buttons.push(
-        <Elem name="skipped-info" key="skipped">
-          <IconBan color="#d00" /> Was skipped
-        </Elem>,
+        <div className={cn("controls").elem("skipped-info").toClassName()} key="skipped">
+          <IconBan /> Was skipped
+        </div>,
       );
       buttons.push(<UnskipButton key="unskip" disabled={disabled} store={store} />);
     } else {
@@ -196,117 +199,148 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
         buttons.push(<SkipButton key="skip" disabled={disabled} store={store} onSkipWithComment={onSkipWithComment} />);
       }
 
-      const isDisabled = disabled || submitDisabled;
-      const look = isDisabled ? "disabled" : "primary";
+      // Also disable when overlap is reached (only when feature flag is enabled)
+      const overlapDisabled = isFF(FF_FIT_1304_STRICT_OVERLAP) && store.overlapReached === true;
+      const isDisabled = disabled || submitDisabled || overlapDisabled || hasIncompleteRegions;
 
       const useExitOption = !isDisabled && isNotQuickView;
 
       const SubmitOption = ({ isUpdate, onClickMethod }: { isUpdate: boolean; onClickMethod: () => any }) => {
         return (
-          <Button
-            name="submit-option"
-            look="primary"
-            onClick={async (event) => {
-              event.preventDefault();
+          <div className="p-tighter rounded">
+            <Button
+              name="submit-option"
+              look="string"
+              size="small"
+              className="w-[150px]"
+              onClick={async (event) => {
+                event.preventDefault();
 
-              const selected = store.annotationStore?.selected;
+                const selected = store.annotationStore?.selected;
 
-              selected?.submissionInProgress();
+                selected?.submissionInProgress();
 
-              if ("URLSearchParams" in window) {
-                const searchParams = new URLSearchParams(window.location.search);
+                if ("URLSearchParams" in window) {
+                  const searchParams = new URLSearchParams(window.location.search);
 
-                searchParams.set("exitStream", "true");
-                const newRelativePathQuery = `${window.location.pathname}?${searchParams.toString()}`;
+                  searchParams.set("exitStream", "true");
+                  const newRelativePathQuery = `${window.location.pathname}?${searchParams.toString()}`;
 
-                window.history.pushState(null, "", newRelativePathQuery);
-              }
+                  window.history.pushState(null, "", newRelativePathQuery);
+                }
 
-              await store.commentStore.commentFormSubmit();
-              onClickMethod();
-            }}
-          >
-            {`${isUpdate ? "Update" : "Submit"} and exit`}
-          </Button>
+                await store.commentStore.commentFormSubmit();
+                onClickMethod();
+              }}
+              data-testid={`bottombar-${isUpdate ? "update" : "submit"}-and-exit-button`}
+            >
+              {`${isUpdate ? "Update" : "Submit"} and exit`}
+            </Button>
+          </div>
         );
       };
 
       if (userGenerate || (store.explore && !userGenerate && store.hasInterface("submit"))) {
-        const title = submitDisabled ? EMPTY_SUBMIT_TOOLTIP : "Save results: [ Ctrl+Enter ]";
+        const title = hasIncompleteRegions
+          ? INCOMPLETE_SUBMIT_TOOLTIP
+          : overlapDisabled
+            ? store.overlapReachedMessage
+            : submitDisabled
+              ? EMPTY_SUBMIT_TOOLTIP
+              : "Save results: [ Ctrl+Enter ]";
 
         buttons.push(
-          <ButtonTooltip key="submit" title={title}>
-            <Elem name="tooltip-wrapper">
-              <Button
-                aria-label="submit"
-                name="submit"
-                disabled={isDisabled}
-                look={look}
-                mod={{ has_icon: useExitOption, disabled: isDisabled }}
-                onClick={async (event) => {
-                  if ((event.target as HTMLButtonElement).classList.contains(dropdownTrigger)) return;
-                  const selected = store.annotationStore?.selected;
+          <ButtonTooltip key="submit" title={title} className="whitespace-nowrap max-w-none">
+            <div className={cn("controls").elem("tooltip-wrapper").toClassName()}>
+              <ButtonGroup>
+                <Button
+                  aria-label="Submit current annotation"
+                  name="submit"
+                  className="w-[150px]"
+                  disabled={isDisabled}
+                  onClick={async (event) => {
+                    if ((event.target as HTMLButtonElement).classList.contains(dropdownTrigger)) return;
+                    const selected = store.annotationStore?.selected;
 
-                  selected?.submissionInProgress();
-                  await store.commentStore.commentFormSubmit();
-                  store.submitAnnotation();
-                }}
-                icon={
-                  useExitOption ? (
-                    <Dropdown.Trigger
-                      alignment="top-right"
-                      content={<SubmitOption onClickMethod={store.submitAnnotation} isUpdate={false} />}
-                    >
-                      <div>
-                        <IconChevron />
+                    selected?.submissionInProgress();
+                    await store.commentStore.commentFormSubmit();
+                    store.submitAnnotation();
+                  }}
+                  data-testid="bottombar-submit-button"
+                >
+                  Submit
+                </Button>
+                {useExitOption ? (
+                  <Dropdown.Trigger
+                    alignment="top-right"
+                    content={
+                      <div className="p-tight bg-neutral-surface">
+                        <SubmitOption onClickMethod={store.submitAnnotation} isUpdate={false} />
                       </div>
-                    </Dropdown.Trigger>
-                  ) : undefined
-                }
-              >
-                Submit
-              </Button>
-            </Elem>
+                    }
+                  >
+                    <Button
+                      disabled={isDisabled}
+                      aria-label="Submit annotation"
+                      data-testid="bottombar-submit-dropdown"
+                    >
+                      <IconChevronDown />
+                    </Button>
+                  </Dropdown.Trigger>
+                ) : null}
+              </ButtonGroup>
+            </div>
           </ButtonTooltip>,
         );
-      }
-
-      if ((userGenerate && sentUserGenerate) || (!userGenerate && store.hasInterface("update"))) {
+      } else if ((userGenerate && sentUserGenerate) || (!userGenerate && store.hasInterface("update"))) {
         const isUpdate = Boolean(isFF(FF_REVIEWER_FLOW) || sentUserGenerate || versions.result);
         // no changes were made over previously submitted version — no drafts, no pending changes
         const noChanges = isFF(FF_REVIEWER_FLOW) && !history.canUndo && !annotation.draftId;
         const isUpdateDisabled = isDisabled || noChanges;
+        const updateTitle = hasIncompleteRegions
+          ? INCOMPLETE_UPDATE_TOOLTIP
+          : overlapDisabled
+            ? store.overlapReachedMessage
+            : noChanges
+              ? "No changes were made"
+              : "Update this task: [ Ctrl+Enter ]";
         const button = (
-          <ButtonTooltip key="update" title={noChanges ? "No changes were made" : "Update this task: [ Ctrl+Enter ]"}>
-            <Button
-              aria-label="submit"
-              name="submit"
-              disabled={isUpdateDisabled}
-              look={look}
-              mod={{ has_icon: useExitOption, disabled: isUpdateDisabled }}
-              onClick={async (event) => {
-                if ((event.target as HTMLButtonElement).classList.contains(dropdownTrigger)) return;
-                const selected = store.annotationStore?.selected;
+          <ButtonTooltip key="update" title={updateTitle} className="whitespace-nowrap max-w-none">
+            <div className={cn("controls").elem("tooltip-wrapper").toClassName()}>
+              <ButtonGroup>
+                <Button
+                  aria-label="submit"
+                  name="submit"
+                  className="w-[150px]"
+                  disabled={isUpdateDisabled}
+                  onClick={async (event) => {
+                    if ((event.target as HTMLButtonElement).classList.contains(dropdownTrigger)) return;
+                    const selected = store.annotationStore?.selected;
 
-                selected?.submissionInProgress();
-                await store.commentStore.commentFormSubmit();
-                store.updateAnnotation();
-              }}
-              icon={
-                useExitOption ? (
+                    selected?.submissionInProgress();
+                    await store.commentStore.commentFormSubmit();
+                    store.updateAnnotation();
+                  }}
+                  data-testid="bottombar-update-button"
+                >
+                  {isUpdate ? "Update" : "Submit"}
+                </Button>
+                {useExitOption ? (
                   <Dropdown.Trigger
                     alignment="top-right"
                     content={<SubmitOption onClickMethod={store.updateAnnotation} isUpdate={isUpdate} />}
                   >
-                    <div>
-                      <IconChevron />
-                    </div>
+                    <Button
+                      disabled={isUpdateDisabled}
+                      aria-label="Update annotation"
+                      data-testid="bottombar-update-dropdown"
+                    >
+                      <IconChevronDown />
+                    </Button>
                   </Dropdown.Trigger>
-                ) : undefined
-              }
-            >
-              {isUpdate ? "Update" : "Submit"}
-            </Button>
+                ) : null}
+              </ButtonGroup>
+            </div>
           </ButtonTooltip>
         );
 
@@ -314,6 +348,6 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
       }
     }
 
-    return <Block name="controls">{buttons}</Block>;
+    return <div className={cn("controls").toClassName()}>{buttons}</div>;
   }),
 );

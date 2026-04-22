@@ -1,4 +1,5 @@
-import { Block, Elem } from "../../utils/bem";
+import { cn } from "../../utils/bem";
+import { isDefined } from "../../utils/utilities";
 import { Fragment, useEffect, useState } from "react";
 import { Hotkey } from "../../core/Hotkey";
 
@@ -10,12 +11,14 @@ const keysDictionary = {
 };
 
 const shortcutView = (shortcut) => {
-  if (!shortcut) return null;
+  const sc = hotkeys.lookupKey(shortcut);
 
-  const combos = shortcut.split(",").map((s) => s.trim());
+  if (!isDefined(sc)) return null;
+
+  const combos = sc.split(",").map((s) => s.trim());
 
   return (
-    <Elem name="shortcut">
+    <div className={cn("flyoutmenu").elem("shortcut").toClassName()}>
       {combos.map((combo, index) => {
         const keys = combo.split("+");
 
@@ -23,15 +26,15 @@ const shortcutView = (shortcut) => {
           <Fragment key={`${keys.join("-")}-${index}`}>
             {keys.map((key) => {
               return (
-                <Elem name="key" tag="kbd" key={key}>
+                <kbd className={cn("flyoutmenu").elem("key").toClassName()} key={key}>
                   {keysDictionary[key] ?? key}
-                </Elem>
+                </kbd>
               );
             })}
           </Fragment>
         );
       })}
-    </Elem>
+    </div>
   );
 };
 
@@ -43,8 +46,8 @@ export const FlyoutMenu = ({ items, icon }) => {
       items.forEach((menuItem) => {
         const currentShortcut = menuItem.shortcut;
 
-        if (currentShortcut && hotkeys.hasKey(currentShortcut)) {
-          hotkeys.removeKey(currentShortcut);
+        if (currentShortcut && hotkeys.hasKeyByName(currentShortcut)) {
+          hotkeys.removeNamed(currentShortcut);
         }
       });
     };
@@ -52,15 +55,12 @@ export const FlyoutMenu = ({ items, icon }) => {
       items.forEach((menuItem) => {
         const currentShortcut = menuItem.shortcut;
 
-        if (currentShortcut && !hotkeys.hasKey(currentShortcut)) {
-          hotkeys.addKey(
-            currentShortcut,
-            () => {
-              menuItem?.onClick?.();
-              setClicked(false);
-            },
-            menuItem.label,
-          );
+        if (currentShortcut && !hotkeys.hasKeyByName(currentShortcut)) {
+          hotkeys.addNamed(currentShortcut, () => {
+            console.log("clicked");
+            menuItem?.onClick?.();
+            setClicked(false);
+          });
         }
       });
     };
@@ -87,22 +87,28 @@ export const FlyoutMenu = ({ items, icon }) => {
   });
 
   return (
-    <Block
-      name="flyoutmenu"
-      tag="div"
-      className={`${isClicked ? "hovered" : ""}`}
+    <div
+      className={cn("flyoutmenu")
+        .mix(isClicked ? "hovered" : "")
+        .toClassName()}
       onClick={(e) => {
         e.stopPropagation();
         setClicked(!isClicked);
       }}
     >
-      <Elem name="icon" className={`${isClicked ? "isClicked" : ""}`} title="Zoom presets (click to see options)">
+      <div
+        className={cn("flyoutmenu")
+          .elem("icon")
+          .mix(isClicked ? "isClicked" : "")
+          .toClassName()}
+        title="Zoom presets (click to see options)"
+      >
         {icon}
-      </Elem>
-      <Block name="tooltips" tag="div">
+      </div>
+      <div className={cn("tooltips").toClassName()}>
         {items.map((childItem, index) => (
-          <Elem
-            name="tooltip"
+          <div
+            className={cn("tooltips").elem("tooltip").toClassName()}
             key={index}
             onClick={(e) => {
               e.stopPropagation();
@@ -110,13 +116,13 @@ export const FlyoutMenu = ({ items, icon }) => {
               setClicked(false);
             }}
           >
-            <Elem name="tooltip-body">
-              <Elem name="label">{childItem.label}</Elem>
+            <div className={cn("tooltips").elem("tooltip-body").toClassName()}>
+              <div className={cn("tooltips").elem("label").toClassName()}>{childItem.label}</div>
               {shortcutView(childItem.shortcut)}
-            </Elem>
-          </Elem>
+            </div>
+          </div>
         ))}
-      </Block>
-    </Block>
+      </div>
+    </div>
   );
 };

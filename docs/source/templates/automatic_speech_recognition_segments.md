@@ -3,7 +3,7 @@ title: Automatic Speech Recognition using Segments
 type: templates
 category: Audio/Speech Processing
 cat: audio-speech-processing
-order: 303
+order: 310
 meta_title: Automatic Speech Recognition using Segments Data Labeling Template
 meta_description: Template for audio transcription for automatic speech recognition segmentation use cases with Label Studio for your machine learning and data science projects.
 ---
@@ -11,6 +11,11 @@ meta_description: Template for audio transcription for automatic speech recognit
 <img src="/images/templates/automatic-speech-recognition-using-segments.png" alt="" class="gif-border" width="552px" height="408px" />
 
 Listen to an audio file and segment it, then transcribe the contents of each segment in natural language, performing speech recognition using segments.
+
+!!! error Enterprise
+    If you're managing more complex or high-volume audio labeling projects, Label Studio Enterprise includes an advanced audio transcription interface built to support faster, more precise annotation at scale.
+
+    See our new [Multi-Channel Audio Transcription](react_audio) template and learn more in [A New Audio Transcription UI for Speed and Quality at Scale](https://humansignal.com/blog/building-a-better-ui-for-audio-transcription-at-scale/) (blog post).
 
 ## Interactive Template Preview
 

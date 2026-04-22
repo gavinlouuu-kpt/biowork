@@ -134,8 +134,8 @@ export async function generateSampleTaskFromConfig(config: string): Promise<{
   }
 
   // Try to find a root-level comment with a JSON object
-  let userData: Record<string, any> | undefined = undefined;
-  let userAnnotation: any = undefined;
+  let userData: Record<string, any> | undefined;
+  let userAnnotation: any;
   const root = xml.documentElement;
   if (root) {
     for (let i = 0; i < root.childNodes.length; i++) {
@@ -207,7 +207,7 @@ export async function generateSampleTaskFromConfig(config: string): Promise<{
     } else if (tag === "timeseries") {
       const isJson = valueType?.includes("json");
       onlyUrls = onlyUrls || !isJson;
-      const columns = Array.from(node.children).filter((child) => child.tagName === "Channel");
+      const columns = Array.from(node.querySelectorAll("Channel"));
       const timeColumn = node.getAttribute("timeColumn");
       let csvSeparator = node.getAttribute("sep");
       const timeFormat = node.getAttribute("timeFormat");

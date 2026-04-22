@@ -3,7 +3,7 @@ import { destroy, detach, getEnv, getParent, onPatch, types } from "mobx-state-t
 import { Hotkey } from "../core/Hotkey";
 import { isDefined } from "../utils/utilities";
 import { AllRegionsType } from "../regions";
-import { debounce } from "../utils/debounce";
+import { debounce } from "@humansignal/core/lib/utils/debounce";
 import Tree, { TRAVERSE_STOP } from "../core/Tree";
 import { FF_DEV_2755, isFF } from "../utils/feature-flags";
 import { computeColorIntensities } from "../utils/intensity";
@@ -136,29 +136,10 @@ const SelectionMap = types
 export default types
   .model("RegionStore", {
     sort: types.optional(
-      types.enumeration([
-        "date",
-        "score",
-        "intensity_r",
-        "intensity_g",
-        "intensity_b",
-        "area",
-        "bbox_width",
-        "bbox_height",
-      ]),
+      types.enumeration(["date", "score", "mediaStartTime", "intensity_r", "intensity_g", "intensity_b", "area", "bbox_width", "bbox_height"]),
       (() => {
         const stored = window.localStorage.getItem(localStorageKeys.sort);
-        const allowed = new Set([
-          "date",
-          "score",
-          "intensity_r",
-          "intensity_g",
-          "intensity_b",
-          "area",
-          "bbox_width",
-          "bbox_height",
-        ]);
-
+        const allowed = new Set(["date", "score", "mediaStartTime", "intensity_r", "intensity_g", "intensity_b", "area", "bbox_width", "bbox_height"]);
         if (!stored || !allowed.has(stored)) return "date";
         return stored;
       })(),
@@ -166,7 +147,7 @@ export default types
 
     sortOrder: types.optional(
       types.enumeration(["asc", "desc"]),
-      window.localStorage.getItem(localStorageKeys.sortDirection) ?? "asc",
+      () => window.localStorage.getItem(localStorageKeys.sortDirection) ?? "asc",
     ),
 
     group: types.optional(
@@ -300,49 +281,28 @@ export default types
             [...self.filteredRegions].sort(isDesc ? (a, b) => b.score - a.score : (a, b) => a.score - b.score),
           intensity_r: (isDesc) => {
             const intensities = new Map();
-
-            self.filteredRegions.forEach((region) => {
-              intensities.set(region.id, getRegionIntensities(region));
-            });
-
+            self.filteredRegions.forEach((region) => { intensities.set(region.id, getRegionIntensities(region)); });
             return [...self.filteredRegions].sort((a, b) => {
-              const ia = intensities.get(a.id);
-              const ib = intensities.get(b.id);
-              const av = ia?.r ?? 0;
-              const bv = ib?.r ?? 0;
-
+              const av = intensities.get(a.id)?.r ?? 0;
+              const bv = intensities.get(b.id)?.r ?? 0;
               return isDesc ? bv - av : av - bv;
             });
           },
           intensity_g: (isDesc) => {
             const intensities = new Map();
-
-            self.filteredRegions.forEach((region) => {
-              intensities.set(region.id, getRegionIntensities(region));
-            });
-
+            self.filteredRegions.forEach((region) => { intensities.set(region.id, getRegionIntensities(region)); });
             return [...self.filteredRegions].sort((a, b) => {
-              const ia = intensities.get(a.id);
-              const ib = intensities.get(b.id);
-              const av = ia?.g ?? 0;
-              const bv = ib?.g ?? 0;
-
+              const av = intensities.get(a.id)?.g ?? 0;
+              const bv = intensities.get(b.id)?.g ?? 0;
               return isDesc ? bv - av : av - bv;
             });
           },
           intensity_b: (isDesc) => {
             const intensities = new Map();
-
-            self.filteredRegions.forEach((region) => {
-              intensities.set(region.id, getRegionIntensities(region));
-            });
-
+            self.filteredRegions.forEach((region) => { intensities.set(region.id, getRegionIntensities(region)); });
             return [...self.filteredRegions].sort((a, b) => {
-              const ia = intensities.get(a.id);
-              const ib = intensities.get(b.id);
-              const av = ia?.b ?? 0;
-              const bv = ib?.b ?? 0;
-
+              const av = intensities.get(a.id)?.b ?? 0;
+              const bv = intensities.get(b.id)?.b ?? 0;
               return isDesc ? bv - av : av - bv;
             });
           },
@@ -350,22 +310,28 @@ export default types
             [...self.filteredRegions].sort((a, b) => {
               const aArea = a.meta?.area ?? 0;
               const bArea = b.meta?.area ?? 0;
-
               return isDesc ? bArea - aArea : aArea - bArea;
             }),
           bbox_width: (isDesc) =>
             [...self.filteredRegions].sort((a, b) => {
               const aWidth = a.meta?.bbox?.width ?? 0;
               const bWidth = b.meta?.bbox?.width ?? 0;
-
               return isDesc ? bWidth - aWidth : aWidth - bWidth;
             }),
           bbox_height: (isDesc) =>
             [...self.filteredRegions].sort((a, b) => {
               const aHeight = a.meta?.bbox?.height ?? 0;
               const bHeight = b.meta?.bbox?.height ?? 0;
-
               return isDesc ? bHeight - aHeight : aHeight - bHeight;
+            }),
+          mediaStartTime: (isDesc) =>
+            [...self.filteredRegions].sort((a, b) => {
+              const aTime = self.getRegionMediaTime(a);
+              const bTime = self.getRegionMediaTime(b);
+              if (aTime === null && bTime === null) return 0;
+              if (aTime === null) return 1;
+              if (bTime === null) return -1;
+              return isDesc ? bTime - aTime : aTime - bTime;
             }),
         };
 
@@ -381,6 +347,26 @@ export default types
           map[region.id] = idx + 1;
         });
         return map;
+      },
+
+      getRegionMediaTime(region) {
+        // Handle audio regions - they have start time in seconds
+        if ((region.type === "audioregion" || region.type === "timeseriesregion") && typeof region.start === "number") {
+          return region.start;
+        }
+
+        // Handle timeline regions (video) - they have ranges with start frame
+        if (region.type === "timelineregion" && region.ranges?.[0]) {
+          return region.ranges[0].start;
+        }
+
+        // Handle video rectangle regions - they have sequence with frames
+        if (region.type === "videorectangleregion" && region.sequence?.[0]) {
+          return region.sequence[0].frame;
+        }
+
+        // Return null for regions without media time information
+        return null;
       },
 
       getRegionsTree(enrich) {

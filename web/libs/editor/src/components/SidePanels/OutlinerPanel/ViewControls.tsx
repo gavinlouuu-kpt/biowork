@@ -1,34 +1,33 @@
-import { type ChangeEvent, type FC, useCallback, useContext, useMemo, useState } from "react";
 import {
-  IconCursor,
+  IconBoundingBox,
   IconClockTimeFourOutline,
+  IconCursor,
   IconList,
   IconOutlinerEyeClosed,
   IconOutlinerEyeOpened,
+  IconPredictions,
   IconSortDown,
   IconSortUp,
-  IconBoundingBox,
   IconFilter,
-  IconPredictions,
+  IconTimelineRegion,
 } from "@humansignal/icons";
-import { Button } from "../../../common/Button/Button";
-import { Dropdown } from "../../../common/Dropdown/Dropdown";
+import { Button } from "@humansignal/ui";
+import { type FC, useCallback, useContext, useEffect, useMemo } from "react";
+import { Dropdown } from "@humansignal/ui";
 // eslint-disable-next-line
 // @ts-ignore
 import { Menu } from "../../../common/Menu/Menu";
-import { BemWithSpecifiContext } from "../../../utils/bem";
+import { cn } from "../../../utils/bem";
 import { SidePanelsContext } from "../SidePanelsContext";
 import "./ViewControls.scss";
-import { FF_DEV_3873, isFF } from "../../../utils/feature-flags";
 import { observer } from "mobx-react";
-
-const { Block, Elem } = BemWithSpecifiContext();
 
 export type GroupingOptions = "manual" | "label" | "type";
 
 export type OrderingOptions =
   | "score"
   | "date"
+  | "mediaStartTime"
   | "intensity_r"
   | "intensity_g"
   | "intensity_b"
@@ -45,8 +44,14 @@ interface ViewControlsProps {
   onOrderingChange: (ordering: OrderingOptions) => void;
   onOrderingDirectionToggle: () => void;
   onGroupingChange: (grouping: GroupingOptions) => void;
-  onFilterChange: (filter: any) => void;
 }
+
+const mediaStartTimeSupportedTags = [
+  ["labels", "audio"],
+  ["labels", "videorectangle", "video"],
+  ["timelinelabels", "video"],
+  ["timeserieslabels", "timeseries"],
+];
 
 export const ViewControls: FC<ViewControlsProps> = observer(
   ({
@@ -60,6 +65,26 @@ export const ViewControls: FC<ViewControlsProps> = observer(
   }) => {
     const grouping = regions.group;
     const context = useContext(SidePanelsContext);
+
+    // Check labeling configuration for media-time-capable object tags
+    const mediaTimeSupport: boolean | null = useMemo(() => {
+      const names = regions.annotation?.names;
+      if (!names || names.size === 0) return null;
+
+      const tags = Array.from(names.values());
+      // Check if all tag types from the tuple exist in the configuration
+      return mediaStartTimeSupportedTags.some((requiredTagTypes) => {
+        return requiredTagTypes.every((requiredType) => tags.some((tag: any) => tag?.type === requiredType));
+      });
+    }, [regions.annotation?.names]);
+
+    // Auto-fallback to "date" if current ordering is "mediaStartTime" but no media-time support in config
+    useEffect(() => {
+      if (ordering === "mediaStartTime" && mediaTimeSupport === false) {
+        onOrderingChange("date");
+      }
+    }, [ordering, mediaTimeSupport, onOrderingChange]);
+
     const getGroupingLabels = useCallback((value: GroupingOptions): LabelInfo => {
       switch (value) {
         case "manual":
@@ -69,7 +94,7 @@ export const ViewControls: FC<ViewControlsProps> = observer(
                 <IconList /> Group Manually
               </>
             ),
-            selectedLabel: isFF(FF_DEV_3873) ? "Manual" : "Manual Grouping",
+            selectedLabel: "Manual",
             icon: <IconList width={16} height={16} />,
             tooltip: "Manually Grouped",
           };
@@ -80,7 +105,7 @@ export const ViewControls: FC<ViewControlsProps> = observer(
                 <IconBoundingBox /> Group by Label
               </>
             ),
-            selectedLabel: isFF(FF_DEV_3873) ? "By Label" : "Grouped by Label",
+            selectedLabel: "By Label",
             icon: <IconBoundingBox width={16} height={16} />,
             tooltip: "Grouped by Label",
           };
@@ -91,7 +116,7 @@ export const ViewControls: FC<ViewControlsProps> = observer(
                 <IconCursor /> Group by Tool
               </>
             ),
-            selectedLabel: isFF(FF_DEV_3873) ? "By Tool" : "Grouped by Tool",
+            selectedLabel: "By Tool",
             icon: <IconCursor width={16} height={16} />,
             tooltip: "Grouped by Tool",
           };
@@ -122,63 +147,45 @@ export const ViewControls: FC<ViewControlsProps> = observer(
           };
         case "intensity_r":
           return {
-            label: (
-              <>
-                <IconPredictions /> Order by Mean Red
-              </>
-            ),
+            label: (<><IconPredictions /> Order by Mean Red</>),
             selectedLabel: "By Mean Red",
             icon: <IconPredictions width={16} height={16} />,
           };
         case "intensity_g":
           return {
-            label: (
-              <>
-                <IconPredictions /> Order by Mean Green
-              </>
-            ),
+            label: (<><IconPredictions /> Order by Mean Green</>),
             selectedLabel: "By Mean Green",
             icon: <IconPredictions width={16} height={16} />,
           };
         case "intensity_b":
           return {
-            label: (
-              <>
-                <IconPredictions /> Order by Mean Blue
-              </>
-            ),
+            label: (<><IconPredictions /> Order by Mean Blue</>),
             selectedLabel: "By Mean Blue",
             icon: <IconPredictions width={16} height={16} />,
           };
         case "area":
           return {
-            label: (
-              <>
-                <IconBoundingBox /> Order by Area
-              </>
-            ),
+            label: (<><IconBoundingBox /> Order by Area</>),
             selectedLabel: "By Area",
             icon: <IconBoundingBox width={16} height={16} />,
           };
         case "bbox_width":
           return {
-            label: (
-              <>
-                <IconBoundingBox /> Order by Width
-              </>
-            ),
+            label: (<><IconBoundingBox /> Order by Width</>),
             selectedLabel: "By Width",
             icon: <IconBoundingBox width={16} height={16} />,
           };
         case "bbox_height":
           return {
-            label: (
-              <>
-                <IconBoundingBox /> Order by Height
-              </>
-            ),
+            label: (<><IconBoundingBox /> Order by Height</>),
             selectedLabel: "By Height",
             icon: <IconBoundingBox width={16} height={16} />,
+          };
+        case "mediaStartTime":
+          return {
+            label: (<><IconTimelineRegion /> Order by Media Start Time</>),
+            selectedLabel: "By Media Start Time",
+            icon: <IconTimelineRegion width={16} height={16} />,
           };
       }
     }, []);
@@ -186,7 +193,7 @@ export const ViewControls: FC<ViewControlsProps> = observer(
     const renderOrderingDirectionIcon = orderingDirection === "asc" ? <IconSortUp /> : <IconSortDown />;
 
     return (
-      <Block name="view-controls" mod={{ collapsed: context.locked }}>
+      <div className={cn("view-controls").mod({ collapsed: context.locked }).toClassName()}>
         <Grouping
           value={grouping}
           options={["manual", "type", "label"]}
@@ -194,40 +201,25 @@ export const ViewControls: FC<ViewControlsProps> = observer(
           readableValueForKey={getGroupingLabels}
         />
         {grouping === "manual" && (
-          <Elem name="sort">
+          <div className={cn("view-controls").elem("sort").toClassName()}>
             <Grouping
               value={ordering}
               direction={orderingDirection}
-              options={[
-                "score",
-                "date",
-                "area",
-                "bbox_width",
-                "bbox_height",
-                "intensity_r",
-                "intensity_g",
-                "intensity_b",
-              ]}
+              options={
+                mediaTimeSupport
+                  ? ["score", "date", "mediaStartTime", "area", "bbox_width", "bbox_height", "intensity_r", "intensity_g", "intensity_b"]
+                  : ["score", "date", "area", "bbox_width", "bbox_height", "intensity_r", "intensity_g", "intensity_b"]
+              }
               onChange={(value) => onOrderingChange(value)}
               readableValueForKey={getOrderingLabels}
-              allowClickSelected={false}
+              allowClickSelected
+              extraIcon={renderOrderingDirectionIcon}
+              width={230}
             />
-            <Elem
-              tag={Button}
-              type="text"
-              onClick={onOrderingDirectionToggle}
-              aria-label={orderingDirection === "asc" ? "Sort descending" : "Sort ascending"}
-              tooltip={orderingDirection === "asc" ? "High to low" : "Low to high"}
-              tooltipTheme="dark"
-            >
-              {renderOrderingDirectionIcon}
-            </Elem>
-            <RegionMetricsFilter regions={regions} />
-            <BulkGroupAssignment regions={regions} />
-          </Elem>
+          </div>
         )}
         <ToggleRegionsVisibilityButton regions={regions} />
-      </Block>
+      </div>
     );
   },
 );
@@ -247,6 +239,7 @@ interface GroupingProps<T extends string> {
   onChange: (value: T) => void;
   readableValueForKey: (value: T) => LabelInfo;
   extraIcon?: JSX.Element;
+  width?: number;
 }
 
 const Grouping = <T extends string>({
@@ -257,6 +250,7 @@ const Grouping = <T extends string>({
   onChange,
   readableValueForKey,
   extraIcon,
+  width = 200,
 }: GroupingProps<T>) => {
   const readableValue = useMemo(() => {
     return readableValueForKey(value);
@@ -264,16 +258,16 @@ const Grouping = <T extends string>({
 
   const optionsList: [T, LabelInfo][] = useMemo(() => {
     return options.map((key) => [key, readableValueForKey(key)]);
-  }, []);
+  }, [options, readableValueForKey]);
 
   const dropdownContent = useMemo(() => {
     return (
       <Menu
         size="medium"
         style={{
-          width: 200,
-          minWidth: 200,
-          borderRadius: isFF(FF_DEV_3873) && 4,
+          width,
+          minWidth: width,
+          borderRadius: 4,
         }}
         selectedKeys={[value]}
         allowClickSelected={allowClickSelected}
@@ -292,27 +286,15 @@ const Grouping = <T extends string>({
     );
   }, [value, optionsList, readableValue, direction, onChange]);
 
-  // mods are already set in the button from type, so use it only in new UI
-  const extraStyles = isFF(FF_DEV_3873) ? { mod: { newUI: true } } : undefined;
-  const style = isFF(FF_DEV_3873) ? { padding: "0 12px 0 2px" } : {};
-
   return (
-    <Dropdown.Trigger content={dropdownContent} style={{ width: 200 }}>
+    <Dropdown.Trigger content={dropdownContent} style={{ width }}>
       <Button
-        type="text"
+        variant="neutral"
+        size="smaller"
         data-testid={`grouping-${value}`}
-        {...extraStyles}
-        icon={readableValue.icon}
-        style={style}
-        extra={
-          isFF(FF_DEV_3873) ? (
-            extraIcon
-          ) : (
-            <DirectionIndicator direction={direction} name={value} value={value} wrap={false} />
-          )
-        }
-        tooltip={readableValue.tooltip || undefined}
-        tooltipTheme="dark"
+        look="string"
+        leading={readableValue.icon}
+        trailing={extraIcon}
       >
         {readableValue.selectedLabel}
       </Button>
@@ -331,10 +313,10 @@ interface GroupingMenuItemProps<T extends string> {
 const GroupingMenuItem = <T extends string>({ value, name, label, direction, onChange }: GroupingMenuItemProps<T>) => {
   return (
     <Menu.Item name={name} onClick={() => onChange(name)}>
-      <Elem name="label">
+      <div className={cn("view-controls").elem("label").toClassName()}>
         {label.label}
         <DirectionIndicator direction={direction} name={name} value={value} />
-      </Elem>
+      </div>
     </Menu.Item>
   );
 };
@@ -349,7 +331,7 @@ interface DirectionIndicator {
 const DirectionIndicator: FC<DirectionIndicator> = ({ direction, value, name, wrap = true }) => {
   const content = direction === "asc" ? <IconSortUp /> : <IconSortDown />;
 
-  if (!direction || value !== name || isFF(FF_DEV_3873)) return null;
+  if (!direction || value !== name) return null;
   if (!wrap) return content;
 
   return <span>{content}</span>;
@@ -543,23 +525,21 @@ const ToggleRegionsVisibilityButton = observer<FC<ToggleRegionsVisibilityButton>
   const isAllHidden = !isDisabled && regions.isAllHidden;
 
   return (
-    <Elem
-      tag={Button}
-      type="text"
+    <Button
+      variant="neutral"
+      size="smaller"
+      look="string"
       disabled={isDisabled}
       onClick={toggleRegionsVisibility}
-      mod={{ hidden: isAllHidden }}
       aria-label={isAllHidden ? "Show all regions" : "Hide all regions"}
-      icon={
-        isAllHidden ? (
-          <IconOutlinerEyeClosed width={16} height={16} />
-        ) : (
-          <IconOutlinerEyeOpened width={16} height={16} />
-        )
-      }
       tooltip={isAllHidden ? "Show all regions" : "Hide all regions"}
-      tooltipTheme="dark"
-    />
+    >
+      {isAllHidden ? (
+        <IconOutlinerEyeClosed width={16} height={16} />
+      ) : (
+        <IconOutlinerEyeOpened width={16} height={16} />
+      )}
+    </Button>
   );
 });
 

@@ -192,15 +192,14 @@ class S3ImportStorageBase(S3StorageMixin, ImportStorage):
     )
 
     @catch_and_reraise_from_none
-    def iterkeys(self):
-        client, bucket = self.get_client_and_bucket()
+    def iter_objects(self):
+        _, bucket = self.get_client_and_bucket()
+        list_kwargs = {}
         if self.prefix:
-            list_kwargs = {'Prefix': self.prefix.rstrip('/') + '/'}
-            if not self.recursive_scan:
-                list_kwargs['Delimiter'] = '/'
-            bucket_iter = bucket.objects.filter(**list_kwargs).all()
-        else:
-            bucket_iter = bucket.objects.all()
+            list_kwargs['Prefix'] = self.prefix.rstrip('/') + '/'
+        if not self.recursive_scan:
+            list_kwargs['Delimiter'] = '/'
+        bucket_iter = bucket.objects.filter(**list_kwargs).all()
         regex = re.compile(str(self.regex_filter)) if self.regex_filter else None
         for obj in bucket_iter:
             key = obj.key
@@ -210,7 +209,20 @@ class S3ImportStorageBase(S3StorageMixin, ImportStorage):
             if regex and not regex.match(key):
                 logger.debug(key + ' is skipped by regex filter')
                 continue
-            yield key
+            logger.debug(f's3 {key} has passed the regex filter')
+            yield obj
+
+    @catch_and_reraise_from_none
+    def iter_keys(self):
+        for obj in self.iter_objects():
+            yield obj.key
+
+    def get_unified_metadata(self, obj):
+        return {
+            'key': obj.key,
+            'last_modified': obj.last_modified,
+            'size': obj.size,
+        }
 
     @catch_and_reraise_from_none
     def scan_and_create_links(self):
@@ -305,7 +317,14 @@ class S3ExportStorage(S3StorageMixin, ExportStorage):
         S3ExportStorageLink.objects.filter(storage=self, annotation=annotation).delete()
 
 
-def async_export_annotation_to_s3_storages(annotation):
+def async_export_annotation_to_s3_storages(annotation: 'Annotation | int'):
+    if isinstance(annotation, int):
+        try:
+            annotation = Annotation.objects.get(pk=annotation)
+        except Annotation.DoesNotExist:
+            logger.info(f'Annotation {annotation} no longer exists, skipping S3 export')
+            return
+
     project = annotation.project
     if hasattr(project, 'io_storages_s3exportstorages'):
         for storage in project.io_storages_s3exportstorages.all():
@@ -317,7 +336,7 @@ def async_export_annotation_to_s3_storages(annotation):
 def export_annotation_to_s3_storages(sender, instance, **kwargs):
     storages = getattr(instance.project, 'io_storages_s3exportstorages', None)
     if storages and storages.exists():  # avoid excess jobs in rq
-        start_job_async_or_sync(async_export_annotation_to_s3_storages, instance)
+        start_job_async_or_sync(async_export_annotation_to_s3_storages, instance.pk)
 
 
 @receiver(pre_delete, sender=Annotation)
@@ -334,15 +353,18 @@ class S3ImportStorageLink(ImportStorageLink):
     storage = models.ForeignKey(S3ImportStorage, on_delete=models.CASCADE, related_name='links')
 
     @classmethod
-    def exists(cls, key, storage):
-        storage_link_exists = super(S3ImportStorageLink, cls).exists(key, storage)
+    def exists(cls, keys, storage) -> set[str]:
+        super_exists = super(S3ImportStorageLink, cls).exists
         # TODO: this is a workaround to be compatible with old keys version - remove it later
         prefix = str(storage.prefix) or ''
-        return (
-            storage_link_exists
-            or cls.objects.filter(key=prefix + key, storage=storage.id).exists()
-            or cls.objects.filter(key=prefix + '/' + key, storage=storage.id).exists()
-        )
+        if prefix:
+            return (
+                super_exists(keys, storage)
+                | super_exists([prefix + key for key in keys], storage)
+                | super_exists([prefix + '/' + key for key in keys], storage)
+            )
+        else:
+            return super_exists(keys, storage)
 
 
 class S3ExportStorageLink(ExportStorageLink):

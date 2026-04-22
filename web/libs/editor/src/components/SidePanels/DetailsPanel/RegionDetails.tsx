@@ -1,30 +1,52 @@
-import { Typography } from "antd";
 import { observer } from "mobx-react";
 import { type FC, useEffect, useMemo, useRef } from "react";
-import { Block, Elem, useBEM } from "../../../utils/bem";
+import { cn } from "../../../utils/bem";
 import { RegionEditor } from "./RegionEditor";
 import "./RegionDetails.scss";
-
-const { Text } = Typography;
+import { JsonViewer, Typography } from "@humansignal/ui";
 
 const TextResult: FC<{ mainValue: string[] }> = observer(({ mainValue }) => {
   return (
-    <Text mark>
+    <div className="flex flex-col items-start gap-tighter">
       {mainValue.map((value: string, i: number) => (
-        <p key={`${value}-${i}`} data-counter={i + 1}>
-          {value}
-        </p>
+        <mark
+          key={`${value}-${i}`}
+          className="bg-primary-background px-tighter py-tightest rounded-sm text-neutral-content"
+        >
+          <Typography data-counter={i + 1} size="small" className="!m-0">
+            {value}
+          </Typography>
+        </mark>
       ))}
-    </Text>
+    </div>
   );
 });
 
 const ChoicesResult: FC<{ mainValue: string[] }> = observer(({ mainValue }) => {
-  return <Text mark>{mainValue.join(", ")}</Text>;
+  return (
+    <mark className="bg-primary-background px-tighter py-tightest rounded-sm">
+      <Typography as="span" size="small" className="text-neutral-content">
+        {mainValue.join(", ")}
+      </Typography>
+    </mark>
+  );
 });
 
 const RatingResult: FC<{ mainValue: string[] }> = observer(({ mainValue }) => {
   return <span>{mainValue}</span>;
+});
+
+const ReactCodeResult: FC<{ mainValue: unknown }> = observer(({ mainValue }) => {
+  return (
+    <JsonViewer
+      data={mainValue}
+      showSearch={false}
+      showFilters={false}
+      showCopyButton={false}
+      minHeight={100}
+      maxHeight={300}
+    />
+  );
 });
 
 export const ResultItem: FC<{ result: any }> = observer(({ result }) => {
@@ -39,47 +61,56 @@ export const ResultItem: FC<{ result: any }> = observer(({ result }) => {
   const content = useMemo(() => {
     if (type === "rating") {
       return (
-        <Elem name="result">
-          <Text>Rating: </Text>
-          <Elem name="value">
+        <div className={cn("region-meta").elem("result").toClassName()}>
+          <Typography size="small">Rating: </Typography>
+          <div className={cn("region-meta").elem("value").toClassName()}>
             <RatingResult mainValue={mainValue} />
-          </Elem>
-        </Elem>
+          </div>
+        </div>
       );
     }
     if (type === "textarea") {
       return (
-        <Elem name="result">
-          <Text>Text: </Text>
-          <Elem name="value">
+        <div className={cn("region-meta").elem("result").toClassName()}>
+          <Typography size="small">Text: </Typography>
+          <div className={cn("region-meta").elem("value").toClassName()}>
             <TextResult mainValue={mainValue} />
-          </Elem>
-        </Elem>
+          </div>
+        </div>
       );
     }
     if (type === "choices") {
       return (
-        <Elem name="result">
-          <Text>Choices: </Text>
-          <Elem name="value">
+        <div className={cn("region-meta").elem("result").toClassName()}>
+          <Typography size="small">Choices: </Typography>
+          <div className={cn("region-meta").elem("value").toClassName()}>
             <ChoicesResult mainValue={mainValue} />
-          </Elem>
-        </Elem>
+          </div>
+        </div>
       );
     }
     if (type === "taxonomy") {
       return (
-        <Elem name="result">
-          <Text>Taxonomy: </Text>
-          <Elem name="value">
+        <div className={cn("region-meta").elem("result").toClassName()}>
+          <Typography size="small">Taxonomy: </Typography>
+          <div className={cn("region-meta").elem("value").toClassName()}>
             <ChoicesResult mainValue={mainValue.map((v: string[]) => v.join("/"))} />
-          </Elem>
-        </Elem>
+          </div>
+        </div>
+      );
+    }
+    if (type === "reactcode") {
+      return (
+        <div className={cn("region-meta").elem("result").toClassName()}>
+          <div className={cn("region-meta").elem("value").toClassName()}>
+            <ReactCodeResult mainValue={mainValue} />
+          </div>
+        </div>
       );
     }
   }, [type, mainValue]);
 
-  return content ? <Block name="region-meta">{content}</Block> : null;
+  return content ? <div className={cn("region-meta").toClassName()}>{content}</div> : null;
 });
 
 export const RegionDetailsMain: FC<{ region: any }> = observer(({ region }) => {
@@ -138,20 +169,25 @@ export const RegionDetailsMain: FC<{ region: any }> = observer(({ region }) => {
           </Elem>
         </Block>
       ) : null}
-      <Elem name="result">
-        {(region?.results as any[]).map((res) => (
-          <ResultItem key={res.pid} result={res} />
-        ))}
-        {region?.text ? (
-          <Block name="region-meta">
-            <Elem name="item">
-              <Elem name="content" mod={{ type: "text" }}>
+      <div className={cn("detailed-region").elem("result").toClassName()}>
+        {(region?.results as any[])
+          // hide per-regions stored only in this session just for a better UX
+          .filter((res) => res.canBeSubmitted)
+          .map((res) => (
+            <ResultItem key={res.pid} result={res} />
+          ))}
+        {/* @todo dirty hack to not duplicate text for OCR regions */}
+        {/* @todo should be converted into universal solution */}
+        {region?.text && !region?.ocrtext ? (
+          <div className={cn("region-meta").toClassName()}>
+            <div className={cn("region-meta").elem("item").toClassName()}>
+              <div className={cn("region-meta").elem("content").mod({ type: "text" }).toClassName()}
                 {region.text.replace(/\\n/g, "\n")}
-              </Elem>
-            </Elem>
-          </Block>
+              </div>
+            </div>
+          </div>
         ) : null}
-      </Elem>
+      </div>
       <RegionEditor region={region} />
     </>
   );
@@ -166,7 +202,6 @@ type RegionDetailsMetaProps = {
 
 export const RegionDetailsMeta: FC<RegionDetailsMetaProps> = observer(
   ({ region, editMode, cancelEditMode, enterEditMode }) => {
-    const bem = useBEM();
     const input = useRef<HTMLTextAreaElement | null>();
 
     const saveMeta = (value: string) => {
@@ -188,7 +223,7 @@ export const RegionDetailsMeta: FC<RegionDetailsMetaProps> = observer(
           <textarea
             ref={(el) => (input.current = el)}
             placeholder="Meta"
-            className={bem.elem("meta-text").toClassName()}
+            className={cn("detailed-region").elem("meta-text").toClassName()}
             value={region.meta.text}
             onChange={(e) => saveMeta(e.target.value)}
             onBlur={(e) => {
@@ -205,9 +240,9 @@ export const RegionDetailsMeta: FC<RegionDetailsMetaProps> = observer(
           />
         ) : (
           region.meta?.text && (
-            <Elem name="meta-text" onClick={() => enterEditMode?.()}>
+            <div className={cn("detailed-region").elem("meta-text").toClassName()} onClick={() => enterEditMode?.()}>
               {region.meta?.text}
-            </Elem>
+            </div>
           )
         )}
       </>

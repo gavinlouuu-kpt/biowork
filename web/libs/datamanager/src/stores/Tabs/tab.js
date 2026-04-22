@@ -13,6 +13,8 @@ import { FF_ANNOTATION_RESULTS_FILTERING, isFF } from "../../utils/feature-flags
 const THRESHOLD_MIN = 0;
 const THRESHOLD_MIN_DIFF = 0.001;
 
+import { validateFilterSnapshot } from "./filter_snapshot_utils";
+
 export const Tab = types
   .model("View", {
     id: StringOrNumberID,
@@ -46,6 +48,7 @@ export const Tab = types
     deletable: true,
     semantic_search: types.optional(types.array(CustomJSON), []),
     threshold: types.optional(types.maybeNull(ThresholdType), null),
+    agreement_selected: types.optional(CustomJSON, {}),
   })
   .volatile(() => {
     const defaultWidth = getComputedStyle(document.body)
@@ -90,7 +93,7 @@ export const Tab = types
     },
 
     get hiddenColumnsList() {
-      return self.columns.filter((c) => c.hidden).map((c) => c.key);
+      return self.columns.filter((c) => c.is_hidden).map((c) => c.key);
     },
 
     get availableFilters() {
@@ -110,10 +113,12 @@ export const Tab = types
     },
 
     get currentFilters() {
-      if (isFF(FF_ANNOTATION_RESULTS_FILTERING)) {
-        return self.filters.filter((f) => f.target === self.target);
-      }
-      return self.filters.filter((f) => f.target === self.target && !f.field.isAnnotationResultsFilterColumn);
+      return self.filters.filter((f) => {
+        const targetMatches = f.target === self.target;
+        const annotationResultsOK = isFF(FF_ANNOTATION_RESULTS_FILTERING) || !f.field.isAnnotationResultsFilterColumn;
+
+        return targetMatches && annotationResultsOK;
+      });
     },
 
     get currentOrder() {
@@ -142,15 +147,26 @@ export const Tab = types
     },
 
     get serializedFilters() {
-      return self.validFilters.map((el) => {
-        const filterItem = {
-          ...getSnapshot(el),
-          type: el.filter.currentType,
+      const serialize = (filterModel) => {
+        const item = {
+          ...getSnapshot(filterModel),
+          type: filterModel.filter.currentType,
         };
 
-        filterItem.value = normalizeFilterValue(filterItem.type, filterItem.operator, filterItem.value);
-        return filterItem;
-      });
+        // cleanup or recurse on child_filter
+        if (item.child_filter) {
+          if (!filterModel.child_filter?.isValidFilter) {
+            item.child_filter = null;
+          } else {
+            item.child_filter = serialize(filterModel.child_filter);
+          }
+        }
+
+        item.value = normalizeFilterValue(item.type, item.operator, item.value);
+        return item;
+      };
+
+      return self.validFilters.map((el) => serialize(el));
     },
 
     get selectedCount() {
@@ -171,6 +187,29 @@ export const Tab = types
       };
     },
 
+    /**
+     * Snapshot of ALL filters (including empty/invalid ones).
+     * Used by the "Copy filters" button — unlike filterSnapshot which only includes
+     * valid filters, this captures the full state so the user can paste it back
+     * and continue editing.
+     */
+    get allFiltersSnapshot() {
+      const serialize = (filterModel) => {
+        const item = {
+          ...getSnapshot(filterModel),
+          type: filterModel.filter.currentType,
+        };
+        if (item.child_filter) {
+          item.child_filter = filterModel.child_filter ? serialize(filterModel.child_filter) : null;
+        }
+        return item;
+      };
+      return {
+        conjunction: self.conjunction,
+        items: self.filters.map((el) => serialize(el)),
+      };
+    },
+
     // key used in urls
     get tabKey() {
       return self.virtual ? self.key : self.id;
@@ -185,6 +224,7 @@ export const Tab = types
         filters: self.filterSnapshot,
         ordering: self.ordering.toJSON(),
         hiddenColumns: self.hiddenColumnsSnapshot,
+        agreement_selected: self.agreement_selected,
       });
     },
 
@@ -194,6 +234,7 @@ export const Tab = types
           title: self.title,
           filters: self.filterSnapshot,
           ordering: self.ordering.toJSON(),
+          agreement_selected: self.agreement_selected,
         };
       }
 
@@ -213,6 +254,7 @@ export const Tab = types
         gridFitImagesToWidth: self.gridFitImagesToWidth,
         semantic_search: self.semantic_search?.toJSON() ?? [],
         threshold: self.threshold?.toJSON(),
+        agreement_selected: self.agreement_selected,
       };
 
       if (self.saved || apiVersion === 1) {
@@ -255,6 +297,10 @@ export const Tab = types
 
     setTitle(title) {
       self.title = title;
+    },
+
+    setVirtual(value) {
+      self.virtual = value;
     },
 
     setRenameMode(mode) {
@@ -342,6 +388,15 @@ export const Tab = types
       self.selected.toggleItem(id);
     },
 
+    /**
+     * Select or unselect a range of items by their IDs (used for shift-click range selection)
+     * @param {Array} ids - Array of item IDs
+     * @param {boolean} select - true to select, false to unselect
+     */
+    selectRange(ids, select = true) {
+      self.selected.selectRange(ids, select);
+    },
+
     setColumnWidth(columnID, width) {
       if (width) {
         self.columnsWidth.set(columnID, width);
@@ -366,8 +421,14 @@ export const Tab = types
       }
     },
 
+    /**
+     * Add a new filter row.
+     * Copies the column and operator from the last existing filter to reduce
+     * repetitive re-selection when the user adds multiple filters for the same column.
+     */
     createFilter() {
-      const filterType = self.availableFilters[0];
+      const lastFilter = self.filters.length > 0 ? self.filters[self.filters.length - 1] : null;
+      const filterType = lastFilter?.filter ?? self.availableFilters[0];
       const filter = TabFilter.create({
         filter: filterType,
         view: self.id,
@@ -375,7 +436,30 @@ export const Tab = types
 
       self.filters.push(filter);
 
+      // Immediately materialize child filter for the default column, if any
+      self.applyChildFilter(filter);
+
+      // Copy operator from previous filter if the column types match
+      if (lastFilter && filter.filter.currentType === lastFilter.filter.currentType && lastFilter.operator) {
+        filter.setOperator(lastFilter.operator);
+      }
+
       if (filter.isValidFilter) self.save();
+    },
+
+    /**
+     * Create a new filter row for the provided filter *type* (column).
+     */
+    createChildFilterForType(filterType, parentFilter) {
+      const filter = TabFilter.create({
+        filter: filterType,
+        view: self.id,
+      });
+
+      // Don't add to main filters array - child is owned by parent
+      parentFilter.child_filter = filter;
+
+      return filter;
     },
 
     toggleColumn(column) {
@@ -385,6 +469,24 @@ export const Tab = types
         self.hiddenColumns.add(column);
       }
       self.save();
+    },
+
+    setAgreementFilters({
+      ground_truth = false,
+      annotators = { all: true, ids: [] },
+      models = { all: true, ids: [] },
+    }) {
+      self.agreement_selected = {
+        ground_truth,
+        annotators: {
+          all: annotators.all,
+          ids: annotators.ids,
+        },
+        models: {
+          all: models.all,
+          ids: models.ids,
+        },
+      };
     },
 
     reload: flow(function* ({ interaction } = {}) {
@@ -399,11 +501,59 @@ export const Tab = types
     }),
 
     deleteFilter(filter) {
-      const index = self.filters.findIndex((f) => f === filter);
+      // Recursively delete child filter first
+      if (filter.child_filter) {
+        self.deleteFilter(filter.child_filter);
+      }
 
-      self.filters.splice(index, 1);
-      destroy(filter);
+      const index = self.filters.findIndex((f) => f === filter);
+      if (index > -1) {
+        self.filters.splice(index, 1);
+        destroy(filter);
+        self.save();
+      }
+    },
+
+    /**
+     * Replace all current filters with those from a pasted snapshot.
+     * Validates each item against available columns — columns that don't exist
+     * in the current project are silently skipped.
+     * @param {{ conjunction: string, items: Array }} snapshot
+     * @returns {boolean} false if no valid filters could be imported
+     */
+    importFilters(snapshot) {
+      const validItems = validateFilterSnapshot(snapshot, self.availableFilters);
+      if (!validItems) return false;
+
+      const { conjunction } = snapshot;
+
+      // Destroy existing filters before importing
+      while (self.filters.length > 0) {
+        const f = self.filters[self.filters.length - 1];
+        self.filters.splice(self.filters.length - 1, 1);
+        destroy(f);
+      }
+
+      if (conjunction === "and" || conjunction === "or") {
+        self.conjunction = conjunction;
+      }
+
+      for (const item of validItems) {
+        try {
+          const filter = TabFilter.create({
+            filter: item.filter,
+            operator: item.operator ?? null,
+            value: item.value ?? null,
+          });
+          self.filters.push(filter);
+          self.applyChildFilter(filter);
+        } catch (e) {
+          console.warn("importFilters: failed to create filter for", item.filter, e);
+        }
+      }
+
       self.save();
+      return true;
     },
 
     afterAttach() {
@@ -440,9 +590,19 @@ export const Tab = types
     }),
 
     saveVirtual: flow(function* (options) {
-      self.virtual = false;
-      yield self.save(options);
-      History.navigate({ tab: self.id }, true);
+      const originalId = self.id;
+      self.setVirtual(false);
+      const newView = yield self.save(options);
+
+      // If a new view was created (different ID), the old view is destroyed
+      // Use the new view for navigation
+      if (newView && newView.id !== originalId) {
+        History.navigate({ tab: newView.id }, true);
+      } else {
+        // Same view, ensure virtual is false
+        self.setVirtual(false);
+        History.navigate({ tab: self.id }, true);
+      }
     }),
 
     delete: flow(function* () {
@@ -452,11 +612,42 @@ export const Tab = types
     markSaved() {
       self.saved = true;
     },
+
+    /**
+     * Create child filters for a given root filter according to its column's `child_filter` metadata.
+     */
+    applyChildFilter(rootFilter) {
+      if (!rootFilter || !rootFilter.filter || !rootFilter.filter.field) return;
+
+      const column = rootFilter.field;
+      const childFilter = column?.child_filter;
+
+      if (!childFilter) return;
+
+      // NOTE: using targetColumns instead of columns means that annotation results columns cannot be used in child_filters, but seems fine for now
+      const firstChildColumn = self.targetColumns.find((c) => c.alias === childFilter);
+
+      if (firstChildColumn && !rootFilter.child_filter) {
+        const filterType = self.availableFilters.find((ft) => ft.field.id === firstChildColumn.id);
+
+        if (filterType) {
+          const childFilter = self.createChildFilterForType(filterType, rootFilter);
+        }
+      }
+    },
+
+    /** Remove any child filters previously created */
+    clearChildFilter(rootFilter) {
+      if (rootFilter.child_filter) {
+        self.deleteFilter(rootFilter.child_filter);
+        rootFilter.child_filter = null;
+      }
+    },
   }))
   .preProcessSnapshot((snapshot) => {
     if (snapshot === null) return snapshot;
 
-    const { filters, ...sn } = snapshot ?? {};
+    const { filters, agreement_selected, ...sn } = snapshot ?? {};
 
     if (filters && !Array.isArray(filters)) {
       const { conjunction, items } = filters ?? {};
@@ -469,6 +660,12 @@ export const Tab = types
       sn.filters = filters;
     }
 
+    if (agreement_selected) {
+      Object.assign(sn, {
+        agreement_selected:
+          typeof agreement_selected === "string" ? JSON.parse(agreement_selected) : agreement_selected,
+      });
+    }
     delete sn.selectedItems;
 
     return sn;

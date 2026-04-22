@@ -23,14 +23,11 @@ const TaskSummary = ({ annotations: all, store: annotationStore }: TaskSummaryPr
 
   const onSelect = (entity: Annotation) => {
     if (entity.type === "annotation") {
-      annotationStore.selectAnnotation(entity.id);
+      annotationStore.selectAnnotation(entity.id, { exitViewAll: true });
     } else {
-      annotationStore.selectPrediction(entity.id);
+      annotationStore.selectPrediction(entity.id, { exitViewAll: true });
     }
   };
-
-  // Check if agreement should be shown based on project settings
-  const showAgreement = annotationStore.store.project?.review_settings?.show_agreement_to_reviewers ?? true;
 
   const controlTags: [string, MSTControlTag][] = allTags.filter(([_, control]) => control.isControlTag) as [
     string,
@@ -43,13 +40,29 @@ const TaskSummary = ({ annotations: all, store: annotationStore }: TaskSummaryPr
     label_attrs: getLabelColors(control),
     per_region: !!control.perregion,
   }));
+
+  // Add pseudo-controls for ReactCode dimensions
+  // ReactCode tags are object tags that can have dimensions defined via outputs schema
+  const reactcodeTags = allTags.filter(([_, tag]) => tag.type === "reactcode") as [string, any][];
+  for (const [tagName, tag] of reactcodeTags) {
+    const dimensions: string[] = tag.dimensions ?? [];
+    for (const dimension of dimensions) {
+      controlsList.push({
+        name: dimension, // JSONPath used to extract value
+        type: "reactcode",
+        to_name: tagName, // Reference to the ReactCode tag
+        label_attrs: {},
+        per_region: false,
+      });
+    }
+  }
   // place all controls with the same to_name together
   const grouped = Object.groupBy(controlsList, (control) => control.to_name);
   // show global classifications first, then labels, then per-regions
-  const controls = Object.entries(grouped).flatMap(([_, controls]) => sortControls(controls!));
+  const controls = Object.entries(grouped).flatMap(([_, controls]) => sortControls(controls ?? []));
 
   const objectTags: ObjectTagEntry[] = allTags.filter(
-    ([_, tag]) => tag.isObjectTag && tag.value.includes("$"),
+    ([_, tag]) => tag.isObjectTag && (tag.value.includes("$") || tag.loadedData),
   ) as ObjectTagEntry[];
   const dataTypes: ObjectTypes = Object.fromEntries(
     objectTags.map(([name, object]) => [
@@ -62,15 +75,15 @@ const TaskSummary = ({ annotations: all, store: annotationStore }: TaskSummaryPr
       {
         type: object.type,
         value:
-          "parsedValue" in object
-            ? object.parsedValue
-            : (object.dataObj ?? object._url ?? object._value ?? object.value),
+          // @ts-expect-error parsedValue, dataObj and _url are very specific and not added to types
+          object.loadedData ?? object.parsedValue ?? object.dataObj ?? object._url ?? object._value ?? object.value,
       },
     ]),
   );
 
   const values = [
-    ...(showAgreement && typeof task?.agreement === "number"
+    // if agreement is unavailable for current user it's undefined
+    ...(typeof task?.agreement === "number"
       ? [
           {
             title: "Agreement",
@@ -93,12 +106,24 @@ const TaskSummary = ({ annotations: all, store: annotationStore }: TaskSummaryPr
   ];
 
   return (
-    <div className="p-4">
-      <h2 className="px-4 mb-4">Review Summary</h2>
-      <NumbersSummary values={values} />
-      <LabelingSummary annotations={annotations} controls={controls} onSelect={onSelect} />
-      <h2 className="px-4">Task Data</h2>
-      <DataSummary data_types={dataTypes} />
+    <div>
+      <div className="mb-base">
+        <h2 className="mt-base text-headline-small font-semibold text-neutral-content">Task Summary</h2>
+        <NumbersSummary values={values} />
+      </div>
+      <div className="mb-relaxed">
+        <LabelingSummary
+          annotations={annotations}
+          controls={controls}
+          onSelect={onSelect}
+          hideInfo={annotationStore.store.hasInterface("annotations:hide-info")}
+          taskId={task?.id}
+        />
+      </div>
+      <div className="mb-relaxed">
+        <h2 className="mb-base text-headline-small font-semibold text-neutral-content">Task Data</h2>
+        <DataSummary data_types={dataTypes} />
+      </div>
     </div>
   );
 };

@@ -44,6 +44,12 @@ export const Preview = ({ config, data, error, loading, project }) => {
    * @param {string} url http/https are not proxied and returned as is
    */
   const onPresignUrlForProject = async (_, url) => {
+    // if URL is a relative, presigned url (url matches /tasks|projects/:id/resolve/.*) make it absolute
+    const presignedUrlPattern = /^\/(?:tasks|projects)\/\d+\/resolve\/?/;
+    if (presignedUrlPattern.test(url)) {
+      url = new URL(url, document.location.origin).toString();
+    }
+
     const parsedUrl = new URL(url);
 
     // return same url if http(s)
@@ -134,10 +140,10 @@ export const Preview = ({ config, data, error, loading, project }) => {
   }, []);
 
   return (
-    <div className={configClass.elem("preview")}>
-      <h3>UI Preview</h3>
+    <div className={configClass.elem("preview").toClassName()}>
+      <h3>Preview</h3>
       {error && (
-        <div className={configClass.elem("preview-error")}>
+        <div className={configClass.elem("preview-error").toClassName()}>
           <h2>
             {error.detail} {error.id}
           </h2>
@@ -153,7 +159,7 @@ export const Preview = ({ config, data, error, loading, project }) => {
         </div>
       )}
       {!data && loading && <Spinner style={{ width: "100%", height: "50vh" }} />}
-      <div id="label-studio" className={configClass.elem("preview-ui")} ref={rootRef} />
+      <div id="label-studio" className={configClass.elem("preview-ui").toClassName()} ref={rootRef} />
     </div>
   );
 };

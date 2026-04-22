@@ -1,18 +1,16 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Button, Spinner } from "../../../components";
-import { Description } from "../../../components/Description/Description";
+import { Button, Typography, Spinner, EmptyState, SimpleCard } from "@humansignal/ui";
+import { useUpdatePageTitle, createTitleFromSegments } from "@humansignal/core";
 import { Form, Label, Toggle } from "../../../components/Form";
 import { modal } from "../../../components/Modal/Modal";
-import { EmptyState } from "../../../components/EmptyState/EmptyState";
-import { IconModels } from "@humansignal/icons";
+import { IconModels, IconExternal } from "@humansignal/icons";
 import { useAPI } from "../../../providers/ApiProvider";
 import { ProjectContext } from "../../../providers/ProjectProvider";
 import { MachineLearningList } from "./MachineLearningList";
 import { CustomBackendForm } from "./Forms";
 import { TestRequest } from "./TestRequest";
 import { StartModelTraining } from "./StartModelTraining";
-import { Block, Elem } from "../../../utils/bem";
 import "./MachineLearningSettings.scss";
 
 export const MachineLearningSettings = () => {
@@ -21,6 +19,8 @@ export const MachineLearningSettings = () => {
   const [backends, setBackends] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+
+  useUpdatePageTitle(createTitleFromSegments([project?.title, "Model Settings"]));
 
   const fetchBackends = useCallback(async () => {
     setLoading(true);
@@ -96,29 +96,49 @@ export const MachineLearningSettings = () => {
   }, [project.id]);
 
   return (
-    <Block name="ml-settings">
-      <Elem name={"wrapper"}>
+    <section>
+      <div className="w-[42rem]">
+        <Typography variant="headline" size="medium" className="mb-base">
+          Model
+        </Typography>
         {loading && <Spinner size={32} />}
         {loaded && backends.length === 0 && (
-          <EmptyState
-            icon={<IconModels />}
-            title="Let’s connect your first model"
-            description="Connect a machine learning model to generate predictions. These predictions can be compared side by side, used for efficient pre‒labeling and, to aid in active learning, directing users to the most impactful labeling tasks."
-            action={
-              <Button primary onClick={() => showMLFormModal()}>
-                Connect Model
-              </Button>
-            }
-            footer={
-              <div>
-                Need help?
-                <br />
-                <a href="https://labelstud.io/guide/ml" target="_blank" rel="noreferrer">
-                  Learn more about connecting models in our docs
-                </a>
-              </div>
-            }
-          />
+          <SimpleCard title="" className="bg-primary-background border-primary-border-subtler p-base">
+            <EmptyState
+              size="medium"
+              variant="primary"
+              icon={<IconModels />}
+              title="Let's connect your first model"
+              description="Connect a machine learning model to generate live predictions for your project. Compare predictions, accelerate labeling with automatic prelabeling, and direct your team to the most impactful tasks through active learning."
+              actions={
+                <Button
+                  variant="primary"
+                  look="filled"
+                  onClick={() => showMLFormModal()}
+                  aria-label="Add machine learning model"
+                >
+                  Connect Model
+                </Button>
+              }
+              footer={
+                !window.APP_SETTINGS?.whitelabel_is_active && (
+                  <Typography variant="label" size="small" className="text-primary-link">
+                    <a
+                      href="https://labelstud.io/guide/ml"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid="ml-help-link"
+                      aria-label="Learn more about machine learning models (opens in new window)"
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      Learn more
+                      <IconExternal width={16} height={16} />
+                    </a>
+                  </Typography>
+                )
+              }
+            />
+          </SimpleCard>
         )}
         <MachineLearningList
           onEdit={(backend) => showMLFormModal(backend)}
@@ -129,22 +149,28 @@ export const MachineLearningSettings = () => {
         />
 
         {backends.length > 0 && (
-          <>
-            <Description>
+          <div className="my-wide">
+            <Typography size="small" className="text-neutral-content-subtler">
               A connected model has been detected! If you wish to fetch predictions from this model, please follow these
               steps:
-              <br />
-              <br />
-              1. Navigate to the <i>Data Manager</i>.<br />
+            </Typography>
+            <Typography size="small" className="text-neutral-content-subtler mt-base">
+              1. Navigate to the <i>Data Manager</i>.
+            </Typography>
+            <Typography size="small" className="text-neutral-content-subtler mt-tighter">
               2. Select the desired tasks.
-              <br />
-              3. Click on <i>Retrieve predictions</i> from the <i>Actions</i> menu.
-            </Description>
-            <Description>
+            </Typography>
+            <Typography size="small" className="text-neutral-content-subtler mt-tighter">
+              3. Click on <i>Batch predictions</i> from the <i>Actions</i> menu.
+            </Typography>
+            <Typography size="small" className="text-neutral-content-subtler mt-base">
               If you want to use the model predictions for prelabeling, please configure this in the{" "}
-              <NavLink to="annotation">Annotation settings</NavLink>.
-            </Description>
-          </>
+              <NavLink to="annotation" className="hover:underline">
+                Annotation settings
+              </NavLink>
+              .
+            </Typography>
+          </div>
         )}
 
         <Form
@@ -154,17 +180,19 @@ export const MachineLearningSettings = () => {
           onSubmit={() => fetchProject()}
         >
           {backends.length > 0 && (
-            <Form.Row columnCount={1}>
-              <Label text="Configuration" large />
+            <div className="p-wide border border-neutral-border rounded-md">
+              <Form.Row columnCount={1}>
+                <Label text="Configuration" large />
 
-              <div>
-                <Toggle
-                  label="Start model training on annotation submission"
-                  description="This option will send a request to /train with information about annotations. You can use this to enable an Active Learning loop. You can also manually start training through model menu in its card."
-                  name="start_training_on_annotation_update"
-                />
-              </div>
-            </Form.Row>
+                <div>
+                  <Toggle
+                    label="Start model training on annotation submission"
+                    description="This option will send a request to /train with information about annotations. You can use this to enable an Active Learning loop. You can also manually start training through model menu in its card."
+                    name="start_training_on_annotation_update"
+                  />
+                </div>
+              </Form.Row>
+            </div>
           )}
 
           {backends.length > 0 && (
@@ -172,14 +200,14 @@ export const MachineLearningSettings = () => {
               <Form.Indicator>
                 <span case="success">Saved!</span>
               </Form.Indicator>
-              <Button type="submit" look="primary" style={{ width: 120 }}>
+              <Button type="submit" look="primary" className="w-[120px]" aria-label="Save machine learning settings">
                 Save
               </Button>
             </Form.Actions>
           )}
         </Form>
-      </Elem>
-    </Block>
+      </div>
+    </section>
   );
 };
 

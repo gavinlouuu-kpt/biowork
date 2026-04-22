@@ -1,8 +1,8 @@
-import { Button } from "../../common/Button/Button";
+import { Button } from "@humansignal/ui";
 import { IconCopy, IconInfo, IconViewAll, IconTrash, IconSettings } from "@humansignal/icons";
 import { Tooltip } from "@humansignal/ui";
-import { Elem } from "../../utils/bem";
-import { isSelfServe } from "../../utils/billing";
+import { isStarterCloudPlan } from "@humansignal/core";
+import { cn } from "../../utils/bem";
 import { FF_BULK_ANNOTATION, isFF } from "../../utils/feature-flags";
 import { GroundTruth } from "../CurrentEntity/GroundTruth";
 import { EditingHistory } from "./HistoryActions";
@@ -15,22 +15,22 @@ export const Actions = ({ store }) => {
   const saved = !entity.userGenerate || entity.sentUserGenerate;
   const isPrediction = entity?.type === "prediction";
   const isViewAll = annotationStore.viewingAll;
-  const isBulkMode = isFF(FF_BULK_ANNOTATION) && !isSelfServe() && store.hasInterface("annotation:bulk");
+  const isBulkMode = isFF(FF_BULK_ANNOTATION) && !isStarterCloudPlan() && store.hasInterface("annotation:bulk");
 
   const onToggleVisibility = useCallback(() => {
     annotationStore.toggleViewingAllAnnotations();
   }, [annotationStore]);
 
   return (
-    <Elem name="section">
+    <div className={cn("topbar").elem("section").toClassName()}>
       {store.hasInterface("annotations:view-all") && !isBulkMode && (
         <Tooltip title="Compare all annotations">
           <Button
             icon={<IconViewAll />}
-            type="text"
             aria-label="Compare all annotations"
             onClick={() => onToggleVisibility()}
-            primary={isViewAll}
+            variant={isViewAll ? "primary" : "neutral"}
+            look={isViewAll ? "filled" : "string"}
             style={{
               height: 36,
               width: 36,
@@ -48,7 +48,8 @@ export const Actions = ({ store }) => {
         <Tooltip title="Delete annotation">
           <Button
             icon={<IconTrash />}
-            look="danger"
+            variant="negative"
+            look="string"
             type="text"
             aria-label="Delete"
             onClick={() => {
@@ -73,8 +74,8 @@ export const Actions = ({ store }) => {
         <Tooltip title={`Create copy of current ${entity.type}`}>
           <Button
             icon={<IconCopy style={{ width: 36, height: 36 }} />}
-            size="small"
-            look="ghost"
+            variant="neutral"
+            look="string"
             type="text"
             aria-label="Copy Annotation"
             onClick={(ev) => {
@@ -99,7 +100,8 @@ export const Actions = ({ store }) => {
 
       <Button
         icon={<IconSettings />}
-        type="text"
+        variant="neutral"
+        look="string"
         aria-label="Settings"
         onClick={() => store.toggleSettings()}
         style={{
@@ -112,8 +114,8 @@ export const Actions = ({ store }) => {
       {store.description && store.hasInterface("instruction") && !isBulkMode && (
         <Button
           icon={<IconInfo style={{ width: 16, height: 16 }} />}
-          primary={store.showingDescription}
-          type="text"
+          variant={store.showingDescription ? "primary" : "neutral"}
+          look={store.showingDescription ? "filled" : "string"}
           aria-label="Instructions"
           onClick={() => store.toggleDescription()}
           style={{
@@ -123,6 +125,6 @@ export const Actions = ({ store }) => {
           }}
         />
       )}
-    </Elem>
+    </div>
   );
 };

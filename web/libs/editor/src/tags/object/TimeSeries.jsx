@@ -2,7 +2,7 @@ import React from "react";
 import * as d3 from "d3";
 import { inject, observer } from "mobx-react";
 import { getEnv, getRoot, getType, types, isAlive } from "mobx-state-tree";
-import throttle from "lodash.throttle";
+import { throttle } from "@humansignal/core/lib/utils/lodash-replacements";
 import { Spin } from "antd";
 
 import ObjectBase from "./Base";
@@ -24,12 +24,11 @@ import PersistentStateMixin from "../../mixins/PersistentState";
 import { SyncableMixin } from "../../mixins/Syncable";
 import { parseCSV, parseValue, tryToParseJSON } from "../../utils/data";
 import { fixMobxObserve } from "../../utils/utilities";
+import { Hotkey } from "../../core/Hotkey";
 
 import "./TimeSeries/MultiChannel";
 import "./TimeSeries/Channel";
 import { getChannelColor } from "./TimeSeries/palette";
-import { FF_TIMESERIES_SYNC, isFF } from "../../utils/feature-flags";
-import { FF_MULTICHANNEL_TS } from "@humansignal/core/lib/utils/feature-flags";
 import { ff } from "@humansignal/core";
 /**
  * The `TimeSeries` tag can be used to label time series data. Read more about Time Series Labeling on [the time series template page](../templates/time_series.html).
@@ -197,6 +196,30 @@ const Model = types
       return Object.values(self.channelsMap);
     },
 
+    get filteredOverviewChannels() {
+      const allKeys = Object.keys(self.channelsMap);
+
+      if (self.overviewchannels) {
+        // Infer headers from dataObj if headers array is not set
+        let headers = self.headers;
+        if ((!headers || headers.length === 0) && self.dataObj) {
+          headers = Object.keys(self.dataObj);
+        }
+
+        const channels = self.overviewchannels
+          .toLowerCase()
+          .split(",")
+          .map((name) => {
+            const trimmed = name.trim();
+            return /^\d+$/.test(trimmed) && headers ? headers[Number(trimmed)]?.toLowerCase() : trimmed;
+          })
+          .filter((ch) => ch && allKeys.includes(ch));
+
+        if (channels.length) return channels;
+      }
+      return allKeys;
+    },
+
     parseTime(time) {
       const parse = self.parseTimeFn;
 
@@ -207,6 +230,54 @@ const Model = types
       }
 
       return dt;
+    },
+
+    /**
+     * Calculate initial brush boundaries ensuring minimum points are visible
+     */
+    calculateInitialBrushRange(times) {
+      const MIN_POINTS_ON_SCREEN = 10;
+
+      // If dataset is smaller than minimum, show everything
+      if (times.length < MIN_POINTS_ON_SCREEN) {
+        return [times[0], times[times.length - 1]];
+      }
+
+      const startIndex = Math.round((times.length - 1) * self.defaultOverviewWidth[0]);
+      const endIndex = Math.round((times.length - 1) * self.defaultOverviewWidth[1]);
+      const pointsInRange = endIndex - startIndex + 1;
+
+      // If we have enough points, use original range
+      if (pointsInRange >= MIN_POINTS_ON_SCREEN) {
+        return [times[startIndex], times[endIndex]];
+      }
+
+      // Otherwise, expand the range to show at least MIN_POINTS_ON_SCREEN points
+      return self.expandRangeToMinimumPoints(times, [times[startIndex], times[endIndex]], MIN_POINTS_ON_SCREEN);
+    },
+
+    /**
+     * Expand range to ensure minimum number of points are visible
+     */
+    expandRangeToMinimumPoints(times, originalBoundaries, minPoints) {
+      const startIndex = Math.round((times.length - 1) * self.defaultOverviewWidth[0]);
+      const endIndex = Math.round((times.length - 1) * self.defaultOverviewWidth[1]);
+
+      const currentPointCount = endIndex - startIndex + 1;
+      const pointsNeeded = minPoints - currentPointCount;
+
+      if (pointsNeeded <= 0) {
+        return originalBoundaries; // Should not happen, but safety check
+      }
+
+      // Expand to the right first (show more recent data)
+      const expandRight = Math.min(pointsNeeded, times.length - 1 - endIndex);
+      const expandLeft = pointsNeeded - expandRight;
+
+      const newStartIndex = Math.max(0, startIndex - expandLeft);
+      const newEndIndex = Math.min(times.length - 1, endIndex + expandRight);
+
+      return [times[newStartIndex], times[newEndIndex]];
     },
 
     get dataObj() {
@@ -240,10 +311,55 @@ const Model = types
         const dataLength = data[self.keyColumn].length;
         const timestamps = Array.from({ length: dataLength });
 
-        for (let i = 0; i < dataLength; i++) {
-          const value = data[self.keyColumn][i];
+        // Check if user is using %f (microseconds) which D3 doesn't support
+        let actualTimeFormat = self.timeformat;
+        let shouldConvertMicroseconds = false;
 
-          current = self.timeformat ? self.parseTime(value) : value;
+        if (self.timeformat && self.timeformat.includes("%f")) {
+          console.warn(
+            "TimeSeries: timeFormat contains %f (microseconds) which is not supported by D3. " +
+              "Converting microseconds to milliseconds and using %L instead. " +
+              "Consider updating your timeFormat to use %L and your data to use 3-digit milliseconds.",
+          );
+          actualTimeFormat = self.timeformat.replace("%f", "%L");
+          shouldConvertMicroseconds = true;
+        }
+
+        for (let i = 0; i < dataLength; i++) {
+          let value = data[self.keyColumn][i];
+
+          if (self.timeformat) {
+            // Convert microseconds to milliseconds if needed
+            if (shouldConvertMicroseconds && typeof value === "string") {
+              // Convert "00:00:01.123456" to "00:00:01.123"
+              value = value.replace(/\.(\d{3})\d{3}$/, ".$1");
+            }
+
+            // Pad fractional seconds to exactly 3 digits for consistent parsing
+            if (typeof value === "string" && value.includes(".")) {
+              // Match timestamp with decimal point and capture fractional part
+              value = value.replace(/\.(\d{0,3})\b/, (_match, fractional) => {
+                // Pad fractional seconds to exactly 3 digits
+                return `.${fractional.padEnd(3, "0")}`;
+              });
+            }
+
+            // Use the corrected format for parsing
+            const parse = actualTimeFormat ? d3.utcParse(actualTimeFormat) : d3.utcParse(self.timeformat);
+            const dt = parse(value);
+
+            if (dt instanceof Date) {
+              current = dt.getTime();
+            } else if (dt === null) {
+              // Parsing failed - this will trigger the error handling below
+              current = 0;
+            } else {
+              current = dt;
+            }
+          } else {
+            current = value;
+          }
+
           timestamps[i] = current;
 
           if (current < previous) {
@@ -263,7 +379,9 @@ const Model = types
           previous = current;
         }
 
-        if (timestamps[0] === 0 && timestamps[1] === 0 && timestamps[2] === 0) {
+        // Check if parsing failed by looking for multiple null, 0, or NaN values
+        const failedValues = timestamps.slice(0, 3).filter((t) => t === null || t === 0 || isNaN(t));
+        if (failedValues.length >= 2) {
           const message = [
             `<b>timeColumn</b> (${self.timecolumn}) cannot be parsed.`,
             `First wrong values: ${data[self.keyColumn].slice(0, 3).join(", ")}`,
@@ -271,6 +389,12 @@ const Model = types
 
           if (self.timeformat) {
             message.push(`Your <b>timeFormat</b>: ${self.timeformat}. It should be compatible with these values.`);
+
+            if (self.timeformat.includes("%f")) {
+              message.push(
+                "<b>Note:</b> %f (microseconds) is not supported by D3. Use %L (milliseconds) instead and convert your data to 3-digit milliseconds.",
+              );
+            }
           } else {
             message.push("You have to use <b>timeFormat</b> parameter if your values are datetimes.");
           }
@@ -344,6 +468,10 @@ const Model = types
         // @todo as usual for rerender
         scale: self.scale + 0.0001,
       };
+    },
+
+    get persistentFingerprint() {
+      return { task: getRoot(self).task?.id };
     },
 
     states() {
@@ -442,6 +570,39 @@ const Model = types
     },
 
     /**
+     * Pan the visible time range by a fraction of the current view width.
+     * Positive fraction pans right (forward in time), negative pans left (back).
+     * When a region is selected, this is a no-op so region hotkeys can handle the keys.
+     * @param {number} fraction - Fraction of view width to shift (e.g. 0.1 = 10%)
+     */
+    panView(fraction) {
+      // Skip if a TimeSeries region is selected — let region grow/shrink hotkeys handle the key
+      if (self.regs.some((r) => r.selected)) return;
+
+      if (!self.brushRange?.length || self.brushRange.length !== 2) return;
+      if (!self.keysRange?.length || self.keysRange.length !== 2) return;
+
+      const [minKey, maxKey] = self.keysRange;
+      const viewWidth = self.brushRange[1] - self.brushRange[0];
+      const shift = viewWidth * fraction;
+
+      let newStart = self.brushRange[0] + shift;
+      let newEnd = self.brushRange[1] + shift;
+
+      // Clamp to data bounds while preserving view width
+      if (newStart < minKey) {
+        newStart = minKey;
+        newEnd = minKey + viewWidth;
+      }
+      if (newEnd > maxKey) {
+        newEnd = maxKey;
+        newStart = maxKey - viewWidth;
+      }
+
+      self.updateTR([newStart, newEnd], self.scale + 0.0001);
+    },
+
+    /**
      * Restart playback from a specific time position
      * @param {number} time - The time in native units to restart playback from
      */
@@ -521,21 +682,22 @@ const Model = types
       const states = self.getAvailableStates();
 
       if (states.length === 0) return;
-      const control = states[0];
+      const [control, ...rest] = states;
       const labels = { [control.valueType]: control.selectedValues() };
 
-      // const r = self.createRegion(start, end, clonedStates);
-      const r = self.annotation.createResult({ start, end, instant: start === end }, labels, control, self);
+      const r = ff.isActive(ff.FF_MULTIPLE_LABELS_REGIONS)
+        ? self.annotation.createResult({ start, end, instant: start === end }, labels, control, self, false, rest)
+        : self.annotation.createResult({ start, end, instant: start === end }, labels, control, self, false);
 
       return r;
     },
 
-    regionChanged(timerange, i, activeStates) {
+    regionChanged(timerange, i) {
       const r = self.regs[i];
       let needUpdate = false;
 
       if (!r) {
-        const newRegion = self.addRegion(timerange.start, timerange.end, activeStates);
+        const newRegion = self.addRegion(timerange.start, timerange.end);
 
         needUpdate = true;
         newRegion.notifyDrawingFinished();
@@ -624,6 +786,7 @@ const Model = types
           }
           [data, headers] = parseCSV(text, separator);
         }
+        if (!isAlive(self)) return;
         self.setData(data);
         self.setColumnNames(headers);
         self.updateValue(store);
@@ -661,9 +824,8 @@ const Model = types
       // if current view already restored by PersistentState
       if (self.brushRange?.length) return;
 
-      const percentToLength = (percent) => times[Math.round((times.length - 1) * percent)];
-      const boundaries = self.defaultOverviewWidth.map(percentToLength);
-
+      // Calculate initial brush range ensuring minimum points are visible
+      const boundaries = self.calculateInitialBrushRange(times);
       self.updateTR(boundaries);
     },
 
@@ -917,16 +1079,13 @@ const Model = types
 
     registerSyncHandlers() {
       if (!isAlive(self)) return;
-      if (isFF(FF_TIMESERIES_SYNC)) {
-        self.syncHandlers.set("seek", self._handleSeek);
-        self.syncHandlers.set("play", self._handlePlay);
-        self.syncHandlers.set("pause", self._handlePause);
-      }
+      self.syncHandlers.set("seek", self._handleSeek);
+      self.syncHandlers.set("play", self._handlePlay);
+      self.syncHandlers.set("pause", self._handlePause);
     },
 
     emitSeekSync() {
       if (!isAlive(self)) return;
-      if (!isFF(FF_TIMESERIES_SYNC)) return;
       if (self.suppressSync) return;
 
       const centerTime = self.centerTime; // centerTime is in NATIVE units (ms if isDate, else seconds/indices)
@@ -951,7 +1110,7 @@ const Model = types
     },
 
     plotClickHandler(timeClicked) {
-      if (!isAlive(self) || !isFF(FF_TIMESERIES_SYNC) || !self.sync) return;
+      if (!isAlive(self) || !self.sync) return;
       if (self.isNotReady) return;
 
       const [minKey, maxKey] = self.keysRange;
@@ -1020,17 +1179,7 @@ const Overview = observer(({ item, data, series }) => {
   const { margin, keyColumn: idX } = item;
   const width = Math.max(fullWidth - margin.left - margin.right, 0);
   // const data = store.task.dataObj;
-  let keys = Object.keys(item.channelsMap);
-
-  if (item.overviewchannels) {
-    const channels = item.overviewchannels
-      .toLowerCase()
-      .split(",")
-      .map((name) => (/^\d+$/.test(name) ? item.headers[name] : name))
-      .filter((ch) => keys.includes(ch));
-
-    if (channels.length) keys = channels;
-  }
+  const keys = item.filteredOverviewChannels;
   // const series = data[idX];
   const minRegionWidth = 2;
 
@@ -1248,13 +1397,13 @@ const Overview = observer(({ item, data, series }) => {
         .attr("viewBox", [0, 0, width + margin.left + margin.right, focusHeight + margin.bottom]);
 
       gChannels.current.selectAll("path").remove();
-      for (const key of Object.keys(item.channelsMap)) drawPath(key);
+      for (const key of keys) drawPath(key);
 
       drawAxis();
       // gb.current.selectAll("*").remove();
       gb.current.call(brush).call(brush.move, item.brushRange.map(x));
     }
-  }, [width, node]);
+  }, [width, node, keys]);
 
   // redraw overview on zoom
   React.useEffect(() => {
@@ -1314,86 +1463,11 @@ const Overview = observer(({ item, data, series }) => {
   return <div className="htx-timeseries-overview" ref={ref} />;
 });
 
+const PAN_SMALL = 0.1; // 10% of view width
+const PAN_LARGE = 0.5; // 50% of view width
+
 const HtxTimeSeriesViewRTS = ({ item }) => {
   const ref = React.createRef();
-
-  const handleMainAreaClick = (event) => {
-    if (!isAlive(item) || !isFF(FF_TIMESERIES_SYNC) || event.target.closest(".htx-timeseries-overview")) {
-      return;
-    }
-
-    const mainDisplayElement = ref.current;
-    if (
-      !mainDisplayElement ||
-      !item.brushRange ||
-      item.brushRange.length !== 2 ||
-      !item.margin ||
-      !item.canvasWidth ||
-      !item.keysRange ||
-      item.keysRange.length !== 2
-    ) {
-      console.warn("TimeSeries: Click handling skipped, essential data missing or component not ready.", {
-        hasRef: !!mainDisplayElement,
-        brushRange: item.brushRange,
-        margin: item.margin,
-        canvasWidth: item.canvasWidth,
-        keysRange: item.keysRange,
-      });
-      return;
-    }
-
-    const { left: marginLeft = 0, right: marginRight = 0 } = item.margin;
-    const plottingAreaWidth = item.canvasWidth - marginLeft - marginRight;
-
-    if (plottingAreaWidth <= 0) {
-      console.warn(`TimeSeries: Plotting area width (${plottingAreaWidth}) is not positive.`);
-      return;
-    }
-
-    const rect = mainDisplayElement.getBoundingClientRect();
-
-    let clickX = event.clientX - rect.left - marginLeft;
-    clickX = Math.max(0, Math.min(clickX, plottingAreaWidth));
-
-    const [brushTimeStartNative, brushTimeEndNative] = item.brushRange;
-    const brushDurationNative = brushTimeEndNative - brushTimeStartNative;
-
-    if (brushDurationNative <= 0) {
-      console.warn(`TimeSeries: Brush duration (${brushDurationNative}) is not positive.`);
-      return;
-    }
-
-    const timeClicked = brushTimeStartNative + (clickX / plottingAreaWidth) * brushDurationNative;
-    const [minKey, maxKey] = item.keysRange;
-    const finalTime = Math.max(minKey, Math.min(timeClicked, maxKey));
-
-    const insideView = item.brushRange && finalTime >= item.brushRange[0] && finalTime <= item.brushRange[1];
-
-    if (insideView) {
-      // Just move cursor without changing brush range
-      item.setCursor(finalTime);
-    } else if (typeof item._updateViewForTime === "function") {
-      // Re-center only when outside current view
-      item._updateViewForTime(finalTime);
-    }
-
-    // If we're currently playing, update the playback state to restart from the clicked position
-    if (item.isPlaying) {
-      item.restartPlaybackFromTime(finalTime);
-    }
-
-    if (isFF(FF_TIMESERIES_SYNC)) {
-      const referenceTime = insideView ? finalTime : (item.centerTime ?? finalTime);
-      let relativeTime;
-      if (item.isDate) {
-        relativeTime = (referenceTime - minKey) / 1000;
-      } else {
-        relativeTime = referenceTime - minKey;
-      }
-      // Include current playing state to prevent other media from pausing during seek
-      item.syncSend({ time: relativeTime, playing: item.isPlaying }, "seek");
-    }
-  };
 
   React.useEffect(() => {
     if (item?.brushRange?.length) {
@@ -1414,6 +1488,22 @@ const HtxTimeSeriesViewRTS = ({ item }) => {
     }
   }, [item, ref]);
 
+  // Register keyboard hotkeys for panning the time series view
+  React.useEffect(() => {
+    if (!item?.brushRange?.length) return;
+
+    const hotkeys = Hotkey("TimeSeries Navigation", "Time Series Navigation");
+
+    hotkeys.addNamed("ts:pan-left", () => item.panView(-PAN_SMALL));
+    hotkeys.addNamed("ts:pan-right", () => item.panView(PAN_SMALL));
+    hotkeys.addNamed("ts:pan-left-large", () => item.panView(-PAN_LARGE));
+    hotkeys.addNamed("ts:pan-right-large", () => item.panView(PAN_LARGE));
+
+    return () => {
+      hotkeys.unbindAll();
+    };
+  }, [item, item?.brushRange?.length]);
+
   // the last thing updated during initialisation
   if (!item?.brushRange?.length || !item.data)
     return (
@@ -1423,11 +1513,7 @@ const HtxTimeSeriesViewRTS = ({ item }) => {
     );
 
   return (
-    <div
-      ref={ref}
-      className="htx-timeseries"
-      onClick={ff.isActive(FF_MULTICHANNEL_TS) ? undefined : handleMainAreaClick}
-    >
+    <div ref={ref} className="htx-timeseries">
       <ObjectTag item={item}>
         {Tree.renderChildren(item, item.annotation)}
         <Overview data={item.dataObj} series={item.dataHash} item={item} range={item.brushRange} />

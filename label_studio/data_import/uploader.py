@@ -12,6 +12,7 @@ except:  # noqa: E722
     import json
 
 from core.utils.common import timeit
+from core.utils.exceptions import extract_message
 from core.utils.io import ssrf_safe_get
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -82,57 +83,6 @@ def create_file_upload(user, project, file):
     return instance
 
 
-# --- TIFF handling helper ---
-try:
-    from PIL import Image, ImageSequence
-except Exception:  # pragma: no cover
-    Image = None
-    ImageSequence = None
-
-
-def create_image_uploads_with_tiff_conversion(user, project, uploaded_file):
-    """Create one or more FileUpload(s) for an uploaded image.
-
-    - If it's a TIFF (.tif/.tiff), split pages and convert each to PNG, returning
-      a list of created PNG uploads (discarding original TIFF).
-    - Otherwise, create a single upload as-is.
-    """
-    _, ext = os.path.splitext(uploaded_file.name)
-    ext = ext.lower()
-
-    if ext not in ('.tif', '.tiff'):
-        instance = create_file_upload(user, project, uploaded_file)
-        return [instance]
-
-    if Image is None or ImageSequence is None:
-        raise ValidationError('Pillow with TIFF support is required to process TIFF files')
-
-    created_uploads = []
-    base_name = os.path.splitext(os.path.basename(uploaded_file.name))[0]
-
-    # Ensure we read from the start
-    try:
-        uploaded_file.seek(0)
-    except Exception:
-        pass
-
-    try:
-        with Image.open(uploaded_file) as img:
-            # Iterate each page/frame
-            for page_index, frame in enumerate(ImageSequence.Iterator(img), start=1):
-                png_buffer = io.BytesIO()
-                # Convert to RGB to ensure PNG compatibility (avoid palette/CMYK issues)
-                frame.convert('RGB').save(png_buffer, format='PNG')
-                png_buffer.seek(0)
-                png_name = f"{base_name}_page_{page_index}.png"
-                simple = SimpleUploadedFile(png_name, png_buffer.read(), content_type='image/png')
-                created_uploads.append(create_file_upload(user, project, simple))
-    except Exception as exc:
-        raise ValidationError(f'Failed to process TIFF file: {exc}')
-
-    return created_uploads
-
-
 def allowlist_svg(dirty_xml):
     """Filter out malicious/harmful content from SVG files
     by defining allowed tags
@@ -147,7 +97,7 @@ def allowlist_svg(dirty_xml):
         'line',
         'path',
         'polygon',
-        'polyline',
+        'vector',
         'rect',
     ]
 
@@ -209,20 +159,16 @@ def tasks_from_url(file_upload_ids, project, user, url, could_be_tasks_list):
             check_tasks_max_file_size(int(content_length))
 
         file_content = response.content
-        # Expand TIFFs after download as well
-        created_uploads = create_image_uploads_with_tiff_conversion(
-            user, project, SimpleUploadedFile(filename, file_content)
-        )
-        for fu in created_uploads:
-            if fu.format_could_be_tasks_list:
-                could_be_tasks_list = True
-            file_upload_ids.append(fu.id)
+        file_upload = create_file_upload(user, project, SimpleUploadedFile(filename, file_content))
+        if file_upload.format_could_be_tasks_list:
+            could_be_tasks_list = True
+        file_upload_ids.append(file_upload.id)
         tasks, found_formats, data_keys = FileUpload.load_tasks_from_uploaded_files(project, file_upload_ids)
 
     except ValidationError as e:
         raise e
     except Exception as e:
-        raise ValidationError(str(e))
+        raise ValidationError(extract_message(e))
     return data_keys, found_formats, tasks, file_upload_ids, could_be_tasks_list
 
 
@@ -233,12 +179,10 @@ def create_file_uploads(user, project, FILES):
     check_request_files_size(FILES)
     check_extensions(FILES)
     for _, file in FILES.items():
-        # Expand TIFFs into multiple PNG uploads
-        created = create_image_uploads_with_tiff_conversion(user, project, file)
-        for fu in created:
-            if fu.format_could_be_tasks_list:
-                could_be_tasks_list = True
-            file_upload_ids.append(fu.id)
+        file_upload = create_file_upload(user, project, file)
+        if file_upload.format_could_be_tasks_list:
+            could_be_tasks_list = True
+        file_upload_ids.append(file_upload.id)
 
     logger.debug(f'created file uploads: {file_upload_ids} could_be_tasks_list: {could_be_tasks_list}')
     return file_upload_ids, could_be_tasks_list
@@ -299,6 +243,103 @@ def load_tasks_for_async_import(project_import, user):
     return tasks, file_upload_ids, found_formats, list(data_keys)
 
 
+def load_tasks_for_async_import_streaming(project_import, user, batch_size=1000):
+    """Load tasks from different types of request.data / request.files saved in project_import model,
+    yielding tasks in batches to reduce memory usage"""
+    from django.conf import settings
+
+    if not batch_size:
+        batch_size = settings.IMPORT_BATCH_SIZE
+
+    all_file_upload_ids = []
+    all_found_formats = {}
+    all_data_keys = set()
+
+    if project_import.file_upload_ids:
+        file_upload_ids = project_import.file_upload_ids
+        all_file_upload_ids = file_upload_ids.copy()
+
+        for batch_tasks, batch_formats, batch_data_keys in FileUpload.load_tasks_from_uploaded_files_streaming(
+            project_import.project, file_upload_ids, batch_size=batch_size
+        ):
+            all_found_formats.update(batch_formats)
+            all_data_keys.update(batch_data_keys)
+
+            # Validate each batch
+            if not isinstance(batch_tasks, list):
+                raise ValidationError('load_tasks: Data root must be list')
+            if not batch_tasks:
+                continue  # Skip empty batches
+
+            check_max_task_number(batch_tasks)
+            yield batch_tasks, file_upload_ids, batch_formats, list(batch_data_keys)
+
+    elif project_import.url:
+        # For URL imports, we still need to load everything at once
+        # since we don't have streaming support for URL-based imports yet
+        url = project_import.url
+        file_upload_ids, found_formats, data_keys = [], [], set()
+
+        # try to load json with task or tasks from url as string
+        json_data = str_to_json(url)
+        if json_data:
+            file_upload = create_file_upload(
+                user,
+                project_import.project,
+                SimpleUploadedFile('inplace.json', url.encode()),
+            )
+            file_upload_ids.append(file_upload.id)
+            tasks, found_formats, data_keys = FileUpload.load_tasks_from_uploaded_files(
+                project_import.project, file_upload_ids
+            )
+        else:
+            could_be_tasks_list = False
+            (
+                data_keys,
+                found_formats,
+                tasks,
+                file_upload_ids,
+                could_be_tasks_list,
+            ) = tasks_from_url(file_upload_ids, project_import.project, user, url, could_be_tasks_list)
+            if could_be_tasks_list:
+                project_import.could_be_tasks_list = True
+                project_import.save(update_fields=['could_be_tasks_list'])
+
+        if not isinstance(tasks, list):
+            raise ValidationError('load_tasks: Data root must be list')
+        if not tasks:
+            raise ValidationError('load_tasks: No tasks added')
+
+        check_max_task_number(tasks)
+
+        all_file_upload_ids = file_upload_ids.copy()
+        all_found_formats = found_formats.copy()
+        all_data_keys = data_keys.copy()
+
+        for i in range(0, len(tasks), batch_size):
+            batch_tasks = tasks[i : i + batch_size]
+            yield batch_tasks, file_upload_ids, found_formats, list(data_keys)
+
+    elif project_import.tasks:
+        tasks = project_import.tasks
+
+        if not isinstance(tasks, list):
+            raise ValidationError('load_tasks: Data root must be list')
+        if not tasks:
+            raise ValidationError('load_tasks: No tasks added')
+
+        check_max_task_number(tasks)
+
+        for i in range(0, len(tasks), batch_size):
+            batch_tasks = tasks[i : i + batch_size]
+            yield batch_tasks, [], {}, []
+
+    else:
+        raise ValidationError('load_tasks: No tasks added')
+
+    return all_file_upload_ids, all_found_formats, list(all_data_keys)
+
+
 def load_tasks(request, project):
     """Load tasks from different types of request.data / request.files"""
     file_upload_ids, found_formats, data_keys = [], [], set()
@@ -309,12 +350,10 @@ def load_tasks(request, project):
         check_request_files_size(request.FILES)
         check_extensions(request.FILES)
         for filename, file in request.FILES.items():
-            # Expand TIFFs into PNG uploads for sync import as well
-            created_uploads = create_image_uploads_with_tiff_conversion(request.user, project, file)
-            for fu in created_uploads:
-                if fu.format_could_be_tasks_list:
-                    could_be_tasks_list = True
-                file_upload_ids.append(fu.id)
+            file_upload = create_file_upload(request.user, project, file)
+            if file_upload.format_could_be_tasks_list:
+                could_be_tasks_list = True
+            file_upload_ids.append(file_upload.id)
         tasks, found_formats, data_keys = FileUpload.load_tasks_from_uploaded_files(project, file_upload_ids)
 
     # take tasks from url address
@@ -360,37 +399,6 @@ def load_tasks(request, project):
     # empty tasks error
     if not tasks:
         raise ValidationError('load_tasks: No tasks added')
-
-    # Attach optional import tags/batch metadata to every task before returning
-    # Support multipart/form-data and x-www-form-urlencoded as well
-    def _parse_meta(req):
-        raw_tags = req.data.get('import_tags') if hasattr(req, 'data') else None
-        tags = []
-        if isinstance(raw_tags, (list, tuple)):
-            tags = list(raw_tags)
-        elif raw_tags not in (None, ''):
-            try:
-                parsed = json.loads(raw_tags)
-                if isinstance(parsed, list):
-                    tags = parsed
-                elif parsed is not None:
-                    tags = [str(parsed)]
-            except Exception:
-                tags = [t.strip() for t in str(raw_tags).split(',') if t.strip()]
-        batch_id = req.data.get('import_batch_id') if hasattr(req, 'data') else None
-        batch_id = batch_id if batch_id not in ('', None) else None
-        return tags, batch_id
-
-    tags, batch_id = _parse_meta(request)
-    if tags or batch_id:
-        for t in tasks:
-            if isinstance(t, dict):
-                if tags and 'import_tags' not in t:
-                    t['import_tags'] = tags
-                if batch_id and 'import_batch_id' not in t:
-                    t['import_batch_id'] = batch_id
-                if 'import_source' not in t:
-                    t['import_source'] = 'ui'
 
     check_max_task_number(tasks)
     return tasks, file_upload_ids, could_be_tasks_list, found_formats, list(data_keys)

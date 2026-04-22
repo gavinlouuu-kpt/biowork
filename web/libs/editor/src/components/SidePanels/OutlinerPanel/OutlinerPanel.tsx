@@ -1,6 +1,6 @@
 import { observer } from "mobx-react";
 import { type FC, useCallback, useEffect, useMemo, useState } from "react";
-import { Block, Elem } from "../../../utils/bem";
+import { cn } from "../../../utils/bem";
 import { PanelBase, type PanelProps } from "../PanelBase";
 import { OutlinerTree } from "./OutlinerTree";
 import { ViewControls } from "./ViewControls";
@@ -15,6 +15,7 @@ type GroupingOptions = "manual" | "label" | "type";
 type OrderingOptions =
   | "score"
   | "date"
+  | "mediaStartTime"
   | "intensity_r"
   | "intensity_g"
   | "intensity_b"
@@ -23,7 +24,7 @@ type OrderingOptions =
   | "bbox_height";
 type Region = {
   id: string;
-  [key: string]: any; // Allow other properties for flexibility
+  [key: string]: any;
 };
 
 interface OutlinerPanelProps extends PanelProps {
@@ -58,13 +59,6 @@ const OutlinerPanelComponent: FC<OutlinerPanelProps> = ({ regions, ...props }) =
     [regions],
   );
 
-  const onFilterChange = useCallback(
-    (value: Region[] | null) => {
-      regions.setFilteredRegions(value);
-    },
-    [regions],
-  );
-
   useEffect(() => {
     setGroup(regions.group);
   }, []);
@@ -80,7 +74,6 @@ const OutlinerPanelComponent: FC<OutlinerPanelProps> = ({ regions, ...props }) =
         onOrderingChange={onOrderingChange}
         onOrderingDirectionToggle={onOrderingDirectionToggle}
         onGroupingChange={onGroupingChange}
-        onFilterChange={onFilterChange}
       />
       <OutlinerTreeComponent regions={regions} />
     </PanelBase>
@@ -105,15 +98,12 @@ const OutlinerStandAlone: FC<OutlinerPanelProps> = ({ regions }) => {
     [regions],
   );
 
-  const onFilterChange = useCallback(
-    (value: Region[] | null) => {
-      regions.setFilteredRegions(value);
-    },
-    [regions],
-  );
-
   return (
-    <Block name="outliner" mix={OutlinerFFClasses}>
+    <div
+      className={cn("outliner")
+        .mix(...OutlinerFFClasses)
+        .toClassName()}
+    >
       <ViewControls
         ordering={regions.sort}
         regions={regions}
@@ -121,10 +111,9 @@ const OutlinerStandAlone: FC<OutlinerPanelProps> = ({ regions }) => {
         onOrderingChange={onOrderingChange}
         onOrderingDirectionToggle={onOrderingDirectionToggle}
         onGroupingChange={onGroupingChange}
-        onFilterChange={onFilterChange}
       />
       <OutlinerTreeComponent regions={regions} />
-    </Block>
+    </div>
   );
 };
 
@@ -157,24 +146,28 @@ const OutlinerTreeComponent: FC<OutlinerTreeComponentProps> = observer(({ region
   return (
     <>
       {allRegionsHidden ? (
-        <Block name="filters-info">
+        <div className={cn("filters-info").toClassName()}>
           <IconInfo width={21} height={20} />
-          <Elem name="filters-title">All regions hidden</Elem>
-          <Elem name="filters-description">Adjust or remove the filters to view</Elem>
-        </Block>
+          <div className={cn("filters-info").elem("filters-title").toClassName()}>All regions hidden</div>
+          <div className={cn("filters-info").elem("filters-description").toClassName()}>
+            Adjust or remove the filters to view
+          </div>
+        </div>
       ) : regions?.regions?.length > 0 ? (
         <>
           <OutlinerTree
             regions={regions}
             footer={
               hiddenRegions > 0 && (
-                <Block name="filters-info">
+                <div className={cn("filters-info").toClassName()}>
                   <IconInfo width={21} height={20} />
-                  <Elem name="filters-title">
+                  <div className={cn("filters-info").elem("filters-title").toClassName()}>
                     There {hiddenRegions === 1 ? "is" : "are"} {hiddenRegions} hidden region{hiddenRegions > 1 && "s"}
-                  </Elem>
-                  <Elem name="filters-description">Adjust or remove filters to view</Elem>
-                </Block>
+                  </div>
+                  <div className={cn("filters-info").elem("filters-description").toClassName()}>
+                    Adjust or remove filters to view
+                  </div>
+                </div>
               )
             }
           />

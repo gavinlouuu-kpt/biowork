@@ -6,7 +6,7 @@ class TextareaHelper {
   private _rootSelector: string;
 
   constructor(rootSelector) {
-    this._rootSelector = rootSelector.replace(/^\&/, this._baseRootSelector);
+    this._rootSelector = rootSelector.replace(/^&/, this._baseRootSelector);
   }
 
   get root() {
@@ -34,7 +34,7 @@ class TextareaHelper {
   }
 
   rowInput(idx: number) {
-    return this.row(idx).find(".ant-input");
+    return this.row(idx).find(".ant-input, input, textarea");
   }
 
   rowType(idx: number, text: string) {

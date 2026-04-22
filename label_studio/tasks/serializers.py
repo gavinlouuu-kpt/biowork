@@ -1,15 +1,22 @@
-"""This file and its contents are licensed under the Apache License 2.0. Please see the included NOTICE for copyright information and LICENSE for a copy of the license.
-"""
+"""This file and its contents are licensed under the Apache License 2.0. Please see the included NOTICE for copyright information and LICENSE for a copy of the license."""
+
 import logging
+from collections.abc import MutableMapping
 
 import ujson as json
+from core.current_request import CurrentContext, get_current_request
 from core.feature_flags import flag_set
 from core.label_config import replace_task_data_undefined_with_config_field
 from core.utils.common import load_func, retry_database_locked
 from core.utils.db import fast_first
+from core.utils.exceptions import extract_message
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from drf_yasg import openapi
+from drf_spectacular.utils import extend_schema_field
+from fsm.serializer_fields import FSMStateField
+from fsm.state_inference import get_or_infer_state
+from fsm.utils import get_or_initialize_state, is_fsm_enabled
+from label_studio_sdk.label_interface import LabelInterface
 from projects.models import Project
 from rest_flex_fields import FlexFieldsModelSerializer
 from rest_framework import generics, serializers
@@ -26,37 +33,49 @@ from users.serializers import UserSerializer
 logger = logging.getLogger(__name__)
 
 
+def sanitize_prediction_import_payload(prediction):
+    """Drop only FSM `state` from prediction import payloads."""
+    if not isinstance(prediction, MutableMapping):
+        return prediction
+    prediction.pop('state', None)
+    return prediction
+
+
 class PredictionQuerySerializer(serializers.Serializer):
     task = serializers.IntegerField(required=False, help_text='Task ID to filter predictions')
     project = serializers.IntegerField(required=False, help_text='Project ID to filter predictions')
 
 
+@extend_schema_field(
+    {
+        'type': 'array',
+        'title': 'Prediction result list',
+        'description': 'List of prediction results for the task',
+        'items': {
+            'type': 'object',
+            'title': 'Prediction result items (regions)',
+            'description': 'List of predicted regions for the task',
+        },
+    }
+)
 class PredictionResultField(serializers.JSONField):
-    class Meta:
-        swagger_schema_fields = {
-            'type': openapi.TYPE_ARRAY,
-            'title': 'Prediction result list',
-            'description': 'List of prediction results for the task',
-            'items': {
-                'type': openapi.TYPE_OBJECT,
-                'title': 'Prediction result items (regions)',
-                'description': 'List of predicted regions for the task',
-            },
-        }
+    pass
 
 
+@extend_schema_field(
+    {
+        'type': 'array',
+        'title': 'Annotation result list',
+        'description': 'List of annotation results for the task',
+        'items': {
+            'type': 'object',
+            'title': 'Annotation result items (regions)',
+            'description': 'List of annotated regions for the task',
+        },
+    }
+)
 class AnnotationResultField(serializers.JSONField):
-    class Meta:
-        swagger_schema_fields = {
-            'type': openapi.TYPE_ARRAY,
-            'title': 'Annotation result list',
-            'description': 'List of annotation results for the task',
-            'items': {
-                'type': openapi.TYPE_OBJECT,
-                'title': 'Annotation result items (regions)',
-                'description': 'List of annotated regions for the task',
-            },
-        }
+    pass
 
 
 class PredictionSerializer(ModelSerializer):
@@ -68,6 +87,36 @@ class PredictionSerializer(ModelSerializer):
         'select specific model version for showing preannotations in the labeling interface',
     )
     created_ago = serializers.CharField(default='', read_only=True, help_text='Delta time from creation time')
+
+    def validate(self, data):
+        """Validate prediction using LabelInterface against project configuration"""
+        project = None
+        if 'task' in data:
+            project = data['task'].project
+        elif 'project' in data:
+            project = data['project']
+        ff_user = project.organization.created_by if project else 'auto'
+
+        if not flag_set('fflag_feat_utc_210_prediction_validation_15082025', user=ff_user):
+            # Skip validation if feature flag is not set
+            logger.info(f'Skipping prediction validation in PredictionSerializer for user {ff_user}')
+            return super().validate(data)
+
+        # Only validate if we're updating the result field
+        if 'result' not in data:
+            return data
+
+        if not project:
+            raise ValidationError('Project is required for prediction validation')
+
+        # Validate prediction using LabelInterface
+        li = LabelInterface(project.label_config)
+        validation_errors = li.validate_prediction(data, return_errors=True)
+
+        if validation_errors:
+            raise ValidationError(f'Error validating prediction: {validation_errors}')
+
+        return data
 
     class Meta:
         model = Prediction
@@ -85,7 +134,15 @@ class CompletedByDMSerializer(UserSerializer):
 
 
 class AnnotationSerializer(FlexFieldsModelSerializer):
-    """ """
+    """
+    Annotation Serializer with FSM state support.
+
+    Note: The 'state' field will be populated from the queryset annotation
+    if present, preventing N+1 queries. Use .with_state() on your queryset.
+    """
+
+    state = FSMStateField(read_only=True)  # FSM state - automatically uses annotation if present
+    """"""
 
     result = AnnotationResultField(required=False)
     created_username = serializers.SerializerMethodField(default='', read_only=True, help_text='Username string')
@@ -120,7 +177,7 @@ class AnnotationSerializer(FlexFieldsModelSerializer):
 
         return data
 
-    def get_created_username(self, annotation):
+    def get_created_username(self, annotation) -> str:
         user = annotation.completed_by
         if not user:
             return ''
@@ -132,13 +189,80 @@ class AnnotationSerializer(FlexFieldsModelSerializer):
         name += f' {user.email}, {user.id}'
         return name
 
+    def to_representation(self, obj):
+        """Remove state field if feature flags are disabled"""
+        ret = super().to_representation(obj)
+        user = CurrentContext.get_user()
+        if not (
+            flag_set('fflag_feat_fit_568_finite_state_management', user=user)
+            and flag_set('fflag_feat_fit_710_fsm_state_fields', user=user)
+        ):
+            ret.pop('state', None)
+        return ret
+
     class Meta:
         model = Annotation
         exclude = ['prediction', 'result_count']
         expandable_fields = {'completed_by': (CompletedByDMSerializer,)}
 
 
-class TaskSimpleSerializer(ModelSerializer):
+class AnnotationStubSerializer(FlexFieldsModelSerializer):
+    """
+    Lightweight Annotation Serializer for lazy loading.
+
+    Returns only minimal metadata needed for annotation list display.
+    Used when fflag_fix_all_fit_720_lazy_load_annotations is enabled
+    to improve performance for tasks with many annotations.
+
+    Fields included:
+    - id: for selection and hydration
+    - created_username: for display in annotation list
+    - created_ago: for display in annotation list (relative time string)
+    - created_at: for TimeAgo component (actual timestamp)
+    - completed_by: user id for avatar lookup
+    - ground_truth: for showing star indicator
+    - was_cancelled: for skip queue / cancel-skip button display
+    - is_stub: signals frontend to fetch full data on selection
+    """
+
+    created_username = serializers.SerializerMethodField(default='', read_only=True, help_text='Username string')
+    created_ago = serializers.CharField(default='', read_only=True, help_text='Time delta from creation time')
+    completed_by = serializers.PrimaryKeyRelatedField(required=False, queryset=User.objects.all())
+    # Mark this as a stub so frontend knows to fetch full data on selection
+    is_stub = serializers.SerializerMethodField(read_only=True)
+
+    def get_created_username(self, annotation) -> str:
+        user = annotation.completed_by
+        if not user:
+            return ''
+
+        name = user.first_name
+        if len(user.last_name):
+            name = name + ' ' + user.last_name
+
+        name += f' {user.email}, {user.id}'
+        return name
+
+    def get_is_stub(self, annotation) -> bool:
+        return True
+
+    class Meta:
+        model = Annotation
+        # Minimal fields for annotation list display only
+        # ground_truth, created_at, and was_cancelled are simple model fields (no extra query)
+        fields = [
+            'id',
+            'created_username',
+            'created_ago',
+            'created_at',
+            'completed_by',
+            'ground_truth',
+            'was_cancelled',
+            'is_stub',
+        ]
+
+
+class TaskSimpleSerializer(FlexFieldsModelSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['annotations'] = AnnotationSerializer(many=True, default=[], context=self.context, read_only=True)
@@ -155,7 +279,7 @@ class TaskSimpleSerializer(ModelSerializer):
 
     class Meta:
         model = Task
-        fields = '__all__'
+        exclude = ('precomputed_agreement', 'allow_skip')
 
 
 class BaseTaskSerializer(FlexFieldsModelSerializer):
@@ -176,8 +300,23 @@ class BaseTaskSerializer(FlexFieldsModelSerializer):
 
     def validate(self, task):
         instance = self.instance if hasattr(self, 'instance') else None
+
+        project = self.project(task=instance)
+
+        current_request = get_current_request()
+        if current_request and current_request.method == 'POST' and not project:
+            # raise ValidationError for the project field with standard DRF message
+            try:
+                self.fields['project'].fail('required')
+            except ValidationError as exc:
+                raise ValidationError(
+                    {
+                        'project': exc.detail,
+                    }
+                )
+
         validator = TaskValidator(
-            self.project(task=instance),
+            project,
             instance=instance if 'data' not in task else None,
         )
         return validator.validate(task)
@@ -197,7 +336,7 @@ class BaseTaskSerializer(FlexFieldsModelSerializer):
 
     class Meta:
         model = Task
-        fields = '__all__'
+        exclude = ('precomputed_agreement', 'allow_skip')
 
 
 class BaseTaskSerializerBulk(serializers.ListSerializer):
@@ -361,7 +500,6 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
 
         # to be sure we add tasks with annotations at the same time
         with transaction.atomic():
-
             # extract annotations, predictions, drafts, reviews, etc
             # all these lists will be grouped by tasks, e.g.:
             # task_annotations = [ [a1, a2], [a3, a4, a5], ... ]
@@ -391,7 +529,15 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
 
             db_tasks = self.add_tasks(task_annotations, task_predictions, validated_tasks)
             db_annotations = self.add_annotations(task_annotations, user)
-            self.add_predictions(task_predictions)
+            prediction_errors = self.add_predictions(task_predictions)
+
+            raise_prediction_errors = True
+            if not flag_set('fflag_feat_utc_210_prediction_validation_15082025', user=ff_user):
+                raise_prediction_errors = False
+
+            # If there are prediction validation errors, raise them
+            if prediction_errors and raise_prediction_errors:
+                raise ValidationError({'predictions': prediction_errors})
 
         self.post_process_annotations(user, db_annotations, 'imported')
         self.post_process_tasks(self.project.id, [t.id for t in self.db_tasks])
@@ -407,41 +553,89 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
                 self.add_drafts(task_drafts, db_tasks, annotation_mapping, self.project)
                 self.add_reviews(task_reviews, annotation_mapping, self.project)
 
+        # Backfill FSM states for bulk-created tasks
+        # bulk_create() bypasses save() so FSM transitions don't fire automatically
+        # Do this after all child entities states(annotations, drafts, reviews) have been backfilled
+        self._backfill_fsm_states(self.db_tasks)
+
         return db_tasks
 
     def add_predictions(self, task_predictions):
         """Save predictions to DB and set the latest model version in the project"""
         db_predictions = []
+        validation_errors = []
+
+        should_validate = self.project.label_config_is_not_default and flag_set(
+            'fflag_feat_utc_210_prediction_validation_15082025', user=self.project.organization.created_by
+        )
 
         # add predictions
         last_model_version = None
         for i, predictions in enumerate(task_predictions):
-            for prediction in predictions:
+            for j, prediction in enumerate(predictions):
                 if not isinstance(prediction, dict):
+                    validation_errors.append(f'Task {i}, prediction {j}: Prediction must be a dictionary')
                     continue
 
-                # we need to call result normalizer here since "bulk_create" doesn't call save() method
-                result = Prediction.prepare_prediction_result(prediction['result'], self.project)
-                prediction_score = prediction.get('score')
-                if prediction_score is not None:
-                    try:
-                        prediction_score = float(prediction_score)
-                    except ValueError:
-                        logger.error(
-                            "Can't upload prediction score: should be in float format." 'Fallback to score=None'
-                        )
-                        prediction_score = None
+                # Strip FSM state field from predictions before validation
+                # Exported data may include 'state' which is not a valid prediction field
+                ff_user = self.project.organization.created_by
+                if flag_set('fflag_feat_fit_568_finite_state_management', user=ff_user) and flag_set(
+                    'fflag_feat_fit_710_fsm_state_fields', user=ff_user
+                ):
+                    prediction.pop('state', None)
 
-                last_model_version = prediction.get('model_version', 'undefined')
-                db_predictions.append(
-                    Prediction(
-                        task=self.db_tasks[i],
-                        project=self.db_tasks[i].project,
-                        result=result,
-                        score=prediction_score,
-                        model_version=last_model_version,
+                # Validate prediction only when project label config is not default
+                if should_validate:
+                    try:
+                        prediction = sanitize_prediction_import_payload(prediction)
+                        li = LabelInterface(self.project.label_config) if should_validate else None
+                        validation_errors_list = li.validate_prediction(prediction, return_errors=True)
+
+                        if validation_errors_list:
+                            # Format errors for better readability
+                            for error in validation_errors_list:
+                                validation_errors.append(f'Task {i}, prediction {j}: {error}')
+                            continue
+
+                    except Exception as e:
+                        validation_errors.append(
+                            f'Task {i}, prediction {j}: Error validating prediction - {extract_message(e)}'
+                        )
+                        continue
+
+                try:
+                    # we need to call result normalizer here since "bulk_create" doesn't call save() method
+                    result = Prediction.prepare_prediction_result(prediction['result'], self.project)
+                    prediction_score = prediction.get('score')
+                    if prediction_score is not None:
+                        try:
+                            prediction_score = float(prediction_score)
+                        except ValueError:
+                            logger.error(
+                                "Can't upload prediction score: should be in float format.Fallback to score=None"
+                            )
+                            prediction_score = None
+
+                    last_model_version = prediction.get('model_version', 'undefined')
+                    db_predictions.append(
+                        Prediction(
+                            task=self.db_tasks[i],
+                            project=self.db_tasks[i].project,
+                            result=result,
+                            score=prediction_score,
+                            model_version=last_model_version,
+                        )
                     )
-                )
+                except Exception as e:
+                    validation_errors.append(
+                        f'Task {i}, prediction {j}: Failed to create prediction - {extract_message(e)}'
+                    )
+                    continue
+
+        # Return validation errors if they exist
+        if validation_errors:
+            return validation_errors
 
         # predictions: DB bulk create
         self.db_predictions = Prediction.objects.bulk_create(db_predictions, batch_size=settings.BATCH_SIZE)
@@ -452,7 +646,7 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
             self.project.model_version = last_model_version
             self.project.save()
 
-        return self.db_predictions, last_model_version
+        return None  # No errors
 
     def add_reviews(self, task_reviews, annotation_mapping, project):
         """Save task reviews to DB"""
@@ -485,6 +679,10 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
 
         self.db_drafts = AnnotationDraft.objects.bulk_create(db_drafts, batch_size=settings.BATCH_SIZE)
         logging.info(f'drafts serialization success, len = {len(self.db_drafts)}')
+
+        # Backfill FSM states for bulk-created drafts
+        # bulk_create() bypasses save() so FSM transitions don't fire automatically
+        self._backfill_fsm_states(self.db_drafts)
 
         return self.db_drafts
 
@@ -531,6 +729,10 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
             self.db_annotations = Annotation.objects.bulk_create(db_annotations, batch_size=settings.BATCH_SIZE)
         logging.info(f'Annotations serialization success, len = {len(self.db_annotations)}')
 
+        # Backfill FSM states for bulk-created annotations
+        # bulk_create() bypasses save() so FSM transitions don't fire automatically
+        self._backfill_fsm_states(self.db_annotations)
+
         return self.db_annotations
 
     def add_tasks(self, task_annotations, task_predictions, validated_tasks):
@@ -548,12 +750,13 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
         for i, task in enumerate(validated_tasks):
             cancelled_annotations = len([ann for ann in task_annotations[i] if ann.get('was_cancelled', False)])
             total_annotations = len(task_annotations[i]) - cancelled_annotations
+            current_overlap = len(set([ann.get('completed_by_id') for ann in task_annotations[i]]))
             t = Task(
                 project=self.project,
                 data=task['data'],
                 meta=task.get('meta', {}),
                 overlap=max_overlap,
-                is_labeled=len(task_annotations[i]) >= max_overlap,
+                is_labeled=current_overlap >= max_overlap,
                 file_upload_id=task.get('file_upload_id'),
                 inner_id=None if prev_inner_id is None else max_inner_id + i,
                 total_predictions=len(task_predictions[i]),
@@ -562,6 +765,7 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
                 import_tags=task.get('import_tags', None),
                 import_batch_id=task.get('import_batch_id', None),
                 import_source=task.get('import_source', None),
+                allow_skip=task.get('allow_skip', True),
             )
             db_tasks.append(t)
 
@@ -584,6 +788,21 @@ class BaseTaskSerializerBulk(serializers.ListSerializer):
         logging.info(f'Tasks serialization success, len = {len(self.db_tasks)}')
 
         return db_tasks
+
+    def _backfill_fsm_states(self, entities: list, overwrite_state=False):
+        """
+        Backfill FSM states for entities created via bulk_create().
+
+        bulk_create() bypasses the model's save() method, so FSM transitions
+        don't fire automatically. This sets initial state for newly imported entities.
+        """
+        user = CurrentContext.get_user()
+        if not entities or not is_fsm_enabled(user):
+            return
+
+        for entity in entities:
+            inferred_state = get_or_infer_state(entity)
+            get_or_initialize_state(entity, user=user, inferred_state=inferred_state, overwrite_state=overwrite_state)
 
     @staticmethod
     def post_process_annotations(user, db_annotations, action):
@@ -624,7 +843,14 @@ class TaskWithAnnotationsSerializer(TaskSerializer):
 
 
 class AnnotationDraftSerializer(ModelSerializer):
+    """
+    AnnotationDraft Serializer with FSM state support.
 
+    Note: The 'state' field will be populated from the queryset annotation
+    if present, preventing N+1 queries. Use .with_state() on your queryset.
+    """
+
+    state = FSMStateField(read_only=True)  # FSM state - automatically uses annotation if present
     user = serializers.CharField(default=serializers.CurrentUserDefault())
     created_username = serializers.SerializerMethodField(default='', read_only=True, help_text='User name string')
     created_ago = serializers.CharField(default='', read_only=True, help_text='Delta time from creation time')
@@ -641,13 +867,23 @@ class AnnotationDraftSerializer(ModelSerializer):
         name += (' ' if name else '') + f'{user.email}, {user.id}'
         return name
 
+    def to_representation(self, obj):
+        """Remove state field if feature flags are disabled"""
+        ret = super().to_representation(obj)
+        user = CurrentContext.get_user()
+        if not (
+            flag_set('fflag_feat_fit_568_finite_state_management', user=user)
+            and flag_set('fflag_feat_fit_710_fsm_state_fields', user=user)
+        ):
+            ret.pop('state', None)
+        return ret
+
     class Meta:
         model = AnnotationDraft
         fields = '__all__'
 
 
 class TaskWithAnnotationsAndPredictionsAndDraftsSerializer(TaskSerializer):
-
     predictions = serializers.SerializerMethodField(default=[], read_only=True)
     annotations = serializers.SerializerMethodField(default=[], read_only=True)
     drafts = serializers.SerializerMethodField(default=[], read_only=True)
@@ -712,11 +948,24 @@ class NextTaskSerializer(TaskWithAnnotationsAndPredictionsAndDraftsSerializer):
     def get_annotations(self, task):
         result = []
         if self.context.get('annotations', False):
-            annotations = super().get_annotations(task)
+            # Support lazy loading of annotations (FIT-720)
+            # When annotations_stub is True, return lightweight stubs without result field
+            use_stub = self.context.get('annotations_stub', False)
             user = self.context['request'].user
-            for annotation in annotations:
-                if annotation.get('completed_by') == user.id:
-                    result.append(annotation)
+
+            if use_stub:
+                # Get annotations queryset and filter by user
+                annotations = task.annotations
+                if user.is_annotator:
+                    annotations = annotations.filter(completed_by=user)
+                else:
+                    annotations = annotations.filter(completed_by=user)
+                return AnnotationStubSerializer(annotations, many=True, read_only=True, context=self.context).data
+            else:
+                annotations = super().get_annotations(task)
+                for annotation in annotations:
+                    if annotation.get('completed_by') == user.id:
+                        result.append(annotation)
         return result
 
 

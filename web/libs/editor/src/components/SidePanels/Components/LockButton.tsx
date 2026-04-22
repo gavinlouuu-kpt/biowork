@@ -1,9 +1,9 @@
+import { IconLockLocked, IconLockUnlocked } from "@humansignal/icons";
+import type { ButtonProps } from "@humansignal/ui";
+import type { HotkeyList } from "libs/editor/src/core/Hotkey";
 import { observer } from "mobx-react";
 import type { FC } from "react";
-import { IconLockLocked, IconLockUnlocked } from "@humansignal/icons";
-import type { ButtonProps } from "../../../common/Button/Button";
 import { RegionControlButton } from "./RegionControlButton";
-import { FF_DEV_3873, isFF } from "../../../utils/feature-flags";
 
 export const LockButton: FC<{
   item: any;
@@ -11,33 +11,34 @@ export const LockButton: FC<{
   hovered: boolean;
   locked: boolean;
   hotkey?: string;
+  variant?: ButtonProps["variant"];
   look?: ButtonProps["look"];
+  ariaLabel?: string;
+  tooltip?: string;
   style?: ButtonProps["style"];
+  displayedHotkey?: string;
   onClick: () => void;
-}> = observer(({ item, annotation, hovered, locked, hotkey, look, style, onClick }) => {
+}> = observer(({ item, annotation, locked, hotkey, variant, look, ariaLabel, tooltip, style, onClick }) => {
   if (!item) return null;
   const isLocked = locked || item.isReadOnly() || annotation.isReadOnly();
   const isRegionReadonly = item.isReadOnly() && !locked;
-
-  if (isFF(FF_DEV_3873)) {
-    const styles = {
-      ...style,
-      display: item.isReadOnly() || locked ? undefined : "none",
-    };
-
-    return (
-      <RegionControlButton disabled={isRegionReadonly} onClick={onClick} hotkey={hotkey} look={look} style={styles}>
-        {isLocked ? <IconLockLocked /> : <IconLockUnlocked />}
-      </RegionControlButton>
-    );
-  }
+  const styles = {
+    ...style,
+    display: item.isReadOnly() || locked ? undefined : "none",
+  };
 
   return (
-    item &&
-    (hovered || item.isReadOnly() || locked) && (
-      <RegionControlButton disabled={isRegionReadonly} onClick={onClick} hotkey={hotkey} look={look} style={style}>
-        {isLocked ? <IconLockLocked /> : <IconLockUnlocked />}
-      </RegionControlButton>
-    )
+    <RegionControlButton
+      disabled={isRegionReadonly}
+      onClick={onClick}
+      hotkey={hotkey as HotkeyList}
+      variant={variant}
+      look={look}
+      style={styles}
+      aria-label={ariaLabel}
+      tooltip={tooltip}
+    >
+      {isLocked ? <IconLockLocked /> : <IconLockUnlocked />}
+    </RegionControlButton>
   );
 });

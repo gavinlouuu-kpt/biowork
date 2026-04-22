@@ -6,7 +6,7 @@ class CollapseHelper {
   private _rootSelector: string;
 
   constructor(rootSelector) {
-    this._rootSelector = rootSelector.replace(/^\&/, this._baseRootSelector);
+    this._rootSelector = rootSelector.replace(/^&/, this._baseRootSelector);
   }
 
   get root() {
@@ -19,6 +19,10 @@ class CollapseHelper {
 
   findPanel(text: string) {
     return this.panels.contains(".ant-collapse-item", text);
+  }
+
+  findTab(text: string) {
+    return this.panels.contains(".ant-collapse-header", text);
   }
 
   getPanelByIdx(idx: number) {

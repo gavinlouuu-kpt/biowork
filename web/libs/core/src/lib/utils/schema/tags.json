@@ -69,6 +69,13 @@
         "required": false,
         "default": 32
       },
+      "spectrogram": {
+        "name": "spectrogram",
+        "description": "Determines whether an audio spectrogram is automatically displayed upon loading.",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
       "splitchannels": {
         "name": "splitchannels",
         "description": "Display multiple audio channels separately, if the audio file has more than one channel. (**NOTE: Requires more memory to operate.**)",
@@ -78,7 +85,7 @@
       },
       "decoder": {
         "name": "decoder",
-        "description": "Decoder type to use to decode audio data. (`\"webaudio\"` or `\"ffmpeg\"`)",
+        "description": "Decoder type to use to decode audio data. (`\"webaudio\"`, `\"ffmpeg\"`, or `\"none\"` for no decoding - provides fast loading for large files but disables waveform visualization)",
         "type": "string",
         "required": false,
         "default": "webaudio"
@@ -89,6 +96,150 @@
         "type": "string",
         "required": false,
         "default": "html5"
+      }
+    }
+  },
+  "Channel": {
+    "name": "Channel",
+    "description": "Channel tag can be used to label time series data",
+    "attrs": {
+      "column": {
+        "name": "column",
+        "description": "column name or index",
+        "type": "string",
+        "required": true
+      },
+      "legend": {
+        "name": "legend",
+        "description": "display name of the channel",
+        "type": "string",
+        "required": false
+      },
+      "units": {
+        "name": "units",
+        "description": "display units name",
+        "type": "string",
+        "required": false
+      },
+      "displayFormat": {
+        "name": "displayFormat",
+        "description": "format string for the values, uses d3-format:<br/>\n       `[,][.precision][f\\|%]`<br/>\n       `,` - group thousands with separator (from locale): `,` (12345.6 -> 12,345.6) `,.2f` (12345.6 -> 12,345.60)<br/>\n       `.precision` - precision for `f\\|%` type, significant digits for empty type:<br/>\n                    `.3f` (12.3456 -> 12.345, 1000 -> 1000.000)<br/>\n                    `.3` (12.3456 -> 12.3, 1.2345 -> 1.23, 12345 -> 1.23e+4)<br/>\n       `f` - treat as float, default precision is .6: `f` (12 -> 12.000000) `.2f` (12 -> 12.00) `.0f` (12.34 -> 12)<br/>\n       `%` - treat as percents and format accordingly: `%.0` (0.128 -> 13%) `%.1` (1.2345 -> 123.4%)",
+        "type": "string",
+        "required": false
+      },
+      "height": {
+        "name": "height",
+        "description": "height of the plot",
+        "type": "number",
+        "required": false,
+        "default": 200
+      },
+      "strokeColor": {
+        "name": "strokeColor",
+        "description": "plot stroke color, expects hex value",
+        "type": "string",
+        "required": false,
+        "default": "#f48a42"
+      },
+      "strokeWidth": {
+        "name": "strokeWidth",
+        "description": "plot stroke width",
+        "type": "number",
+        "required": false,
+        "default": 1
+      },
+      "markerColor": {
+        "name": "markerColor",
+        "description": "plot stroke color, expects hex value",
+        "type": "string",
+        "required": false,
+        "default": "#f48a42"
+      },
+      "markerSize": {
+        "name": "markerSize",
+        "description": "plot stroke width",
+        "type": "number",
+        "required": false,
+        "default": 0
+      },
+      "markerSymbol": {
+        "name": "markerSymbol",
+        "description": "plot stroke width",
+        "type": "number",
+        "required": false,
+        "default": "circle"
+      },
+      "timeRange": {
+        "name": "timeRange",
+        "description": "data range of x-axis / time axis",
+        "type": "string",
+        "required": false
+      },
+      "dataRange": {
+        "name": "dataRange",
+        "description": "data range of y-axis / data axis",
+        "type": "string",
+        "required": false
+      },
+      "showAxis": {
+        "name": "showAxis",
+        "description": "show or bide both axis",
+        "type": "string",
+        "required": false
+      },
+      "fixedScale": {
+        "name": "fixedScale",
+        "description": "if false current view scales to fit only displayed values; if given overwrites TimeSeries' fixedScale",
+        "type": ["true", "false"],
+        "required": false
+      }
+    }
+  },
+  "Chat": {
+    "name": "Chat",
+    "description": "The `Chat` tag displays a conversational transcript and lets annotators\nextend it with new messages during labeling. The initial transcript is\nprovided from task data via the `value` attribute.\n\nOptionally, the tag can request automatic replies from an LLM model. To do so,\nset the `llm` attribute to a model in the format `<provider>/<model>`.\n\nMessages can be edited by clicking the edit button that appears on hover for\nuser-created messages (messages from annotation results). System messages from\ntask data cannot be edited.\n\nUse with the following data types: JSON array of message objects.\n\nMessage object format (task data):\n- `role`    — speaker identifier; supported roles: `user`, `assistant`, `system`, `tool`, `developer`\n- `content` — message text\n\nExample task data:\n```json\n{\n  \"dialog\": [\n    {\"role\": \"system\", \"content\": \"Welcome to the assistant.\"},\n    {\"role\": \"user\", \"content\": \"Hello!\"}\n  ]\n}\n```",
+    "attrs": {
+      "name": {
+        "name": "name",
+        "description": "Name of the element",
+        "type": "string",
+        "required": true
+      },
+      "value": {
+        "name": "value",
+        "description": "Data field containing an array of chat messages or empty array",
+        "type": "string",
+        "required": true
+      },
+      "messageroles": {
+        "name": "messageroles",
+        "description": "Comma-separated list of roles that the user can create and send messages on behalf of. Default is \"user\" if the `llm` parameter is set; default is \"user,assistant\" if not.",
+        "type": "string",
+        "required": false
+      },
+      "editable": {
+        "name": "editable",
+        "description": "Whether messages are editable. Use true/false, or a comma-separated list of roles that are editable",
+        "type": ["true", "false"],
+        "required": false
+      },
+      "minmessages": {
+        "name": "minmessages",
+        "description": "Minimum total number of messages required to submit",
+        "type": ["string", "number"],
+        "required": false
+      },
+      "maxmessages": {
+        "name": "maxmessages",
+        "description": "Maximum total number of messages allowed",
+        "type": ["string", "number"],
+        "required": false
+      },
+      "llm": {
+        "name": "llm",
+        "description": "Model used to enable automatic assistant replies, format: `<provider>/<model>`",
+        "type": "string",
+        "required": false
       }
     }
   },
@@ -186,7 +337,7 @@
       },
       "valueList": {
         "name": "valueList",
-        "description": "References a variable that holds a list of image URLs",
+        "description": "References a variable that holds a list of image URLs. For an example, see the [Multi-Page Document Annotation](/templates/multi-page-document-annotation) template.",
         "type": "string",
         "required": false
       },
@@ -341,6 +492,39 @@
       }
     }
   },
+  "MultiChannel": {
+    "name": "MultiChannel",
+    "description": "MultiChannel tag for grouped display of channels on the same plot",
+    "attrs": {
+      "height": {
+        "name": "height",
+        "description": "height of the plot",
+        "type": "number",
+        "required": false,
+        "default": 200
+      },
+      "showAxis": {
+        "name": "showAxis",
+        "description": "whether to show both axes",
+        "type": ["true", "false"],
+        "required": false,
+        "default": true
+      },
+      "showYAxis": {
+        "name": "showYAxis",
+        "description": "whether to show the y-axis",
+        "type": ["true", "false"],
+        "required": false,
+        "default": true
+      },
+      "fixedScale": {
+        "name": "fixedScale",
+        "description": "whether to use a fixed scale for all channels. If not set, inherits from parent TimeSeries tag",
+        "type": ["true", "false"],
+        "required": false
+      }
+    }
+  },
   "Paragraphs": {
     "name": "Paragraphs",
     "description": "The `Paragraphs` tag displays paragraphs of text on the labeling interface. Use to label dialogue transcripts for NLP and NER projects.\nThe `Paragraphs` tag expects task data formatted as an array of objects like the following:\n[{ $nameKey: \"Author name\", $textKey: \"Text\" }, ... ]\n\nUse with the following data types: text.",
@@ -420,6 +604,18 @@
       }
     }
   },
+  "Pdf": {
+    "name": "Pdf",
+    "description": "The `Pdf` tag is used to display a PDF document from a URL.",
+    "attrs": {
+      "value": {
+        "name": "value",
+        "description": "Data field value containing the URL to the PDF",
+        "type": "string",
+        "required": true
+      }
+    }
+  },
   "Table": {
     "name": "Table",
     "description": "The `Table` tag is used to display object keys and values in a table.",
@@ -440,7 +636,7 @@
   },
   "Text": {
     "name": "Text",
-    "description": "The `Text` tag shows text that can be labeled. Use to display any type of text on the labeling interface.\nYou can use `<Style>.htx-text{ white-space: pre-wrap; }</Style>` to preserve all spaces in the text, otherwise spaces are trimmed when displayed and saved in the results.\nEvery space in the text sample is counted when calculating result offsets, for example for NER labeling tasks.\n\nUse with the following data types: text.",
+    "description": "The `Text` tag shows text that can be labeled. Use to display any type of text on the labeling interface.\nYou can use `<Style>.htx-text{ white-space: pre-wrap; }</Style>` to preserve all spaces in the text, otherwise spaces are trimmed when displayed and saved in the results.\nEvery space in the text sample is counted when calculating result offsets, for example for NER labeling tasks.\n\nUse with the following data types: text.\n\n### How to read my text files in python?\nThe Label Studio editor counts `\\r\\n` as two different symbols, displaying them as `\\n\\n`, making it look like there is extra margin between lines.\nYou should either preprocess your files to replace `\\r\\n` with `\\n` completely, or open files in Python with `newline=''` to avoid converting `\\r\\n` to `\\n`:\n`with open('my-file.txt', encoding='utf-8', newline='') as f: text = f.read()`\nThis is especially important when you are doing span NER labeling and need to get the correct offsets:\n`text[start_offset:end_offset]`",
     "attrs": {
       "name": {
         "name": "name",
@@ -523,6 +719,18 @@
         "required": false,
         "default": "url"
       },
+      "sync": {
+        "name": "sync",
+        "description": "Object name to sync with.",
+        "type": "string",
+        "required": false
+      },
+      "cursorColor": {
+        "name": "cursorColor",
+        "description": "Color of the playback cursors used in sync (hex or any SVG-compatible color string)",
+        "type": "string",
+        "required": false
+      },
       "timeColumn": {
         "name": "timeColumn",
         "description": "Column name or index that provides temporal values. If your time series data has no temporal column then one is automatically generated.",
@@ -576,104 +784,9 @@
       }
     }
   },
-  "Channel": {
-    "name": "Channel",
-    "description": "Channel tag can be used to label time series data",
-    "attrs": {
-      "column": {
-        "name": "column",
-        "description": "column name or index",
-        "type": "string",
-        "required": true
-      },
-      "legend": {
-        "name": "legend",
-        "description": "display name of the channel",
-        "type": "string",
-        "required": false
-      },
-      "units": {
-        "name": "units",
-        "description": "display units name",
-        "type": "string",
-        "required": false
-      },
-      "displayFormat": {
-        "name": "displayFormat",
-        "description": "format string for the values, uses d3-format:<br/>\n       `[,][.precision][f\\|%]`<br/>\n       `,` - group thousands with separator (from locale): `,` (12345.6 -> 12,345.6) `,.2f` (12345.6 -> 12,345.60)<br/>\n       `.precision` - precision for `f\\|%` type, significant digits for empty type:<br/>\n                    `.3f` (12.3456 -> 12.345, 1000 -> 1000.000)<br/>\n                    `.3` (12.3456 -> 12.3, 1.2345 -> 1.23, 12345 -> 1.23e+4)<br/>\n       `f` - treat as float, default precision is .6: `f` (12 -> 12.000000) `.2f` (12 -> 12.00) `.0f` (12.34 -> 12)<br/>\n       `%` - treat as percents and format accordingly: `%.0` (0.128 -> 13%) `%.1` (1.2345 -> 123.4%)",
-        "type": "string",
-        "required": false
-      },
-      "height": {
-        "name": "height",
-        "description": "height of the plot",
-        "type": "number",
-        "required": false
-      },
-      "strokeColor": {
-        "name": "strokeColor",
-        "description": "plot stroke color, expects hex value",
-        "type": "string",
-        "required": false,
-        "default": "#f48a42"
-      },
-      "strokeWidth": {
-        "name": "strokeWidth",
-        "description": "plot stroke width",
-        "type": "number",
-        "required": false,
-        "default": 1
-      },
-      "markerColor": {
-        "name": "markerColor",
-        "description": "plot stroke color, expects hex value",
-        "type": "string",
-        "required": false,
-        "default": "#f48a42"
-      },
-      "markerSize": {
-        "name": "markerSize",
-        "description": "plot stroke width",
-        "type": "number",
-        "required": false,
-        "default": 0
-      },
-      "markerSymbol": {
-        "name": "markerSymbol",
-        "description": "plot stroke width",
-        "type": "number",
-        "required": false,
-        "default": "circle"
-      },
-      "timeRange": {
-        "name": "timeRange",
-        "description": "data range of x-axis / time axis",
-        "type": "string",
-        "required": false
-      },
-      "dataRange": {
-        "name": "dataRange",
-        "description": "data range of y-axis / data axis",
-        "type": "string",
-        "required": false
-      },
-      "showAxis": {
-        "name": "showAxis",
-        "description": "show or bide both axis",
-        "type": "string",
-        "required": false
-      },
-      "fixedScale": {
-        "name": "fixedScale",
-        "description": "if false current view scales to fit only displayed values; if given overwrites TimeSeries' fixedScale",
-        "type": ["true", "false"],
-        "required": false
-      }
-    }
-  },
   "Video": {
     "name": "Video",
-    "description": "Video tag plays a simple video file. Use for video annotation tasks such as classification and transcription.\n\nUse with the following data types: video",
+    "description": "Video tag plays a simple video file. Use for video annotation tasks such as classification and transcription.\n\nUse with the following data types: video\n\n### Video format\n\nLabel Studio relies on your web browser to play videos and evaluate the total frame number. So, it's essential that your videos use a format and codecs that are universally supported. To ensure maximum compatibility, we recommend using an MP4 container with video encoded using the H.264 (AVC) codec and audio encoded with AAC. This combination is widely supported across all modern browsers and minimizes issues like incorrect total duration detection or problems with playback. In addition, it's important to convert your videos to a constant frame rate (CFR), ideally around 30 fps, to avoid discrepancies in frame counts and issues with duplicated or missing frames. All audio and video streams from your file must have the same durations; otherwise, you will have extra total frames.\n\nConverting your videos to this recommended format will help ensure that they play smoothly in Label Studio and that the frame rate and duration are correctly recognized for accurate annotations. To convert any video to this format, you can use FFmpeg. For example, the following commands convert an input video to MP4 with H.264 video, AAC audio, and a constant frame rate of 30 fps:\n\n```bash\n# Extract the exact video stream duration in seconds\nDUR=$(ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=nokey=1:noprint_wrappers=1 input.mp4)\n# Re-encode media file to recommended format\nffmpeg -i input_video.mp4 -c:v libx264 -profile:v high -level 4.0 -pix_fmt yuv420p -r 30 -c:a aac -b:a 128k -to $DUR output_video.mp4\n```\n\nIn this command:\n- `-i input_video.mp4` specifies your source video.\n- `-c:v libx264` uses the H.264 codec for video encoding.\n- `-profile:v high -level 4.0` sets compatibility parameters for a broad range of devices.\n- `-pix_fmt yuv420p` ensures the pixel format is compatible with most browsers.\n- `-r 30` forces a constant frame rate of 30 fps. You can also omit the -r option, ffmpeg will save your current frame rate. This is fine if you are 100% certain that your video has a constant frame rate.\n- `-c:a aac -b:a 128k` encodes the audio in AAC at 128 kbps.\n- `-to` stops writing output as soon as the container clock hits your video's end timestamp, so any extra audio tail is automatically dropped.\n- `output_video.mp4` is the converted video file ready for use in Label Studio.\n\nUsing this FFmpeg command to re-encode your videos will help eliminate playback issues and ensure that Label Studio detects the total video duration accurately, providing a smooth annotation experience.\n\nIt is a good idea to check all parameters of your video using this command:\n```bash\nffprobe -v error -show_format -show_streams -print_format json input.mp4\n```",
     "attrs": {
       "name": {
         "name": "name",
@@ -720,6 +833,58 @@
         "type": "number",
         "required": false,
         "default": 64
+      },
+      "defaultPlaybackSpeed": {
+        "name": "defaultPlaybackSpeed",
+        "description": "default playback speed the player should start with when loaded",
+        "type": "number",
+        "required": false,
+        "default": 1
+      },
+      "minPlaybackSpeed": {
+        "name": "minPlaybackSpeed",
+        "description": "minimum allowed playback speed; defaultPlaybackSpeed cannot be set below this value",
+        "type": "number",
+        "required": false,
+        "default": 1
+      }
+    }
+  },
+  "BitmaskLabels": {
+    "name": "BitmaskLabels",
+    "description": "The `BitmaskLabels` tag for pixel-wise image segmentation tasks is used in the area where you want to apply a mask or use a brush to draw a region on the image.\n\n`BitmaskLabels` operates on pixel level and outputs a Base64 encoded PNG data URL image with black pixels on transparent background.\n\nExport data example: `data-url:image/png;[base64-encoded-string]`\n\n**Note:** You need to set `smoothing=\"false\"` on the Image tag to be able to work with individual pixels;\n\n <video class=\"Video astro-OQEP7KKB\" loop=\"\" playsinline=\"\" autoplay=\"\" muted=\"\">\n   <source src=\"https://cdn.sanity.io/files/mzff2hy8/production/4812f66851a7fd4836e729bc7ccb7e510823af5d.mp4\" type=\"video/mp4\" class=\"astro-OQEP7KKB\">\n </video>\n\nUse with the following data types: image.",
+    "attrs": {
+      "name": {
+        "name": "name",
+        "description": "Name of the element",
+        "type": "string",
+        "required": true
+      },
+      "toName": {
+        "name": "toName",
+        "description": "Name of the image to label",
+        "type": "string",
+        "required": true
+      },
+      "choice": {
+        "name": "choice",
+        "description": "Configure whether the data labeler can select one or multiple labels",
+        "type": ["single", "multiple"],
+        "required": false,
+        "default": "single"
+      },
+      "maxUsages": {
+        "name": "maxUsages",
+        "description": "Maximum number of times a label can be used per task",
+        "type": "number",
+        "required": false
+      },
+      "showInline": {
+        "name": "showInline",
+        "description": "Show labels in the same visual line",
+        "type": ["true", "false"],
+        "required": false,
+        "default": true
       }
     }
   },
@@ -808,6 +973,30 @@
         "type": ["true", "false"],
         "required": false,
         "default": true
+      }
+    }
+  },
+  "Bucket": {
+    "name": "Bucket",
+    "description": "Simple container for items in `Ranker` tag. Can be used to group items in `List` tag.",
+    "attrs": {
+      "name": {
+        "name": "name",
+        "description": "Name of the column; used as a key in resulting data",
+        "type": "string",
+        "required": true
+      },
+      "title": {
+        "name": "title",
+        "description": "Title of the column",
+        "type": "string",
+        "required": true
+      },
+      "default": {
+        "name": "default",
+        "description": "This Bucket will be used to display results from `List` by default; see `Ranker` tag for more details",
+        "type": ["true", "false"],
+        "required": false
       }
     }
   },
@@ -910,25 +1099,25 @@
       },
       "visibleWhen": {
         "name": "visibleWhen",
-        "description": "Control visibility of the choices. Can also be used with `when*` attributes below to narrow down visibility",
+        "description": "Control visibility of the choices. Can also be used with the `when*` parameters below to narrow down visibility",
         "type": ["region-selected", "no-region-selected", "choice-selected", "choice-unselected"],
         "required": false
       },
       "whenTagName": {
         "name": "whenTagName",
-        "description": "Use with visibleWhen. Narrow down visibility by name of the tag. For regions, use the name of the object tag, for choices, use the name of the choices tag",
+        "description": "Use with `visibleWhen`. Narrow down visibility by name of the tag. For regions, use the name of the object tag, for choices, use the name of the `choices` tag",
         "type": "string",
         "required": false
       },
       "whenLabelValue": {
         "name": "whenLabelValue",
-        "description": "Use with visibleWhen=\"region-selected\". Narrow down visibility by label value",
+        "description": "Use with `visibleWhen=\"region-selected\"`. Narrow down visibility by label value. Multiple values can be separated with commas",
         "type": "string",
         "required": false
       },
       "whenChoiceValue": {
         "name": "whenChoiceValue",
-        "description": "Use with visibleWhen (\"choice-selected\" or \"choice-unselected\") and whenTagName, both are required. Narrow down visibility by choice value",
+        "description": "Use with `visibleWhen` (`\"choice-selected\"` or `\"choice-unselected\"`) and `whenTagName`, both are required. Narrow down visibility by choice value. Multiple values can be separated with commas",
         "type": "string",
         "required": false
       },
@@ -954,6 +1143,12 @@
         "name": "allowNested",
         "description": "Allow to use `children` field in dynamic choices to nest them. Submitted result will contain array of arrays, every item is a list of values from topmost parent choice down to selected one.",
         "type": ["true", "false"],
+        "required": false
+      },
+      "layout": {
+        "name": "layout",
+        "description": "Layout of the choices: `select` for dropdown/select box format, `inline` for horizontal single row display, `vertical` for vertically stacked display (default)",
+        "type": ["select", "inline", "vertical"],
         "required": false
       }
     }
@@ -1890,13 +2085,6 @@
         "required": false,
         "default": "medium"
       },
-      "icon": {
-        "name": "icon",
-        "description": "Rating icon",
-        "type": ["star", "heart", "fire", "smile"],
-        "required": false,
-        "default": "star"
-      },
       "hotkey": {
         "name": "hotkey",
         "description": "HotKey for changing rating value",
@@ -1932,7 +2120,7 @@
   },
   "Rectangle": {
     "name": "Rectangle",
-    "description": "The `Rectangle` tag is used to add a rectangle (Bounding Box) to an image without selecting a label. This can be useful when you have only one label to assign to a rectangle.\n\nUse with the following data types: image.",
+    "description": "The `Rectangle` tag is used to add a rectangle (Bounding Box) to an image without selecting a label. This can be useful when you have only one label to assign to a rectangle.\n\nUse with the following data types: image. Annotation results store the left top corner of the bounding box,\nread more about it and rotation in the [Object Detection Template](/templates/image_bbox.html#Bounding-box-rotation-in-the-Label-Studio-results).",
     "attrs": {
       "name": {
         "name": "name",
@@ -1991,12 +2179,19 @@
         "description": "Only show smart tool for interactive pre-annotations",
         "type": ["true", "false"],
         "required": false
+      },
+      "snap": {
+        "name": "snap",
+        "description": "Snap rectangle to image pixels",
+        "type": ["pixel", "none"],
+        "required": false,
+        "default": "none"
       }
     }
   },
   "RectangleLabels": {
     "name": "RectangleLabels",
-    "description": "The `RectangleLabels` tag creates labeled rectangles. Use to apply labels to bounding box semantic segmentation tasks.\n\nUse with the following data types: image.",
+    "description": "The `RectangleLabels` tag creates labeled rectangles. Use to apply labels to bounding box semantic segmentation tasks.\n\nUse with the following data types: image. Annotation results store the left top corner of the bounding box,\nread more about it and rotation in the [Object Detection Template](/templates/image_bbox.html#Bounding-box-rotation-in-the-Label-Studio-results).",
     "attrs": {
       "name": {
         "name": "name",
@@ -2062,6 +2257,13 @@
         "type": ["true", "false"],
         "required": false,
         "default": true
+      },
+      "snap": {
+        "name": "snap",
+        "description": "Snap rectangle to image pixels",
+        "type": ["pixel", "none"],
+        "required": false,
+        "default": "none"
       }
     }
   },
@@ -2178,19 +2380,19 @@
       },
       "maxWidth": {
         "name": "maxWidth",
-        "description": "Maximum width for dropdown",
+        "description": "Maximum width for dropdown with units (eg: \"500px\")",
         "type": "number",
         "required": false
       },
       "minWidth": {
         "name": "minWidth",
-        "description": "Minimum width for dropdown",
+        "description": "Minimum width for dropdown with units (eg: \"300px\")",
         "type": "number",
         "required": false
       },
       "required": {
         "name": "required",
-        "description": "Whether taxonomy validation is required",
+        "description": "Whether it is required to have selected at least one option",
         "type": ["true", "false"],
         "required": false,
         "default": false
@@ -2219,6 +2421,12 @@
         "type": ["true", "false"],
         "required": false
       },
+      "labeling": {
+        "name": "labeling",
+        "description": "Use taxonomy to label regions in text. Only supported with `<Text>` and `<HyperText>` object tags.",
+        "type": ["true", "false"],
+        "required": false
+      },
       "legacy": {
         "name": "legacy",
         "description": "Use this tag to enable the legacy version of the Taxonomy tag. The legacy version supports the ability for annotators to add labels as needed. However, when true, the `apiUrl` parameter is not usable.",
@@ -2233,31 +2441,25 @@
     "attrs": {
       "name": {
         "name": "name",
-        "description": "Name of the element",
+        "description": "Name to identify the TextArea",
         "type": "string",
         "required": true
       },
       "toName": {
         "name": "toName",
-        "description": "Name of the element that you want to label",
+        "description": "Name assigned to the object tag that the TextArea is labeling",
         "type": "string",
         "required": true
       },
       "value": {
         "name": "value",
-        "description": "Pre-filled value",
-        "type": "string",
-        "required": true
-      },
-      "label": {
-        "name": "label",
-        "description": "Label text",
+        "description": "A pre-filled default value that appears within the rendered TextArea field and can be submitted",
         "type": "string",
         "required": false
       },
       "placeholder": {
         "name": "placeholder",
-        "description": "Placeholder text",
+        "description": "Placeholder text that appears inside the rendered TextArea field, but unlike `value` it cannot be submitted",
         "type": "string",
         "required": false
       },
@@ -2269,41 +2471,42 @@
       },
       "editable": {
         "name": "editable",
-        "description": "Whether to display an editable textarea",
-        "type": ["true", "false"],
-        "required": false,
-        "default": false
-      },
-      "skipDuplicates": {
-        "name": "skipDuplicates",
-        "description": "Prevent duplicates in textarea inputs",
+        "description": "Whether to display an icon that allows the annotator to edit their text after adding it",
         "type": ["true", "false"],
         "required": false,
         "default": false
       },
       "transcription": {
         "name": "transcription",
-        "description": "If false, always show editor",
+        "description": "When set to true and used with `editable=\"true\"`, the TextArea UI will remain an editable field even after you add your text",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
+      "skipDuplicates": {
+        "name": "skipDuplicates",
+        "description": "When set to true, a pop-up warning will appear and prevent duplicate values. See [the example below](#Example-Enforce-unique-values)",
         "type": ["true", "false"],
         "required": false,
         "default": false
       },
       "displayMode": {
         "name": "displayMode",
-        "description": "Display mode for the textarea; region-list shows it for every region in regions list",
+        "description": "Display mode for the TextArea; when set to `region-list` there will be an input field for every region in the Regions panel. See [the example below](#Example-Region-list-TextArea-fields)",
         "type": ["tag", "region-list"],
         "required": false,
         "default": "tag"
       },
       "rows": {
         "name": "rows",
-        "description": "Number of rows in the textarea",
+        "description": "Number of rows in the TextArea input field. If `1`, you can submit text by pressing Enter. If greater than `1`, you can submit text by clicking **Add** or pressing Shift + Enter",
         "type": "number",
-        "required": false
+        "required": false,
+        "default": 1
       },
       "required": {
         "name": "required",
-        "description": "Validate whether content in textarea is required",
+        "description": "Determine whether content in TextArea is required",
         "type": ["true", "false"],
         "required": false,
         "default": false
@@ -2316,7 +2519,7 @@
       },
       "showSubmitButton": {
         "name": "showSubmitButton",
-        "description": "Whether to show or hide the submit button. By default it shows when there are more than one rows of text, such as in textarea mode.",
+        "description": "Determine whether to show or hide the **Add** button. By default it's hidden if `rows=\"1\"`, and it's visible if there are more than 1 row",
         "type": ["true", "false"],
         "required": false
       },
@@ -2418,6 +2621,268 @@
       }
     }
   },
+  "Vector": {
+    "name": "Vector",
+    "description": "The `Vector` tag is used to add vectors to an image without selecting a label. This can be useful when you have only one label to assign to the vector. Use for image segmentation tasks.\n\nUse with the following data types: image.",
+    "attrs": {
+      "name": {
+        "name": "name",
+        "description": "Name of tag",
+        "type": "string",
+        "required": true
+      },
+      "toname": {
+        "name": "toname",
+        "description": "Name of image to label",
+        "type": "string",
+        "required": true
+      },
+      "opacity": {
+        "name": "opacity",
+        "description": "Opacity of vector",
+        "type": "number",
+        "required": false,
+        "default": 0.6
+      },
+      "fillColor": {
+        "name": "fillColor",
+        "description": "Vector fill color in hexadecimal or HTML color name",
+        "type": "string",
+        "required": false,
+        "default": "transparent"
+      },
+      "strokeColor": {
+        "name": "strokeColor",
+        "description": "Stroke color in hexadecimal",
+        "type": "string",
+        "required": false,
+        "default": "#f48a42"
+      },
+      "strokeWidth": {
+        "name": "strokeWidth",
+        "description": "Width of stroke",
+        "type": "number",
+        "required": false,
+        "default": 3
+      },
+      "pointSize": {
+        "name": "pointSize",
+        "description": "Size of vector handle points",
+        "type": ["small", "medium", "large"],
+        "required": false,
+        "default": "small"
+      },
+      "pointStyle": {
+        "name": "pointStyle",
+        "description": "Style of points",
+        "type": ["rectangle", "circle"],
+        "required": false,
+        "default": "circle"
+      },
+      "smart": {
+        "name": "smart",
+        "description": "Show smart tool for interactive pre-annotations",
+        "type": ["true", "false"],
+        "required": false
+      },
+      "smartOnly": {
+        "name": "smartOnly",
+        "description": "Only show smart tool for interactive pre-annotations",
+        "type": ["true", "false"],
+        "required": false
+      },
+      "snap": {
+        "name": "snap",
+        "description": "Snap vector to image pixels",
+        "type": ["pixel", "none"],
+        "required": false,
+        "default": "none"
+      },
+      "closable": {
+        "name": "closable",
+        "description": "Allow closed shapes",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
+      "curves": {
+        "name": "curves",
+        "description": "Allow Bezier curves",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
+      "skeleton": {
+        "name": "skeleton",
+        "description": "Enables skeleton mode to allow branch paths",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
+      "minPoints": {
+        "name": "minPoints",
+        "description": "Minimum allowed number of points",
+        "type": ["number", "none"],
+        "required": false,
+        "default": "none"
+      },
+      "maxPoints": {
+        "name": "maxPoints",
+        "description": "Maximum allowed number of points",
+        "type": ["number", "none"],
+        "required": false,
+        "default": "none"
+      },
+      "pointSizeEnabled": {
+        "name": "pointSizeEnabled",
+        "description": "Size of a point in pixels when shape is selected",
+        "type": "number",
+        "required": false,
+        "default": 5
+      },
+      "pointSizeDisabled": {
+        "name": "pointSizeDisabled",
+        "description": "Size of a point in pixels when shape is not selected",
+        "type": "number",
+        "required": false,
+        "default": 3
+      }
+    }
+  },
+  "VectorLabels": {
+    "name": "VectorLabels",
+    "description": "The `VectorLabels` tag is used to create labeled vectors. Use to apply labels to vectors in semantic segmentation tasks.\n\nUse with the following data types: image.\n\n## Key Features\n\n### Point Management\n- **Add Points**: Click on empty space, Shift+click on path segments\n- **Edit Points**: Drag to reposition, Shift+click to convert regular ↔ bezier\n- **Delete Points**: Alt+click on existing points\n- **Multi-Selection**: Select multiple points for batch transformations\n- **Break Closed Path**: Alt+click on any segment of a closed path to break it at that specific segment\n\n### Bezier Curves\n- **Create**: Drag while adding points or convert existing points\n- **Edit**: Drag control points, disconnect/reconnect control handles\n- **Control**: `curves` prop to enable/disable bezier functionality\n\n## Keyboard Shortcuts & Hotkeys\n\n### Point Creation & Editing\n- **Click**: Add new point in drawing mode\n- **Shift + Click** on a segment: Add point on path segment (insert between existing points)\n- **Shift + Drag**: Create bezier point with control handles\n- **Shift + Click** on a point: Convert point between regular ↔ bezier\n- **Alt + Click** on a segment: Break closed path at segment (when path is closed)\n\n### Point Selection\n- **Click**: Select single point\n- **Cmd/Ctrl + Click**: Add point to multi-selection\n- **Cmd/Ctrl + Click on shape**: Select all points in the path\n- **Cmd/Ctrl + Click on point**: Toggle point selection in multi-selection\n\n### Path Management\n- **Click on first/last point**: Close path bidirectionally (first→last or last→first)\n- **Shift + Click**: Add point on path segment without closing\n\n### Bezier Curve Control\n- **Drag control points**: Adjust curve shape\n- **Alt + Drag control point**: Disconnect control handles (make asymmetric)\n- **Shift + Drag**: Create new bezier point with control handles\n\n### Multi-Selection & Transformation\n- **Select multiple points**: Use Cmd/Ctrl + Click to build selection\n- **Transform selection**: Use transformer handles for rotation, scaling, and translation\n- **Clear selection**: Click on any point\n\n## Usage Examples\n\n### Basic Vector Path\n```jsx\n<View>\n  <Image name=\"image\" value=\"$image\" />\n  <VectorLabels name=\"labels\" toName=\"image\">\n    <Label value=\"Road\" />\n    <Label value=\"Boundary\" />\n  </VectorLabels>\n</View>\n```\n\n### Polygon with Bezier Support\n```jsx\n<View>\n  <Image name=\"image\" value=\"$image\" />\n  <VectorLabels\n    name=\"polygons\"\n    toName=\"image\"\n    closable={true}\n    curves={true}\n    minPoints=\"3\"\n    maxPoints=\"20\"\n  >\n    <Label value=\"Building\" />\n    <Label value=\"Park\" />\n  </VectorLabels>\n</View>\n```\n\n### Skeleton Mode for Branching Paths\n```jsx\n<View>\n  <Image name=\"image\" value=\"$image\" />\n  <VectorLabels\n    name=\"skeleton\"\n    toName=\"image\"\n    skeleton={true}\n    closable={false}\n    curves={true}\n  >\n    <Label value=\"Tree\" />\n    <Label value=\"Branch\" />\n  </VectorLabels>\n</View>\n```\n\n### Keypoint Annotation Tool\n```jsx\n<View>\n  <Image name=\"image\" value=\"$image\" />\n  <VectorLabels\n    name=\"keypoints\"\n    toName=\"image\"\n    closable={false}\n    curves={false}\n    minPoints=\"1\"\n    maxPoints=\"1\"\n  >\n    <Label value=\"Eye\" />\n    <Label value=\"Nose\" />\n    <Label value=\"Mouth\" />\n  </VectorLabels>\n</View>\n```\n\n## Advanced Features\n\n### Path Breaking\nWhen a path is closed, you can break it at any segment:\n- **Alt + Click** on any segment of a closed path\n- The path breaks at that segment\n- The breaking point becomes the first element\n- The point before breaking becomes active\n\n### Skeleton Mode\n- **Purpose**: Create branching paths instead of linear sequences\n- **Behavior**: New points connect to the active point, not the last added point\n- **Use Case**: Tree structures, network diagrams, anatomical features\n\n### Bezier Curve Management\n- **Symmetric Control**: By default, control points move symmetrically\n- **Asymmetric Control**: Hold Alt while dragging to disconnect handles\n- **Control Point Visibility**: Control points are shown when editing bezier points\n\n### Multi-Selection Workflow\n1. **Build Selection**: Use Cmd/Ctrl + Click to add points\n2. **Transform**: Use transformer handles for rotation, scaling, translation\n3. **Batch Operations**: Apply transformations to all selected points\n4. **Clear**: Click outside or use programmatic methods\n\n## Props Reference",
+    "attrs": {
+      "name": {
+        "name": "name",
+        "description": "Name of tag",
+        "type": "string",
+        "required": true
+      },
+      "toName": {
+        "name": "toName",
+        "description": "Name of image to label",
+        "type": "string",
+        "required": true
+      },
+      "choice": {
+        "name": "choice",
+        "description": "Configure whether you can select one or multiple labels",
+        "type": ["single", "multiple"],
+        "required": false,
+        "default": "single"
+      },
+      "maxUsages": {
+        "name": "maxUsages",
+        "description": "Maximum number of times a label can be used per task",
+        "type": "number",
+        "required": false
+      },
+      "showInline": {
+        "name": "showInline",
+        "description": "Show labels in the same visual line",
+        "type": ["true", "false"],
+        "required": false,
+        "default": true
+      },
+      "opacity": {
+        "name": "opacity",
+        "description": "Opacity of vector",
+        "type": "number",
+        "required": false,
+        "default": 0.2
+      },
+      "fillColor": {
+        "name": "fillColor",
+        "description": "Vector fill color in hexadecimal",
+        "type": "string",
+        "required": false
+      },
+      "strokeColor": {
+        "name": "strokeColor",
+        "description": "Stroke color in hexadecimal",
+        "type": "string",
+        "required": false
+      },
+      "strokeWidth": {
+        "name": "strokeWidth",
+        "description": "Width of stroke",
+        "type": "number",
+        "required": false,
+        "default": 1
+      },
+      "pointSize": {
+        "name": "pointSize",
+        "description": "Size of vector handle points",
+        "type": ["small", "medium", "large"],
+        "required": false,
+        "default": "medium"
+      },
+      "pointStyle": {
+        "name": "pointStyle",
+        "description": "Style of points",
+        "type": ["rectangle", "circle"],
+        "required": false,
+        "default": "rectangle"
+      },
+      "snap": {
+        "name": "snap",
+        "description": "Snap vector to image pixels",
+        "type": ["pixel", "none"],
+        "required": false,
+        "default": "none"
+      },
+      "closable": {
+        "name": "closable",
+        "description": "Allow closed shapes",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
+      "curves": {
+        "name": "curves",
+        "description": "Allow Bezier curves",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
+      "skeleton": {
+        "name": "skeleton",
+        "description": "Enables skeleton mode to allow branch paths",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
+      "minPoints": {
+        "name": "minPoints",
+        "description": "Minimum allowed number of points",
+        "type": ["number", "none"],
+        "required": false,
+        "default": "none"
+      },
+      "maxPoints": {
+        "name": "maxPoints",
+        "description": "Maximum allowed number of points",
+        "type": ["number", "none"],
+        "required": false,
+        "default": "none"
+      },
+      "pointsizeenabled": {
+        "name": "pointsizeenabled",
+        "description": "Size of a point in pixels when shape is selected",
+        "type": "number",
+        "required": false,
+        "default": 5
+      },
+      "pointsizedisabled": {
+        "name": "pointsizedisabled",
+        "description": "Size of a point in pixels when shape is not selected",
+        "type": "number",
+        "required": false,
+        "default": 5
+      }
+    }
+  },
   "VideoRectangle": {
     "name": "VideoRectangle",
     "description": "VideoRectangle tag brings Object Tracking capabilities to videos. It works in combination with the `<Video/>` and the `<Labels/>` tags.\n\nUse with the following data types: video",
@@ -2451,6 +2916,13 @@
         "name": "bordered",
         "description": "Shows border",
         "type": "string",
+        "required": false,
+        "default": false
+      },
+      "open": {
+        "name": "open",
+        "description": "Sets default collapsed state",
+        "type": ["true", "false"],
         "required": false,
         "default": false
       }
@@ -2520,6 +2992,60 @@
       }
     }
   },
+  "Markdown": {
+    "name": "Markdown",
+    "description": "The `Markdown` element is used to display markdown-formatted text content.",
+    "attrs": {
+      "value": {
+        "name": "value",
+        "description": "Markdown text content, either static text or field name in task data (e.g., $markdown_field)",
+        "type": "string",
+        "required": true
+      },
+      "style": {
+        "name": "style",
+        "description": "CSS style string",
+        "type": "string",
+        "required": false
+      },
+      "className": {
+        "name": "className",
+        "description": "Class name of the CSS style to apply",
+        "type": "string",
+        "required": false
+      },
+      "idAttr": {
+        "name": "idAttr",
+        "description": "Unique ID attribute to use in CSS",
+        "type": "string",
+        "required": false
+      },
+      "visibleWhen": {
+        "name": "visibleWhen",
+        "description": "Control visibility of the content",
+        "type": ["region-selected", "choice-selected", "no-region-selected", "choice-unselected"],
+        "required": false
+      },
+      "whenTagName": {
+        "name": "whenTagName",
+        "description": "Use with `visibleWhen`. Narrow down visibility by tag name",
+        "type": "string",
+        "required": false
+      },
+      "whenLabelValue": {
+        "name": "whenLabelValue",
+        "description": "Use with `visibleWhen=\"region-selected\"`. Narrow down visibility by label value",
+        "type": "string",
+        "required": false
+      },
+      "whenChoiceValue": {
+        "name": "whenChoiceValue",
+        "description": "Use with `visibleWhen` and `whenTagName`. Narrow down visibility by choice value",
+        "type": "string",
+        "required": false
+      }
+    }
+  },
   "Style": {
     "name": "Style",
     "description": "The `Style` tag is used in combination with the View tag to apply custom CSS properties to the labeling interface. See the [CSS Reference](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference) on the MDN page for a full list of available properties that you can reference. You can also adjust default Label Studio CSS classes. Use the browser developer tools to inspect the element on the UI and locate the class name, then specify that class name in the `Style` tag.",
@@ -2567,42 +3093,47 @@
       },
       "visibleWhen": {
         "name": "visibleWhen",
-        "description": "Control visibility of the content. Can also be used with `when*` attributes below to narrow down visibility",
+        "description": "Control visibility of the content. Can also be used with the `when*` parameters below to narrow visibility",
         "type": ["region-selected", "choice-selected", "no-region-selected", "choice-unselected"],
         "required": false
       },
       "whenTagName": {
         "name": "whenTagName",
-        "description": "Use with visibleWhen. Narrow down visibility by tag name. For regions, use the name of the object tag, for choices, use the name of the choices tag",
+        "description": "Use with `visibleWhen`. Narrow down visibility by tag name. For regions, use the name of the object tag, for choices, use the name of the `choices` tag",
         "type": "string",
         "required": false
       },
       "whenLabelValue": {
         "name": "whenLabelValue",
-        "description": "Use with visibleWhen=\"region-selected\". Narrow down visibility by label value",
+        "description": "Use with `visibleWhen=\"region-selected\"`. Narrow down visibility by label value. Multiple values can be separated with commas",
         "type": "string",
         "required": false
       },
       "whenChoiceValue": {
         "name": "whenChoiceValue",
-        "description": "Use with visibleWhen (\"choice-selected\" or \"choice-unselected\") and whenTagName, both are required. Narrow down visibility by choice value",
+        "description": "Use with `visibleWhen` (`\"choice-selected\"` or `\"choice-unselected\"`) and `whenTagName`, both are required. Narrow down visibility by choice value. Multiple values can be separated with commas",
         "type": "string",
         "required": false
       }
     },
     "children": [
       "Audio",
+      "Channel",
+      "Chat",
       "HyperText",
       "Image",
       "List",
+      "MultiChannel",
       "Paragraphs",
+      "Pdf",
       "Table",
       "Text",
       "TimeSeries",
-      "Channel",
       "Video",
+      "BitmaskLabels",
       "Brush",
       "BrushLabels",
+      "Bucket",
       "Choice",
       "Choices",
       "DateTime",
@@ -2630,10 +3161,13 @@
       "TextArea",
       "TimeSeriesLabels",
       "TimelineLabels",
+      "Vector",
+      "VectorLabels",
       "VideoRectangle",
       "Collapse",
       "Filter",
       "Header",
+      "Markdown",
       "Style",
       "View"
     ]

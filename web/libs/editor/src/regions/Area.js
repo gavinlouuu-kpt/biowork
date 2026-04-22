@@ -8,6 +8,7 @@ import { RectRegionModel } from "./RectRegion";
 import { KeyPointRegionModel } from "./KeyPointRegion";
 import { AudioRegionModel } from "./AudioRegion";
 import { PolygonRegionModel } from "./PolygonRegion";
+import { VectorRegionModel } from "./VectorRegion";
 import { EllipseRegionModel } from "./EllipseRegion";
 import { RichTextRegionModel } from "./RichTextRegion";
 import { BrushRegionModel } from "./BrushRegion";
@@ -15,6 +16,7 @@ import { TimelineRegionModel } from "./TimelineRegion";
 import { TimeSeriesRegionModel } from "./TimeSeriesRegion";
 import { ParagraphsRegionModel } from "./ParagraphsRegion";
 import { VideoRectangleRegionModel } from "./VideoRectangleRegion";
+import { BitmaskRegionModel } from "./BitmaskRegion";
 
 // general Area type for classification Results which doesn't belong to any real Area
 const ClassificationArea = types.compose(
@@ -47,11 +49,20 @@ const Area = types.union(
     dispatcher(sn) {
       // for some deserializations
       if (sn.$treenode) return sn.$treenode.type;
+
+      for (const customTag of Registry.customTags) {
+        if (customTag.region && customTag.detector) {
+          if (customTag.detector(sn)) return customTag.region;
+        }
+      }
+
       if (
         !sn.points && // dirty hack to make it work with polygons, but may be the whole condition is not necessary at all
+        !sn.shape && // same for vector
         // `sequence` and `ranges` are used for video regions
         !sn.sequence &&
         !sn.ranges &&
+        !sn.imageDataURL &&
         sn.value &&
         Object.values(sn.value).length <= 1
       )
@@ -83,9 +94,12 @@ const Area = types.union(
   KeyPointRegionModel,
   EllipseRegionModel,
   PolygonRegionModel,
+  VectorRegionModel,
   BrushRegionModel,
+  BitmaskRegionModel,
   VideoRectangleRegionModel,
   ClassificationArea,
+  ...Registry.customTags.map((t) => t.region).filter(Boolean),
 );
 
 export default Area;

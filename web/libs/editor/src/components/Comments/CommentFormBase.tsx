@@ -1,9 +1,10 @@
 import { type FC, type RefObject, useCallback, useRef } from "react";
-import { Block, Elem } from "../../utils/bem";
+import { cn } from "../../utils/bem";
 import { IconSend } from "@humansignal/icons";
 
 import { TextArea } from "../../common/TextArea/TextArea";
 import { observer } from "mobx-react";
+import { Button } from "@humansignal/ui";
 
 export type CommentFormProps = {
   value?: string;
@@ -44,7 +45,7 @@ export const CommentFormBase: FC<CommentFormProps> = observer(
     );
 
     return (
-      <Block ref={formRef} tag="form" name="comment-form" mod={{ inline }} onSubmit={submitHandler}>
+      <form ref={formRef as any} className={cn("comment-form").mod({ inline }).toClassName()} onSubmit={submitHandler}>
         <TextArea
           actionRef={actionRef}
           name="comment"
@@ -64,12 +65,12 @@ export const CommentFormBase: FC<CommentFormProps> = observer(
           }}
           onBlur={(e) => onBlur?.(e)}
         />
-        <Elem tag="div" name="primary-action">
-          <button type="submit">
+        <div className={cn("comment-form").elem("primary-action").toClassName()}>
+          <Button type="submit" aria-label="Submit comment" variant="neutral" look="string">
             <IconSend />
-          </button>
-        </Elem>
-      </Block>
+          </Button>
+        </div>
+      </form>
     );
   },
 );

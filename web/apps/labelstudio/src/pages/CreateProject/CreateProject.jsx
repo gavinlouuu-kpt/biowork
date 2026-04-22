@@ -1,7 +1,8 @@
-import { EnterpriseBadge, Select } from "@humansignal/ui";
+import { EnterpriseBadge, Select, Typography } from "@humansignal/ui";
 import React from "react";
 import { useHistory } from "react-router";
-import { Button, ToggleItems } from "../../components";
+import { ToggleItems } from "../../components";
+import { Button } from "@humansignal/ui";
 import { Modal } from "../../components/Modal/Modal";
 import { Space } from "../../components/Space/Space";
 import { HeidiTips } from "../../components/HeidiTips/HeidiTips";
@@ -13,7 +14,6 @@ import { ImportPage } from "./Import/Import";
 import { useImportPage } from "./Import/useImportPage";
 import { useDraftProject } from "./utils/useDraftProject";
 import { Input, TextArea } from "../../components/Form";
-import { Caption } from "../../components/Caption/Caption";
 import { FF_LSDV_E_297, isFF } from "../../utils/feature-flags";
 import { createURL } from "../../components/HeidiTips/utils";
 
@@ -32,7 +32,7 @@ const ProjectName = ({
 }) =>
   !show ? null : (
     <form
-      className={cn("project-name")}
+      className={cn("project-name").toClassName()}
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit();
@@ -88,10 +88,10 @@ const ProjectName = ({
         <div className="w-full flex flex-col gap-2">
           <label>
             Workspace
-            <EnterpriseBadge className="ml-2" />
+            <EnterpriseBadge className="ml-tight" />
           </label>
           <Select placeholder="Select an option" disabled options={[]} triggerClassName="!flex-1" />
-          <Caption>
+          <Typography size="small" className="mt-tight mb-wider">
             Simplify project management by organizing projects into workspaces.{" "}
             <a
               href={createURL(
@@ -103,10 +103,11 @@ const ProjectName = ({
               )}
               target="_blank"
               rel="noreferrer"
+              className="underline hover:no-underline"
             >
               Learn more
             </a>
-          </Caption>
+          </Typography>
           <HeidiTips collection="projectCreation" />
         </div>
       )}
@@ -186,8 +187,8 @@ export const CreateProject = ({ onClose }) => {
   const rootClass = cn("create-project");
   const tabClass = rootClass.elem("tab");
   const steps = {
-    name: <span className={tabClass.mod({ disabled: !!error })}>Project Name</span>,
-    import: <span className={tabClass.mod({ disabled: uploadDisabled })}>Data Import</span>,
+    name: <span className={tabClass.mod({ disabled: !!error }).toClassName()}>Project Name</span>,
+    import: <span className={tabClass.mod({ disabled: uploadDisabled }).toClassName()}>Data Import</span>,
     config: "Labeling Setup",
   };
 
@@ -207,6 +208,16 @@ export const CreateProject = ({ onClose }) => {
   );
 
   const onCreate = React.useCallback(async () => {
+    // First, persist project with label_config so import/reimport validates against it
+    const response = await api.callApi("updateProject", {
+      params: {
+        pk: project.id,
+      },
+      body: { ...projectBody, is_draft: false },
+    });
+
+    if (response === null) return;
+
     const imported = await finishUpload();
 
     if (!imported) return;
@@ -216,12 +227,6 @@ export const CreateProject = ({ onClose }) => {
     if (sample) await uploadSample(sample);
 
     __lsa("create_project.create", { sample: sample?.url });
-    const response = await api.callApi("updateProject", {
-      params: {
-        pk: project.id,
-      },
-      body: projectBody,
-    });
 
     // Attach ML backends from template (if any) with dedupe by URL
     if (response && selectedRecipe?.ml_backends?.length) {
@@ -251,9 +256,7 @@ export const CreateProject = ({ onClose }) => {
 
     setWaitingStatus(false);
 
-    if (response !== null) {
-      history.push(`/projects/${response.id}/data`);
-    }
+    history.push(`/projects/${response.id}/data`);
   }, [project, projectBody, finishUpload]);
 
   const onSaveName = async () => {
@@ -297,14 +300,20 @@ export const CreateProject = ({ onClose }) => {
           <ToggleItems items={steps} active={step} onSelect={setStep} />
 
           <Space>
-            <Button look="danger" size="compact" onClick={onDelete} waiting={waiting}>
-              Delete
+            <Button
+              variant="negative"
+              look="outlined"
+              onClick={onDelete}
+              waiting={waiting}
+              aria-label="Cancel project creation"
+            >
+              Cancel
             </Button>
             <Button
               look="primary"
-              size="compact"
               onClick={onCreate}
               waiting={waiting || uploading}
+              waitingClickable={false}
               disabled={!project || uploadDisabled || error}
             >
               Save

@@ -2,8 +2,8 @@ import { inject } from "mobx-react";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { IconChevronDown, IconChevronLeft, IconGearNewUI } from "@humansignal/icons";
-import { Block, Elem } from "../../utils/bem";
-import { Button } from "../Common/Button/Button";
+import { cn } from "../../utils/bem";
+import { Button } from "@humansignal/ui";
 import { FieldsButton } from "../Common/FieldsButton";
 import { Icon } from "../Common/Icon/Icon";
 import { Resizer } from "../Common/Resizer/Resizer";
@@ -14,7 +14,7 @@ import "./Label.scss";
 // Todo: consider renaming this file to something like LabelingWrapper as it is not a Label component
 const LabelingHeader = ({ SDK, onClick, isExplorerMode }) => {
   return (
-    <Elem name="header" mod={{ labelStream: !isExplorerMode }}>
+    <div className={cn("label-view").elem("header").mod({ labelStream: !isExplorerMode }).toClassName()}>
       <Space size="large">
         {SDK.interfaceEnabled("backButton") && (
           <Button
@@ -36,7 +36,7 @@ const LabelingHeader = ({ SDK, onClick, isExplorerMode }) => {
           />
         ) : null}
       </Space>
-    </Elem>
+    </div>
   );
 };
 
@@ -62,12 +62,16 @@ export const Labeling = injector(
     }, []);
 
     const closeLabeling = useCallback(() => {
+      delete document.body.dataset.lsfLabeling;
       store.closeLabeling();
     }, [store]);
 
     const initLabeling = useCallback(() => {
       if (!SDK.lsf) SDK.initLSF(lsfRef.current);
       SDK.startLabeling();
+      // Signal that labeling is active so DM shortcuts yield to editor hotkeys.
+      // This is read by useShortcut() in hotkeys.ts.
+      document.body.dataset.lsfLabeling = "true";
     }, []);
 
     useEffect(() => {
@@ -85,7 +89,44 @@ export const Labeling = injector(
     }, []);
 
     useEffect(() => {
-      return () => SDK.destroyLSF();
+      return () => {
+        SDK.destroyLSF();
+        delete document.body.dataset.lsfLabeling;
+      };
+    }, []);
+
+    // Track which panel the user last interacted with via a data attribute
+    // on document.body. When the attribute is "true", DM shortcuts (shift+left
+    // to close labeling, etc.) yield so that editor hotkeys (TimeSeries pan,
+    // region grow) take priority. Clicking on the DM table clears the flag
+    // so DM shortcuts resume working.
+    //
+    // This replaces a focus-based approach that couldn't work because clicking
+    // on canvas/SVG elements never moves document.activeElement away from body.
+    useEffect(() => {
+      const container = lsfRef.current;
+      if (!container) return;
+
+      const handleContainerPointerDown = () => {
+        document.body.dataset.lsfLabeling = "true";
+      };
+
+      // When the user clicks outside the LSF container (e.g. the DM table),
+      // clear the flag so DM shortcuts work again.
+      const handleDocumentPointerDown = (e) => {
+        if (!container.contains(e.target)) {
+          document.body.dataset.lsfLabeling = "false";
+        }
+      };
+
+      container.addEventListener("pointerdown", handleContainerPointerDown);
+      document.addEventListener("pointerdown", handleDocumentPointerDown);
+
+      return () => {
+        container.removeEventListener("pointerdown", handleContainerPointerDown);
+        document.removeEventListener("pointerdown", handleDocumentPointerDown);
+        delete document.body.dataset.lsfLabeling;
+      };
     }, []);
 
     const onResize = useCallback((width) => {
@@ -95,18 +136,17 @@ export const Labeling = injector(
     }, []);
 
     return (
-      <Block name="label-view" mod={{ loading }}>
+      <div className={cn("label-view").mod({ loading }).toClassName()}>
         {SDK.interfaceEnabled("labelingHeader") && (
           <LabelingHeader SDK={SDK} onClick={closeLabeling} isExplorerMode={isExplorerMode} />
         )}
 
-        <Elem name="content">
+        <div className={cn("label-view").elem("content").toClassName()}>
           {isExplorerMode && (
-            <Elem name="table">
-              <Elem
-                tag={Resizer}
-                name="dataview"
-                minWidth={200}
+            <div className={cn("label-view").elem("table").toClassName()}>
+              <Resizer
+                className={cn("label-view").elem("dataview").toClassName()}
+                minWidth={202}
                 showResizerLine={false}
                 type={"quickview"}
                 maxWidth={window.innerWidth * 0.35}
@@ -115,16 +155,26 @@ export const Labeling = injector(
                 style={{ display: "flex", flex: 1, width: "100%" }}
               >
                 <DataView />
-              </Elem>
-            </Elem>
+              </Resizer>
+            </div>
           )}
 
-          <Elem name="lsf-wrapper" mod={{ mode: isExplorerMode ? "explorer" : "labeling" }}>
-            {loading && <Elem name="waiting" mod={{ animated: true }} />}
-            <Elem ref={lsfRef} id="label-studio-dm" name="lsf-container" key="label-studio" />
-          </Elem>
-        </Elem>
-      </Block>
+          <div
+            className={cn("label-view")
+              .elem("lsf-wrapper")
+              .mod({ mode: isExplorerMode ? "explorer" : "labeling" })
+              .toClassName()}
+          >
+            {loading && <div className={cn("label-view").elem("waiting").mod({ animated: true }).toClassName()} />}
+            <div
+              ref={lsfRef}
+              id="label-studio-dm"
+              className={cn("label-view").elem("lsf-container").toClassName()}
+              key="label-studio"
+            />
+          </div>
+        </div>
+      </div>
     );
   }),
 );

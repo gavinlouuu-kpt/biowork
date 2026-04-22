@@ -13,7 +13,7 @@ from urllib.parse import urljoin
 
 import ujson as json
 from core.bulk_update_utils import bulk_update
-from core.current_request import get_current_request
+from core.current_request import CurrentContext, get_current_request
 from core.feature_flags import flag_set
 from core.label_config import SINGLE_VALUED_TAGS
 from core.redis import start_job_async_or_sync
@@ -23,7 +23,7 @@ from core.utils.common import (
     string_is_url,
     temporary_disconnect_list_signal,
 )
-from core.utils.db import fast_first
+from core.utils.db import batch_delete, fast_first
 from core.utils.params import get_env
 from data_import.models import FileUpload
 from data_manager.managers import PreparedTaskManager, TaskManager
@@ -37,6 +37,8 @@ from django.urls import reverse
 from django.utils.timesince import timesince
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
+from fsm.models import FsmHistoryStateModel
+from fsm.queryset_mixins import FSMStateQuerySetMixin
 from label_studio_sdk.label_interface.objects import PredictionValue
 from rest_framework.exceptions import ValidationError
 from tasks.choices import ActionType
@@ -46,7 +48,7 @@ logger = logging.getLogger(__name__)
 TaskMixin = load_func(settings.TASK_MIXIN)
 
 
-class Task(TaskMixin, models.Model):
+class Task(TaskMixin, FsmHistoryStateModel):
     """Business tasks from project"""
 
     id = models.AutoField(
@@ -95,6 +97,12 @@ class Task(TaskMixin, models.Model):
         help_text='True if the number of annotations for this task is greater than or equal '
         'to the number of maximum_completions for the project',
     )
+    allow_skip = models.BooleanField(
+        _('allow_skip'),
+        default=True,
+        null=True,
+        help_text='Whether this task can be skipped. Set to False to make task unskippable.',
+    )
     overlap = models.IntegerField(
         _('overlap'),
         default=1,
@@ -108,28 +116,6 @@ class Task(TaskMixin, models.Model):
         blank=True,
         related_name='tasks',
         help_text='Uploaded file used as data source for this task',
-    )
-    # Import tagging fields to identify data origin/group
-    import_tags = JSONField(
-        'import tags',
-        null=True,
-        blank=True,
-        default=list,
-        help_text='Tags applied to this task during import (e.g. batch or experiment identifiers)',
-    )
-    import_batch_id = models.CharField(
-        'import batch id',
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text='Batch identifier assigned during import to group tasks',
-    )
-    import_source = models.CharField(
-        'import source',
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text='Source of import: ui, api, storage, etc.',
     )
     inner_id = models.BigIntegerField(
         _('inner id'),
@@ -155,6 +141,11 @@ class Task(TaskMixin, models.Model):
         default=0,
         db_index=True,
         help_text='Number of total predictions for the current task',
+    )
+    precomputed_agreement = models.FloatField(
+        _('precomputed_agreement'),
+        null=True,
+        help_text='Average agreement score for the task',
     )
 
     comment_count = models.IntegerField(
@@ -196,7 +187,6 @@ class Task(TaskMixin, models.Model):
             models.Index(fields=['id', 'overlap']),
             models.Index(fields=['overlap']),
             models.Index(fields=['project', 'id']),
-            models.Index(fields=['import_batch_id']),
         ]
 
     @property
@@ -226,7 +216,7 @@ class Task(TaskMixin, models.Model):
             if locked_task:
                 return locked_task
         else:
-            raise Exception('Neither project or tasks passed to get_locked_by')
+            raise ValidationError('Neither project or tasks passed to get_locked_by')
 
         if lock:
             return lock.task
@@ -281,7 +271,7 @@ class Task(TaskMixin, models.Model):
                 # alien's skipped annotations are not counted at all
                 q = Q(was_cancelled=True) & ~Q(completed_by=user)
             else:
-                raise Exception(f'Invalid SkipQueue value: {self.project.skip_queue}')
+                raise ValidationError(f'Invalid SkipQueue value: {self.project.skip_queue}')
 
             # for LSE we also need to exclude rejected queue
             rejected_q = self.get_rejected_query()
@@ -299,12 +289,8 @@ class Task(TaskMixin, models.Model):
         """
         from projects.functions.next_task import get_next_task_logging_level
 
-        if self.project.show_ground_truth_first and flag_set(
-            'fflag_feat_all_leap_1825_annotator_evaluation_short', user='auto'
-        ):
-            # in show_ground_truth_first mode(onboarding)
-            # we ignore overlap setting for ground_truth tasks
-            # https://humansignal.atlassian.net/browse/LEAP-1963
+        if self.project.annotator_evaluation_enabled:
+            # In annotator evaluation mode, ignore overlap setting for ground truth tasks
             if self.annotations.filter(ground_truth=True).exists():
                 return False
 
@@ -558,7 +544,7 @@ class Task(TaskMixin, models.Model):
     @staticmethod
     def delete_tasks_without_signals(queryset):
         """
-        Delete Tasks queryset with switched off signals
+        Delete Tasks queryset with switched off signals in batches to minimize memory usage
         :param queryset: Tasks queryset
         """
         signals = [
@@ -566,7 +552,7 @@ class Task(TaskMixin, models.Model):
             (pre_delete, remove_data_columns, Task),
         ]
         with temporary_disconnect_list_signal(signals):
-            queryset.delete()
+            return batch_delete(queryset, batch_size=500)
 
     @staticmethod
     def delete_tasks_without_signals_from_task_ids(task_ids):
@@ -584,9 +570,36 @@ pre_bulk_create = Signal()   # providing args 'objs' and 'batch_size'
 post_bulk_create = Signal()   # providing args 'objs' and 'batch_size'
 
 
+class AnnotationQuerySet(models.QuerySet):
+    pass
+
+
+class AnnotationQuerySetWithFSM(FSMStateQuerySetMixin, AnnotationQuerySet):
+    pass
+
+
 class AnnotationManager(models.Manager):
+    """
+    Manager for Annotation model with FSM state support.
+
+    Provides:
+    - User-scoped filtering
+    - Bulk creation with signals
+    - FSM state annotation support
+    """
+
+    def get_queryset(self):
+        """Return AnnotationQuerySet with FSM state annotation support"""
+        # Create a dynamic class that mixes FSM support into the queryset
+
+        return AnnotationQuerySetWithFSM(self.model, using=self._db)
+
     def for_user(self, user):
-        return self.filter(project__organization=user.active_organization)
+        return self.get_queryset().filter(project__organization=user.active_organization)
+
+    def with_state(self):
+        """Return queryset with FSM state annotated."""
+        return self.get_queryset().with_state()
 
     def bulk_create(self, objs, batch_size=None):
         pre_bulk_create.send(sender=self.model, objs=objs, batch_size=batch_size)
@@ -595,16 +608,10 @@ class AnnotationManager(models.Manager):
         return res
 
 
-GET_UNIQUE_IDS = """
-with tt as (
-    select jsonb_array_elements(tch.result) as item from task_completion_history tch
-    where task=%(t_id)s and task_annotation=%(tc_id)s
-) select count( distinct tt.item -> 'id') from tt"""
-
 AnnotationMixin = load_func(settings.ANNOTATION_MIXIN)
 
 
-class Annotation(AnnotationMixin, models.Model):
+class Annotation(AnnotationMixin, FsmHistoryStateModel):
     """Annotations & Labeling results"""
 
     objects = AnnotationManager()
@@ -773,7 +780,7 @@ class Annotation(AnnotationMixin, models.Model):
             self.task.updated_by = request.user
             update_fields.append('updated_by')
 
-        self.task.save(update_fields=update_fields)
+        self.task.save(update_fields=update_fields, skip_fsm=True)
 
     def save(self, *args, update_fields=None, **kwargs):
         request = get_current_request()
@@ -793,13 +800,24 @@ class Annotation(AnnotationMixin, models.Model):
         return result
 
     def delete(self, *args, **kwargs):
+        # Store task and project references before deletion
+
         result = super().delete(*args, **kwargs)
         self.update_task()
         self.on_delete_update_counters()
+
         return result
+
+    def _update_task_state_after_deletion(self, task, project):
+        """Update task FSM state after annotation deletion."""
+        from fsm.functions import update_task_state_after_annotation_deletion
+
+        update_task_state_after_annotation_deletion(task, project)
 
     def on_delete_update_counters(self):
         task = self.task
+        project = self.project
+
         logger.debug(f'Start updating counters for task {task.id}.')
         if self.was_cancelled:
             cancelled = task.annotations.all().filter(was_cancelled=True).count()
@@ -814,12 +832,38 @@ class Annotation(AnnotationMixin, models.Model):
         task.update_is_labeled()
         Task.objects.filter(id=task.id).update(is_labeled=task.is_labeled)
 
+        # FSM: Update task state
+        self._update_task_state_after_deletion(task, project)
+
         # remove annotation counters in project summary followed by deleting an annotation
         logger.debug('Remove annotation counters in project summary followed by deleting an annotation')
         self.decrease_project_summary_counters()
 
 
-class TaskLock(models.Model):
+class TaskLockQuerySet(models.QuerySet):
+    """Custom QuerySet for TaskLock model"""
+
+    pass
+
+
+class TaskLockQuerySetWithFSM(FSMStateQuerySetMixin, TaskLockQuerySet):
+    pass
+
+
+class TaskLockManager(models.Manager):
+    """Manager for TaskLock with FSM state support"""
+
+    def get_queryset(self):
+        """Return QuerySet with FSM state annotation support"""
+        return TaskLockQuerySetWithFSM(self.model, using=self._db)
+
+    def with_state(self):
+        """Return queryset with FSM state annotated."""
+        return self.get_queryset().with_state()
+
+
+class TaskLock(FsmHistoryStateModel):
+    objects = TaskLockManager()
     task = models.ForeignKey(
         'tasks.Task',
         on_delete=models.CASCADE,
@@ -836,8 +880,34 @@ class TaskLock(models.Model):
     )
     created_at = models.DateTimeField(_('created at'), auto_now_add=True, help_text='Creation time', null=True)
 
+    def has_permission(self, user):
+        return self.task.has_permission(user)
 
-class AnnotationDraft(models.Model):
+
+class AnnotationDraftQuerySet(models.QuerySet):
+    """Custom QuerySet for AnnotationDraft model"""
+
+    pass
+
+
+class AnnotationDraftQuerySetWithFSM(FSMStateQuerySetMixin, AnnotationDraftQuerySet):
+    pass
+
+
+class AnnotationDraftManager(models.Manager):
+    """Manager for AnnotationDraft with FSM state support"""
+
+    def get_queryset(self):
+        """Return QuerySet with FSM state annotation support"""
+        return AnnotationDraftQuerySetWithFSM(self.model, using=self._db)
+
+    def with_state(self):
+        """Return queryset with FSM state annotated."""
+        return self.get_queryset().with_state()
+
+
+class AnnotationDraft(FsmHistoryStateModel):
+    objects = AnnotationDraftManager()
     result = JSONField(_('result'), help_text='Draft result in JSON format')
     lead_time = models.FloatField(
         _('lead time'),
@@ -894,14 +964,29 @@ class AnnotationDraft(models.Model):
 
     def save(self, *args, **kwargs):
         with transaction.atomic():
-            super().save(*args, **kwargs)
             project = self.task.project
+            # Lock projectsummary first to avoid deadlocks with annotation-reviews
+            # which accesses projectsummary before annotationdraft
+            if hasattr(project, 'summary'):
+                from projects.models import ProjectSummary
+
+                ProjectSummary.objects.select_for_update().filter(pk=project.summary.pk).first()
+            super().save(*args, **kwargs)
             if hasattr(project, 'summary'):
                 project.summary.update_created_labels_drafts([self])
 
     def delete(self, *args, **kwargs):
         with transaction.atomic():
             project = self.task.project
+            # Lock projectsummary first to match save() and annotation-reviews lock ordering.
+            # This prevents deadlocks with concurrent operations that access
+            # projectsummary before annotationdraft.
+            if hasattr(project, 'summary'):
+                from projects.models import ProjectSummary
+
+                ProjectSummary.objects.select_for_update().filter(pk=project.summary.pk).first()
+            # Then lock annotationdraft row
+            AnnotationDraft.objects.select_for_update().filter(pk=self.pk).first()
             if hasattr(project, 'summary'):
                 project.summary.remove_created_drafts_and_labels([self])
             super().delete(*args, **kwargs)
@@ -1017,7 +1102,7 @@ class Prediction(models.Model):
             self.task.updated_by = request.user
             update_fields.append('updated_by')
 
-        self.task.save(update_fields=update_fields)
+        self.task.save(update_fields=update_fields, skip_fsm=True)
 
     def save(self, *args, update_fields=None, **kwargs):
         if self.project_id is None and self.task_id:
@@ -1327,7 +1412,7 @@ def update_project_summary_annotations_and_is_labeled(sender, instance, created,
     else:
         instance.task.total_annotations = instance.task.annotations.all().filter(was_cancelled=False).count()
     instance.task.update_is_labeled()
-    instance.task.save(update_fields=['is_labeled', 'total_annotations', 'cancelled_annotations'])
+    instance.task.save(update_fields=['is_labeled', 'total_annotations', 'cancelled_annotations'], skip_fsm=True)
     logger.debug(f'Updated total_annotations and cancelled_annotations for {instance.task.id}.')
 
 
@@ -1399,7 +1484,7 @@ def update_task_stats(task, stats=('is_labeled',), save=True):
         task.save()
 
 
-def bulk_update_stats_project_tasks(tasks, project=None):
+def deprecated_bulk_update_stats_project_tasks(tasks, project=None):
     """bulk Task update accuracy
        ex: after change settings
        apply several update queries size of batch
@@ -1447,6 +1532,30 @@ def bulk_update_stats_project_tasks(tasks, project=None):
                     update_fields=['is_labeled'],
                     batch_size=settings.BATCH_SIZE,
                 )
+
+
+def bulk_update_stats_project_tasks(tasks, project=None):
+    # Avoid circular import
+    from projects.functions.utils import get_unique_ids_list
+
+    bulk_update_is_labeled = load_func(settings.BULK_UPDATE_IS_LABELED)
+
+    if flag_set('fflag_fix_back_plt_802_update_is_labeled_20062025_short', user='auto'):
+        task_ids = get_unique_ids_list(tasks)
+
+        if not task_ids:
+            return
+
+        if project is None:
+            first_task = Task.objects.get(id=task_ids[0])
+            project = first_task.project
+
+        # Set user context so FSM checks work when this runs in an async worker
+        if project.created_by_id:
+            CurrentContext.set_user(project.created_by)
+        bulk_update_is_labeled(task_ids, project)
+    else:
+        return deprecated_bulk_update_stats_project_tasks(tasks, project)
 
 
 Q_finished_annotations = Q(was_cancelled=False) & Q(result__isnull=False)

@@ -16,6 +16,8 @@ import { TimelineLabelsModel } from "./TimelineLabels";
 import { VideoRectangleModel } from "./VideoRectangle";
 
 import { BrushLabelsModel } from "./BrushLabels";
+import { BitmaskLabelsModel } from "./BitmaskLabels";
+import { BitmaskModel } from "./Bitmask";
 import { BrushModel } from "./Brush";
 import { EllipseLabelsModel } from "./EllipseLabels";
 import { EllipseModel } from "./Ellipse";
@@ -23,7 +25,9 @@ import { KeyPointLabelsModel } from "./KeyPointLabels";
 import { KeyPointModel } from "./KeyPoint";
 import { MagicWandModel } from "./MagicWand";
 import { PolygonLabelsModel } from "./PolygonLabels";
+import { VectorLabelsModel } from "./VectorLabels";
 import { PolygonModel } from "./Polygon";
+import { VectorModel } from "./Vector";
 import { RectangleLabelsModel } from "./RectangleLabels";
 import { RectangleModel } from "./Rectangle";
 
@@ -43,6 +47,8 @@ export {
   HyperTextLabelsModel,
   LabelsModel,
   ParagraphLabelsModel,
+  BitmaskLabelsModel,
+  BitmaskModel,
   TimeSeriesLabelsModel,
   TimelineLabelsModel,
   VideoRectangleModel,
@@ -54,7 +60,9 @@ export {
   KeyPointModel,
   MagicWandModel,
   PolygonLabelsModel,
+  VectorLabelsModel,
   PolygonModel,
+  VectorModel,
   RectangleLabelsModel,
   RectangleModel,
   RelationsModel,

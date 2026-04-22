@@ -56,7 +56,6 @@ type TaxonomyProps = {
   onDeleteLabel?: onDeleteLabelCallback;
   options: TaxonomyOptions;
   isEditable?: boolean;
-  defaultSearch?: boolean;
 };
 
 type TaxonomyExtendedOptions = TaxonomyOptions & {
@@ -85,14 +84,15 @@ const convert = (
 
   const convertItem = (item: TaxonomyItem): AntTaxonomyItem => {
     const value = item.path.join(options.pathSeparator);
-    const disabledNode = options.leafsOnly && (item.isLeaf === false || !!item.children);
+    const isLeaf = item.isLeaf !== false && !item.children?.length;
+    const disabledNode = options.leafsOnly && !isLeaf;
     const maxUsagesReached = options.maxUsagesReached && !selectedPaths.includes(value);
 
     return {
       title: enrich(item),
       value,
       key: value,
-      isLeaf: item.isLeaf !== false && !item.children,
+      isLeaf,
       disableCheckbox: disabledNode || maxUsagesReached,
       children: item.children?.map(convertItem),
     };
@@ -106,7 +106,6 @@ const NewTaxonomy = ({
   selected,
   onChange,
   onLoadData,
-  defaultSearch = true,
   // @todo implement user labels
   // onAddLabel,
   // onDeleteLabel,
@@ -145,7 +144,7 @@ const NewTaxonomy = ({
     (origin: ReactNode) => {
       return (
         <>
-          {!defaultSearch && <TaxonomySearch ref={refInput} treeData={treeData} onChange={handleSearch} />}
+          <TaxonomySearch ref={refInput} treeData={treeData} onChange={handleSearch} />
           {origin}
         </>
       );
@@ -170,7 +169,7 @@ const NewTaxonomy = ({
 
   return (
     <TreeSelect
-      treeData={defaultSearch ? treeData : filteredTreeData}
+      treeData={filteredTreeData}
       value={displayed}
       labelInValue={true}
       onChange={(items) =>
@@ -181,11 +180,11 @@ const NewTaxonomy = ({
       }
       loadData={loadData}
       treeCheckable
-      showSearch={defaultSearch}
-      showArrow={!defaultSearch}
+      showSearch={false}
+      showArrow
       dropdownRender={renderDropdown}
       onDropdownVisibleChange={handleDropdownChange}
-      treeExpandedKeys={!defaultSearch ? expandedKeys : undefined}
+      treeExpandedKeys={expandedKeys}
       onTreeExpand={(expandedKeys: React.Key[]) => {
         setExpandedKeys(expandedKeys);
       }}
@@ -196,6 +195,7 @@ const NewTaxonomy = ({
       placeholder={options.placeholder || "Click to add..."}
       style={style}
       className="htx-taxonomy"
+      popupClassName="htx-taxonomy-dropdown"
       disabled={!isEditable}
     />
   );

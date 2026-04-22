@@ -3,7 +3,7 @@ title: Contextual Scrolling
 type: templates
 category: Audio/Speech Processing
 cat: audio-speech-processing
-order: 307
+order: 301
 meta_title: Contextual Scrolling 
 meta_description: Template annotating transcriptions in their audio context.
 ---
@@ -11,6 +11,11 @@ meta_description: Template annotating transcriptions in their audio context.
 <img src="/images/templates/thumbnail-conversation-sentiment.png" alt="" class="gif-border" width="482px" height="282px" />
 
 Playback synchronization between audio and corresponding paragraph segments provides you with enhanced context and control resulting in high-quality annotated datasets and increased productivity when performing conversational analysis.
+
+!!! error Enterprise
+    If you're managing more complex or high-volume audio labeling projects, Label Studio Enterprise includes an advanced audio transcription interface built to support faster, more precise annotation at scale.
+
+    See our new [Multi-Channel Audio Transcription](react_audio) template and learn more in [A New Audio Transcription UI for Speed and Quality at Scale](https://humansignal.com/blog/building-a-better-ui-for-audio-transcription-at-scale/) (blog post).
 
 ## Labeling Configuration
 

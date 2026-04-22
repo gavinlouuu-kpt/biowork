@@ -82,12 +82,7 @@ export const Tour: React.FC<TourProps> = ({ name, autoStart = false, delay = 0, 
    * - Dynamic step content based on application state
    */
   const handleTourCallback = useCallback(
-    (data: {
-      action: string;
-      index: number;
-      type: string;
-      status: string;
-    }) => {
+    (data: { action: string; index: number; type: string; status: string }) => {
       const { action, index, type, status } = data;
 
       // tour ends when
@@ -115,9 +110,17 @@ export const Tour: React.FC<TourProps> = ({ name, autoStart = false, delay = 0, 
     [name, state.run],
   );
 
+  const { key, ...joyrideState } = state;
+
+  // Disable tours when running in Cypress tests
+  const isCypressTest = typeof window !== "undefined" && !!(window as any).Cypress;
+  const shouldRunTour = !isCypressTest && joyrideState.run;
+
   return state.steps.length > 0 ? (
     <JoyRide
-      {...state}
+      key={key}
+      {...joyrideState}
+      run={shouldRunTour}
       {...props}
       callback={handleTourCallback}
       styles={{
@@ -125,11 +128,11 @@ export const Tour: React.FC<TourProps> = ({ name, autoStart = false, delay = 0, 
           width: "468px",
         },
         options: {
-          backgroundColor: "var(--color-neutral-surface-active)",
+          backgroundColor: "var(--color-neutral-background)",
           primaryColor: "var(--color-primary-surface)",
           textColor: "var(--color-neutral-content)",
           overlayColor: "rgba(var(--color-neutral-shadow-raw) / calc( 50% * var(--shadow-intensity)))",
-          arrowColor: "var(--color-neutral-surface-active)",
+          arrowColor: "var(--color-primary-surface)",
         },
       }}
       hideCloseButton={true}
