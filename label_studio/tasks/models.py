@@ -241,9 +241,10 @@ class Task(TaskMixin, models.Model):
 
         project = self.project
         predictions = self.predictions
+        active_model_version = project.get_active_learning_model_version()
 
         # TODO if we use live_model on project then we will need to check for it here
-        if project.show_collab_predictions and project.model_version is not None:
+        if project.show_collab_predictions and active_model_version is not None:
             if project.ml_backend_in_model_version:
                 new_predictions = evaluate_predictions([self])
                 # TODO this is not as clean as I'd want it to
@@ -257,7 +258,7 @@ class Task(TaskMixin, models.Model):
                 else:
                     return new_predictions
             else:
-                return predictions.filter(model_version=project.model_version)
+                return predictions.filter(model_version=active_model_version)
         else:
             return []
 

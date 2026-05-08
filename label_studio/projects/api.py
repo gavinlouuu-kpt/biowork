@@ -519,6 +519,9 @@ class ProjectNextTaskAPI(generics.RetrieveAPIView):
 
     def get(self, request, *args, **kwargs):
         project = self.get_object()
+        # Keep active learning model version synchronized with training backend
+        # (for example, when backend setup reflects MLflow latest trained model).
+        project.get_active_learning_model_version(refresh=True)
         dm_queue = filters_ordering_selected_items_exist(request.data)
         prepared_tasks = get_prepared_queryset(request, project)
 

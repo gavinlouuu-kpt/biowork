@@ -8,6 +8,7 @@ import pytest
 from core.redis import redis_healthcheck
 from django.apps import apps
 from django.db.models import Q
+from ml.models import MLBackend
 from projects.models import Project
 from tasks.models import Annotation, Prediction, Task
 
@@ -531,6 +532,65 @@ def test_active_learning_with_uploaded_predictions(business_client):
     assert get_next_task_id_and_complete_it() == 'score = 0.3'
     assert get_next_task_id_and_complete_it() == 'score = 0.4'
     assert get_next_task_id_and_complete_it() == 'score = 0.5'
+
+
+@pytest.mark.django_db
+def test_next_task_uses_training_backend_model_version_for_active_learning(mocker, business_client):
+    project = make_project(
+        dict(
+            title='Test',
+            is_published=True,
+            sampling=Project.UNCERTAINTY,
+            model_version='YOLO',
+            training_backend='YOLO',
+            label_config="""
+                <View>
+                  <Text name="text" value="$text"></Text>
+                  <Choices name="text_class" choice="single">
+                    <Choice value="class_A"></Choice>
+                    <Choice value="class_B"></Choice>
+                  </Choices>
+                </View>""",
+        ),
+        business_client.user,
+        use_ml_backend=False,
+    )
+
+    MLBackend.objects.create(
+        project=project,
+        title='YOLO',
+        url='http://localhost:8999',
+        model_version='mlflow-v2',
+        auto_update=False,
+    )
+
+    first_task = make_task({'data': {'text': 'score = 0.9'}}, project)
+    second_task = make_task({'data': {'text': 'score = 0.1'}}, project)
+
+    Prediction.objects.create(
+        task=first_task,
+        project=project,
+        model_version='mlflow-v2',
+        result=[{'some': 'prediction high score'}],
+        score=0.9,
+    )
+    Prediction.objects.create(
+        task=second_task,
+        project=project,
+        model_version='mlflow-v2',
+        result=[{'some': 'prediction low score'}],
+        score=0.1,
+    )
+
+    # If active learning falls back to random instead of using backend model_version,
+    # it will deterministically pick first_task and fail this assertion.
+    mocker.patch('projects.functions.next_task._get_random_unlocked', return_value=first_task)
+
+    response = business_client.get(f'/api/projects/{project.id}/next')
+    assert response.status_code == 200
+    payload = json.loads(response.content)
+    assert payload['id'] == second_task.id
+    assert payload['predictions'][0]['model_version'] == 'mlflow-v2'
 
 
 @pytest.mark.skipif(not redis_healthcheck(), reason='Multi user locks only supported with redis enabled')

@@ -555,7 +555,8 @@ class AnnotationsListAPI(GetParentObjectMixin, generics.ListCreateAPIView):
         # save stats about how well annotator annotations coincide with current prediction
         # only for finished task annotations
         if result is not None:
-            prediction = Prediction.objects.filter(task=task, model_version=task.project.model_version)
+            active_model_version = task.project.get_active_learning_model_version()
+            prediction = Prediction.objects.filter(task=task, model_version=active_model_version)
             if prediction.exists():
                 prediction = prediction.first()
                 prediction_ser = PredictionSerializer(prediction).data

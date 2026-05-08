@@ -99,7 +99,10 @@ def _try_uncertainty_sampling(
     user: User,
     prepared_tasks: QuerySet[Task],
 ) -> Union[Task, None]:
-    task_with_current_predictions = tasks.filter(predictions__model_version=project.model_version)
+    active_model_version = project.get_active_learning_model_version()
+    task_with_current_predictions = (
+        tasks.filter(predictions__model_version=active_model_version) if active_model_version else tasks.none()
+    )
     if task_with_current_predictions.exists():
         logger.debug('Use uncertainty sampling')
         # collect all clusters already solved by user, count number of solved task in them
@@ -135,7 +138,7 @@ def _try_uncertainty_sampling(
         # uncertainty sampling fallback: choose by random sampling
         logger.debug(
             f'Uncertainty sampling fallbacks to random sampling '
-            f'(current project.model_version={str(project.model_version)})'
+            f'(current project.model_version={str(active_model_version)})'
         )
         next_task = _get_random_unlocked(tasks, user)
     return next_task
