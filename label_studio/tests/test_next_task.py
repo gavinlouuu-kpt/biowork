@@ -541,7 +541,7 @@ def test_next_task_uses_training_backend_model_version_for_active_learning(mocke
             title='Test',
             is_published=True,
             sampling=Project.UNCERTAINTY,
-                model_version='old-version',
+            model_version='old-version',
             training_backend='YOLO',
             label_config="""
                 <View>
