@@ -27,6 +27,8 @@ x-label-studio-runtime-env: &label-studio-runtime-env
     - *database-client-env
     - *redis-client-env
   BASE_DATA_DIR: /label-studio/data
+  MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+  MLFLOW_REGISTRY_URI: ${MLFLOW_REGISTRY_URI:-http://mlflow:5000}
 
 services:
   nginx:
@@ -101,6 +103,29 @@ services:
       timeout: 5s
       retries: 5
 
+  mlflow:
+    <<: *service-defaults
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: label-studio-mlflow
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      MLFLOW_BACKEND_STORE_URI: sqlite:////mlflow/mlflow.db
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: /mlflow/artifacts
+    volumes:
+      - mlflow-data:/mlflow
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --default-artifact-root
+      - /mlflow/artifacts
+
   cloudflared:
     <<: *service-defaults
     image: cloudflare/cloudflared:latest
@@ -118,6 +143,8 @@ services:
 
 volumes:
   label-studio-data:
+    driver: local
+  mlflow-data:
     driver: local
 
 networks:
