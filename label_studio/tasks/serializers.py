@@ -663,13 +663,14 @@ class TaskWithAnnotationsAndPredictionsAndDraftsSerializer(TaskSerializer):
     def get_predictions(self, task):
         predictions = task.predictions
         user = self._get_user()
+        active_model_version = task.project.get_active_learning_model_version()
         if flag_set('ff_front_dev_1682_model_version_dropdown_070622_short', user=user or 'auto'):
             active_ml_backends = task.project.get_active_ml_backends()
             model_versions = active_ml_backends.values_list('model_version', flat=True)
             logger.debug(f'Selecting predictions from active ML backend model versions: {model_versions}')
             predictions = predictions.filter(model_version__in=model_versions)
-        elif task.project.model_version:
-            predictions = predictions.filter(model_version=task.project.model_version)
+        elif active_model_version:
+            predictions = predictions.filter(model_version=active_model_version)
         return PredictionSerializer(predictions, many=True, read_only=True, default=[], context=self.context).data
 
     def get_annotations(self, task):

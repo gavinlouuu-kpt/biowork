@@ -10,6 +10,8 @@ name: biowork-dev
 volumes:
   label-studio-data-dev:
     driver: local
+  mlflow-data-dev:
+    driver: local
 
 services:
   nginx-dev:
@@ -78,6 +80,8 @@ services:
       - STRIPE_TEST_PUBLISHABLE_KEY=${STRIPE_TEST_PUBLISHABLE_KEY:-}
       - STRIPE_PRICING_TABLE_ID=${STRIPE_PRICING_TABLE_ID:-}
       - DJSTRIPE_WEBHOOK_SECRET=${DJSTRIPE_WEBHOOK_SECRET:-}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-http://mlflow-dev:5000}
+      - MLFLOW_REGISTRY_URI=${MLFLOW_REGISTRY_URI:-http://mlflow-dev:5000}
     volumes:
       - label-studio-data-dev:/label-studio/data:rw
     command: label-studio-uwsgi
@@ -110,6 +114,8 @@ services:
       - STRIPE_TEST_PUBLISHABLE_KEY=${STRIPE_TEST_PUBLISHABLE_KEY:-}
       - STRIPE_PRICING_TABLE_ID=${STRIPE_PRICING_TABLE_ID:-}
       - DJSTRIPE_WEBHOOK_SECRET=${DJSTRIPE_WEBHOOK_SECRET:-}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-http://mlflow-dev:5000}
+      - MLFLOW_REGISTRY_URI=${MLFLOW_REGISTRY_URI:-http://mlflow-dev:5000}
     volumes:
       - label-studio-data-dev:/label-studio/data:rw
     command: python3 /label-studio/label_studio/manage.py rqworker default
@@ -144,6 +150,31 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  mlflow-dev:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: label-studio-mlflow-dev
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:////mlflow/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    volumes:
+      - mlflow-data-dev:/mlflow
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --default-artifact-root
+      - /mlflow/artifacts
+    networks:
+      - label-studio-dev-network
 
 networks:
   label-studio-dev-network:

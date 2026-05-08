@@ -181,14 +181,39 @@ class MLApi(BaseHTTPAPI):
         time_id = int(project.created_at.timestamp())
         return f'{project.id}.{time_id}'
 
+    def _get_organization_context(self, project):
+        organization = getattr(project, 'organization', None)
+        return {
+            'id': organization.id if organization else None,
+            'title': organization.title if organization else None,
+            'created_by_id': organization.created_by_id if organization else None,
+        }
+
+    def _get_setup_access_token(self, project):
+        organization = getattr(project, 'organization', None)
+        token_holders = []
+        if organization and organization.created_by:
+            token_holders.append(organization.created_by)
+        if project.created_by:
+            token_holders.append(project.created_by)
+
+        for user in token_holders:
+            token = getattr(getattr(user, 'auth_token', None), 'key', None)
+            if token:
+                return token
+
+        return None
+
     def train(self, project, use_ground_truth=False):
         # TODO Replace AnonymousUser with real user from request
         user = AnonymousUser()
+        organization = self._get_organization_context(project)
         # Identify if feature flag is turned on
         if flag_set('ff_back_dev_1417_start_training_mlbackend_webhooks_250122_long', user):
             request = {
                 'action': 'START_TRAINING',
                 'project': load_func(settings.WEBHOOK_SERIALIZERS['project'])(instance=project).data,
+                'organization': organization,
             }
             return self._request('webhook', request, verbose=False, timeout=TIMEOUT_PREDICT)
         else:
@@ -200,6 +225,7 @@ class MLApi(BaseHTTPAPI):
             request = {
                 'annotations': tasks_ser,
                 'project': self._create_project_uid(project),
+                'organization': organization,
                 'label_config': project.label_config,
                 'params': {'login': project.task_data_login, 'password': project.task_data_password},
             }
@@ -209,6 +235,7 @@ class MLApi(BaseHTTPAPI):
         request = {
             'tasks': tasks,
             'project': self._create_project_uid(project),
+            'organization': self._get_organization_context(project),
             'label_config': project.label_config,
             'params': {
                 'login': project.task_data_login,
@@ -230,13 +257,17 @@ class MLApi(BaseHTTPAPI):
         return self._request(VALIDATE_URL, request={'config': config}, timeout=self._validate_request_timeout)
 
     def setup(self, project, extra_params=None, **kwargs):
+        access_token = self._get_setup_access_token(project)
+        if not access_token and project.created_by:
+            access_token = project.created_by.auth_token.key
         return self._request(
             SETUP_URL,
             request={
                 'project': self._create_project_uid(project),
+                'organization': self._get_organization_context(project),
                 'schema': project.label_config,
                 'hostname': settings.HOSTNAME if settings.HOSTNAME else ('http://localhost:' + settings.INTERNAL_PORT),
-                'access_token': project.created_by.auth_token.key,
+                'access_token': access_token,
                 'extra_params': extra_params,
             },
             timeout=TIMEOUT_SETUP,

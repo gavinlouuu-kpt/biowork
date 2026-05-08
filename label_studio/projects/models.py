@@ -1046,6 +1046,36 @@ class Project(ProjectMixin, models.Model):
 
         return self.get_ml_backends(state=MLBackendState.CONNECTED)
 
+    def get_active_learning_model_version(self, refresh=False):
+        """
+        Resolve the model version used by uncertainty sampling.
+
+        If a dedicated training backend is configured, prefer its current model
+        version (typically returned by backend setup and backed by MLflow in
+        Biowork deployments).
+        """
+        active_model_version = self.model_version
+        if self.sampling != self.UNCERTAINTY or not self.training_backend:
+            return active_model_version
+
+        training_backend = fast_first(self.get_ml_backends(title=self.training_backend))
+        if training_backend is None:
+            return active_model_version
+
+        if refresh and training_backend.auto_update:
+            try:
+                training_backend.update_state()
+                training_backend.refresh_from_db(fields=['model_version'])
+            except Exception as exc:
+                logger.warning(
+                    'Failed to refresh active learning model version from backend "%s" for project %s: %s',
+                    self.training_backend,
+                    self.id,
+                    exc,
+                )
+
+        return training_backend.model_version or active_model_version
+
     @cached_property
     def get_all_import_storage_objects(self):
         from io_storages.models import get_storage_classes

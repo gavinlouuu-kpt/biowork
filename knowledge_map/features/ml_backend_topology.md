@@ -19,6 +19,14 @@ because Docker aliases are scoped per network.
 | FastSAM | `fastsam-backend` | `9090` |
 | YOLO | `yolo-backend` | `9090` |
 
+MLflow tracking is now provided by the main Biowork compose stacks in this
+repo (not in the sibling ML backend repo):
+
+| Environment | Service | Alias | Internal port | Host mapping |
+|-------------|---------|-------|---------------|--------------|
+| dev (`docker-compose*.yml`) | `mlflow-dev` | `mlflow-dev` | `5000` | `5001:5000` |
+| MIB (`docker-compose.mib.yml`) | `mlflow` | `mlflow` | `5000` | `127.0.0.1:5000:5000` |
+
 Host port mappings are only for local debugging and must be unique when
 dev and prod backends run at the same time.
 
