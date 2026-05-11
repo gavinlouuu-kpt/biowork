@@ -9,7 +9,7 @@ from django.conf import settings
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import no_body, swagger_auto_schema
-from ml.models import MLBackend
+from ml.models import MLBackend, MLBackendPredictionJob
 from ml.serializers import MLBackendSerializer, MLInteractiveAnnotatingRequest
 from projects.models import Project, Task
 from rest_framework import generics, status
@@ -415,3 +415,65 @@ class MLBackendVersionsAPI(generics.RetrieveAPIView):
             result = {'error': str(versions_response.error_message)}
             status_code = versions_response.status_code if versions_response.status_code > 0 else 500
             return Response(data=result, status=status_code)
+
+
+class MLBackendPredictAsyncAPI(APIView):
+    """Submit a high-volume batch prediction job without blocking.
+
+    POST  /api/ml/<pk>/predict/async
+        Submits all unpredicted tasks to the ML backend asynchronously.
+        Returns {"job_id": "...", "prediction_job_id": <db id>} immediately.
+
+    GET   /api/ml/<pk>/predictions/<job_pk>/status
+        Polls for results and saves them when the ML backend is done.
+        Returns 202 while pending, 200 when saved, 500 on error.
+    """
+
+    permission_required = all_permissions.projects_change
+
+    def post(self, request, *args, **kwargs):
+        ml_backend = generics.get_object_or_404(MLBackend, pk=self.kwargs['pk'])
+        self.check_object_permissions(self.request, ml_backend)
+
+        from tasks.models import Task
+        tasks = Task.objects.filter(project=ml_backend.project)
+        job = ml_backend.predict_tasks_async(tasks)
+
+        if job is None:
+            return Response(
+                {'detail': 'Could not submit async prediction job. Check ML backend connectivity or task status.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {'job_id': job.job_id, 'prediction_job_id': job.pk, 'batch_size': job.batch_size},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class MLBackendPredictionJobStatusAPI(APIView):
+    """Poll an async prediction job and save results when the ML backend is done."""
+
+    permission_required = all_permissions.projects_change
+
+    def get(self, request, *args, **kwargs):
+        ml_backend = generics.get_object_or_404(MLBackend, pk=self.kwargs['pk'])
+        self.check_object_permissions(self.request, ml_backend)
+        job = generics.get_object_or_404(MLBackendPredictionJob, pk=self.kwargs['job_pk'], ml_backend=ml_backend)
+
+        result = ml_backend.collect_async_predictions(job)
+
+        if result is False:
+            return Response(
+                {'status': 'pending', 'job_id': job.job_id},
+                status=status.HTTP_202_ACCEPTED,
+            )
+        if result is None:
+            return Response(
+                {'status': 'error', 'detail': 'Prediction job failed or results could not be retrieved'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response(
+            {'status': 'done', 'predictions_saved': len(result), 'job_id': job.job_id},
+            status=status.HTTP_200_OK,
+        )

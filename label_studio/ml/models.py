@@ -365,6 +365,142 @@ class MLBackend(models.Model):
             instances = prediction_ser.save()
         return instances
 
+    def predict_tasks_async(self, tasks):
+        """Submit a batch prediction job without blocking. Returns an MLBackendPredictionJob or None.
+
+        The ML backend processes tasks in the background. Call collect_async_predictions(job)
+        to poll for results and save them once the job is done.
+        """
+        model_version = self.update_state()
+        if self.not_ready:
+            logger.debug(f'ML backend {self} is not ready')
+            return None
+
+        if isinstance(tasks, list):
+            from tasks.models import Task
+            tasks = Task.objects.filter(id__in=[task.id for task in tasks])
+
+        tasks = tasks.annotate(predictions_count=Count('predictions')).exclude(
+            Q(predictions_count__gt=0) & Q(predictions__model_version=model_version)
+        )
+        if not tasks.exists():
+            logger.debug(f'All tasks already have predictions from model version={self.model_version}')
+            return None
+
+        tasks_ser = TaskSimpleSerializer(tasks, many=True).data
+        result = self.api.make_predictions_async(tasks_ser, self.project)
+
+        if result.is_error:
+            logger.error(f'Failed to submit async prediction job: {result.error_message}')
+            return None
+
+        job_id = result.response.get('job_id')
+        if not job_id:
+            logger.error('ML backend did not return a job_id for async prediction')
+            return None
+
+        task_ids = [t['id'] for t in tasks_ser]
+        job = MLBackendPredictionJob.objects.create(
+            job_id=job_id,
+            ml_backend=self,
+            model_version=str(model_version) if model_version else '',
+            batch_size=len(task_ids),
+            task_ids=task_ids,
+        )
+        logger.info(f'Async prediction job {job_id} submitted for {len(task_ids)} tasks')
+        return job
+
+    def collect_async_predictions(self, prediction_job):
+        """Fetch results from a completed async prediction job and save them.
+
+        Returns:
+            list of saved Prediction instances if done and saved successfully,
+            False if the job is still running (pending or started),
+            None on error.
+        """
+        from tasks.models import Task
+
+        result = self.api.get_async_prediction_status(prediction_job.job_id)
+
+        if result.is_error:
+            logger.error(
+                f'Error fetching async prediction status for job {prediction_job.job_id}: '
+                f'{result.error_message}'
+            )
+            return None
+
+        job_status = result.response.get('status')
+        if job_status in ('pending', 'started'):
+            return False
+
+        if job_status == 'error':
+            logger.error(
+                f'Async prediction job {prediction_job.job_id} failed: '
+                f'{result.response.get("error")}'
+            )
+            return None
+
+        if job_status != 'done':
+            logger.error(f'Unexpected job status "{job_status}" for job {prediction_job.job_id}')
+            return None
+
+        responses = result.response.get('results', [])
+        task_ids = prediction_job.task_ids or []
+
+        if not task_ids:
+            logger.error(f'Prediction job {prediction_job.job_id} has no stored task_ids')
+            return None
+
+        if len(task_ids) != len(responses):
+            logger.error(
+                f'Async job {prediction_job.job_id}: task count mismatch: '
+                f'{len(task_ids)} submitted vs {len(responses)} results returned'
+            )
+            return None
+
+        model_version = prediction_job.model_version or str(self.model_version)
+        tasks_by_id = {
+            t['id']: t
+            for t in TaskSimpleSerializer(
+                Task.objects.filter(id__in=task_ids, project=self.project),
+                many=True,
+            ).data
+        }
+
+        predictions = []
+        for task_id, response in zip(task_ids, responses):
+            task = tasks_by_id.get(task_id)
+            if not task:
+                logger.warning(f'Task {task_id} not found; skipping')
+                continue
+
+            if isinstance(response, dict):
+                response = [response]
+
+            for r in response:
+                if 'result' not in r:
+                    logger.error(f"Prediction response missing 'result' field: {r}")
+                    continue
+                predictions.append({
+                    'task': task_id,
+                    'result': r['result'],
+                    'score': r.get('score'),
+                    'model_version': r.get('model_version', model_version),
+                    'project': task['project'],
+                })
+
+        if not predictions:
+            logger.warning(f'No valid predictions from async job {prediction_job.job_id}')
+            return []
+
+        with conditional_atomic(predicate=db_is_not_sqlite):
+            prediction_ser = PredictionSerializer(data=predictions, many=True)
+            prediction_ser.is_valid(raise_exception=True)
+            instances = prediction_ser.save()
+
+        logger.info(f'Saved {len(instances)} predictions from async job {prediction_job.job_id}')
+        return instances
+
     def interactive_annotating(self, task, context=None, user=None):
         result = {}
         options = {}
@@ -435,6 +571,11 @@ class MLBackendPredictionJob(models.Model):
     )
     batch_size = models.PositiveSmallIntegerField(
         _('batch size'), default=100, help_text='Number of tasks processed per batch'
+    )
+    task_ids = JSONField(
+        _('task ids'),
+        null=True,
+        help_text='Ordered list of task IDs submitted in this prediction job',
     )
 
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)

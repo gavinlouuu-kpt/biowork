@@ -13,6 +13,12 @@ _api_urlpatterns = [
     path('<int:pk>', api.MLBackendDetailAPI.as_view(), name='ml-detail'),
     path('<int:pk>/train', api.MLBackendTrainAPI.as_view(), name='ml-train'),
     path('<int:pk>/predict/test', api.MLBackendPredictTestAPI.as_view(), name='ml-predict-test'),
+    path('<int:pk>/predict/async', api.MLBackendPredictAsyncAPI.as_view(), name='ml-predict-async'),
+    path(
+        '<int:pk>/predictions/<int:job_pk>/status',
+        api.MLBackendPredictionJobStatusAPI.as_view(),
+        name='ml-prediction-job-status',
+    ),
     path(
         '<int:pk>/interactive-annotating',
         api.MLBackendInteractiveAnnotating.as_view(),

@@ -30,10 +30,13 @@ TIMEOUT_SETUP = float(get_env('ML_TIMEOUT_SETUP', 3))
 TIMEOUT_DUPLICATE_MODEL = float(get_env('ML_TIMEOUT_DUPLICATE_MODEL', 1))
 TIMEOUT_DELETE = float(get_env('ML_TIMEOUT_DELETE', 1))
 TIMEOUT_TRAIN_JOB_STATUS = float(get_env('ML_TIMEOUT_TRAIN_JOB_STATUS', 1))
+TIMEOUT_PREDICTION_STATUS = float(get_env('ML_TIMEOUT_PREDICTION_STATUS', 10))
 
 # TODO
 # we would need to make it configurable on the ML backend side too
 PREDICT_URL = 'predict'
+PREDICT_ASYNC_URL = 'predict_async'
+PREDICTION_STATUS_URL = 'predictions'
 HEALTH_URL = 'health'
 VALIDATE_URL = 'validate'
 SETUP_URL = 'setup'
@@ -222,6 +225,16 @@ class MLApi(BaseHTTPAPI):
     def make_predictions(self, tasks, project, context=None):
         request = self._prep_prediction_req(tasks, project, context=context)
         return self._request(PREDICT_URL, request, verbose=False, timeout=TIMEOUT_PREDICT)
+
+    def make_predictions_async(self, tasks, project, context=None):
+        """Submit tasks for async batch prediction. Returns immediately with a job_id."""
+        request = self._prep_prediction_req(tasks, project, context=context)
+        return self._request(PREDICT_ASYNC_URL, request, verbose=False, timeout=TIMEOUT_PREDICT)
+
+    def get_async_prediction_status(self, job_id):
+        """Poll the status/results of an async prediction job."""
+        url_suffix = f'{PREDICTION_STATUS_URL}/{job_id}'
+        return self._request(url_suffix, method='GET', timeout=TIMEOUT_PREDICTION_STATUS)
 
     def health(self):
         return self._request(HEALTH_URL, method='GET', timeout=TIMEOUT_HEALTH)
