@@ -70,7 +70,13 @@ services:
       - HTTP_PROXY=http://tailscale-proxy:1055
       - HTTPS_PROXY=http://tailscale-proxy:1055
       - ALL_PROXY=socks5://tailscale-proxy:1055
-      - NO_PROXY=localhost,127.0.0.1,db-dev,redis-dev,label-studio-nginx-dev,app-dev,sam2-backend,fastsam-backend,yolo-backend,tailscale-proxy
+      - NO_PROXY=localhost,127.0.0.1,host.docker.internal,db-dev,redis-dev,label-studio-nginx-dev,app-dev,sam2-backend,fastsam-backend,yolo-backend,mlflow,tailscale-proxy
+      - BIOWORK_INFERENCE_PIPELINE_URL=${BIOWORK_INFERENCE_PIPELINE_URL:-http://host.docker.internal:8096/runs/full-dataset-inference}
+      - BIOWORK_INFERENCE_REQUEST_TIMEOUT=${BIOWORK_INFERENCE_REQUEST_TIMEOUT:-30}
+      - BIOWORK_MLFLOW_TRACKING_URI=${BIOWORK_MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      - BIOWORK_MLFLOW_EXPERIMENT_NAME=${BIOWORK_MLFLOW_EXPERIMENT_NAME:-biowork-yolo-training}
+      - BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE=${BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE:-/data/server/yolo_autotrain/project_{project_id}/runs}
+      - BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH=${BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH:-weights}
       - AWS_SHARED_CREDENTIALS_FILE=/run/secrets/aws_credentials
       - AWS_CONFIG_FILE=/run/secrets/aws_config
       - AWS_PROFILE=default
@@ -79,6 +85,8 @@ services:
       - HDF5_IMPORT_MAX_TASKS_PER_FILE=${HDF5_IMPORT_MAX_TASKS_PER_FILE:-100}
     volumes:
       - label-studio-data-dev:/label-studio/data:rw
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     secrets:
       - aws_credentials
       - aws_config
@@ -129,7 +137,13 @@ services:
       - HTTP_PROXY=http://tailscale-proxy:1055
       - HTTPS_PROXY=http://tailscale-proxy:1055
       - ALL_PROXY=socks5://tailscale-proxy:1055
-      - NO_PROXY=localhost,127.0.0.1,db-dev,redis-dev,label-studio-nginx-dev,app-dev,sam2-backend,fastsam-backend,yolo-backend,tailscale-proxy
+      - NO_PROXY=localhost,127.0.0.1,host.docker.internal,db-dev,redis-dev,label-studio-nginx-dev,app-dev,sam2-backend,fastsam-backend,yolo-backend,mlflow,tailscale-proxy
+      - BIOWORK_INFERENCE_PIPELINE_URL=${BIOWORK_INFERENCE_PIPELINE_URL:-http://host.docker.internal:8096/runs}
+      - BIOWORK_INFERENCE_REQUEST_TIMEOUT=${BIOWORK_INFERENCE_REQUEST_TIMEOUT:-30}
+      - BIOWORK_MLFLOW_TRACKING_URI=${BIOWORK_MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      - BIOWORK_MLFLOW_EXPERIMENT_NAME=${BIOWORK_MLFLOW_EXPERIMENT_NAME:-biowork-yolo-training}
+      - BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE=${BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE:-/data/server/yolo_autotrain/project_{project_id}/runs}
+      - BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH=${BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH:-weights}
       - AWS_SHARED_CREDENTIALS_FILE=/run/secrets/aws_credentials
       - AWS_CONFIG_FILE=/run/secrets/aws_config
       - AWS_PROFILE=default
@@ -138,6 +152,8 @@ services:
       - HDF5_IMPORT_MAX_TASKS_PER_FILE=${HDF5_IMPORT_MAX_TASKS_PER_FILE:-100}
     volumes:
       - label-studio-data-dev:/label-studio/data:rw
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     secrets:
       - aws_credentials
       - aws_config

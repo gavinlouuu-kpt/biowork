@@ -29,6 +29,13 @@ _api_urlpatterns = [
     path('<int:pk>/validate/', api.ProjectLabelConfigValidateAPI.as_view(), name='project-label-config-validate'),
     # Project summary
     path('<int:pk>/summary/', api.ProjectSummaryAPI.as_view(), name='project-summary'),
+    # Trigger external YOLO+SAM2 project inference pipeline
+    path('<int:pk>/yolo-sam2-inference/', api.ProjectYoloSam2InferenceAPI.as_view(), name='yolo-sam2-inference'),
+    path(
+        '<int:pk>/yolo-sam2-inference/runs/<str:run_id>/',
+        api.ProjectYoloSam2InferenceRunAPI.as_view(),
+        name='yolo-sam2-inference-run',
+    ),
     # Project summary
     path(
         '<int:pk>/summary/reset/',

@@ -15,9 +15,9 @@ import os
 import re
 from datetime import timedelta
 
+import environ
 from django.core.exceptions import ImproperlyConfigured
 
-import environ
 from label_studio.core.utils.params import get_bool_env, get_env_list
 
 # Load environment variables from .env files
@@ -696,6 +696,16 @@ TURNSTILE_SECRET_KEY = get_env('TURNSTILE_SECRET_KEY', '')
 ML_BLOCK_LOCAL_IP = get_bool_env('ML_BLOCK_LOCAL_IP', False)
 
 RQ_LONG_JOB_TIMEOUT = int(get_env('RQ_LONG_JOB_TIMEOUT', 36000))
+
+BIOWORK_INFERENCE_PIPELINE_URL = get_env('BIOWORK_INFERENCE_PIPELINE_URL', '')
+BIOWORK_INFERENCE_PIPELINE_TOKEN = get_env('BIOWORK_INFERENCE_PIPELINE_TOKEN', '')
+BIOWORK_INFERENCE_REQUEST_TIMEOUT = int(get_env('BIOWORK_INFERENCE_REQUEST_TIMEOUT', 30))
+BIOWORK_MLFLOW_TRACKING_URI = get_env('BIOWORK_MLFLOW_TRACKING_URI', '')
+BIOWORK_MLFLOW_EXPERIMENT_NAME = get_env('BIOWORK_MLFLOW_EXPERIMENT_NAME', 'biowork-yolo-training')
+BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE = get_env(
+    'BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE', '/data/server/yolo_autotrain/project_{project_id}/runs'
+)
+BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH = get_env('BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH', 'weights')
 
 APP_WEBSERVER = get_env('APP_WEBSERVER', 'django')
 

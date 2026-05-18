@@ -258,6 +258,7 @@ def test_security_write_only_payload(business_client, ml_backend_for_test_api, m
     )
     assert response.status_code == 200
     # check that password is not returned in PATCH response
+
     assert 'basic_auth_pass' not in response.json()
 
     # patch ML backend with password

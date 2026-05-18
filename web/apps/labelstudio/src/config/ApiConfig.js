@@ -21,6 +21,9 @@ export const API_CONFIG = {
     createProject: "POST:/projects",
     deleteProject: "DELETE:/projects/:pk",
     projectResetCache: "POST:/projects/:pk/summary/reset",
+    projectYoloSam2InferenceContext: "GET:/projects/:pk/yolo-sam2-inference",
+    projectYoloSam2Inference: "POST:/projects/:pk/yolo-sam2-inference",
+    projectYoloSam2InferenceRun: "GET:/projects/:pk/yolo-sam2-inference/runs/:runId",
 
     // Presigning
     presignUrlForTask: "/../tasks/:taskID/presign",
@@ -96,7 +99,7 @@ export const API_CONFIG = {
     accessTokenUpdateSettings: "POST:/jwt/settings",
 
     // Billing
-    usageLimits: "GET:/billing/usage-limits",
+    usageLimits: "GET:/billing/usage-limits"
   },
-  alwaysExpectJSON: false,
+  alwaysExpectJSON: false
 };
