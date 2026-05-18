@@ -68,7 +68,8 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
     settings.BIOWORK_INFERENCE_PIPELINE_TOKEN = 'secret-token'
     settings.BIOWORK_MLFLOW_TRACKING_URI = 'https://mlflow.example'
     settings.BIOWORK_MLFLOW_EXPERIMENT_NAME = 'biowork-yolo-training'
-    settings.BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH = 'model'
+    settings.BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE = '/data/server/yolo_autotrain/project_{project_id}/runs'
+    settings.BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH = 'weights'
 
     project = ProjectFactory(
         label_config='<View><Image name="image" value="$image"/></View>',
@@ -106,8 +107,11 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
     mlflow_response.raise_for_status.return_value = None
     mlflow_response.json.side_effect = [
         {'experiment': {'experiment_id': '7'}},
+        {'experiment': {'experiment_id': '8'}},
         {'runs': [run_payload]},
         {'runs': [run_payload]},
+        {'runs': []},
+        {'runs': []},
     ]
     mlflow_request_mock = mocker.patch('projects.api.requests.request', return_value=mlflow_response)
 
@@ -135,11 +139,15 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
     assert payload['pipeline_response']['status_code'] == status.HTTP_202_ACCEPTED
     assert payload['pipeline_response']['response'] == {'job_id': 'pipeline-1'}
 
-    assert mlflow_request_mock.call_count == 3
-    assert mlflow_request_mock.call_args_list[1].kwargs['json']['filter'] == (
+    assert mlflow_request_mock.call_count == 6
+    assert mlflow_request_mock.call_args_list[0].kwargs['params']['experiment_name'] == 'biowork-yolo-training'
+    assert mlflow_request_mock.call_args_list[1].kwargs['params']['experiment_name'] == (
+        f'/data/server/yolo_autotrain/project_{project.id}/runs'
+    )
+    assert mlflow_request_mock.call_args_list[2].kwargs['json']['filter'] == (
         f"tags.`biowork.project_id` = '{project.id}'"
     )
-    assert mlflow_request_mock.call_args_list[2].kwargs['json']['filter'] == f"params.`project_id` = '{project.id}'"
+    assert mlflow_request_mock.call_args_list[3].kwargs['json']['filter'] == f"params.`project_id` = '{project.id}'"
 
     post_mock.assert_called_once()
     _, kwargs = post_mock.call_args
@@ -150,7 +158,7 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
     assert kwargs['json']['dataset_storage']['key'] == f's3:{storage.id}'
     assert kwargs['json']['dataset_storage']['bucket'] == 'datasets'
     assert kwargs['json']['dataset_storage']['endpoint_url'] == 'https://rustfs.example'
-    assert kwargs['json']['model_uri'] == 'runs:/e58d20c1e77f4cd0894e91c82974f368/model'
+    assert kwargs['json']['model_uri'] == 'runs:/e58d20c1e77f4cd0894e91c82974f368/weights'
     assert kwargs['json']['model_run']['run_id'] == 'e58d20c1e77f4cd0894e91c82974f368'
     assert kwargs['json']['label_config'] == project.label_config
     assert kwargs['json']['parameters'] == {'confidence': 0.4}
@@ -160,6 +168,8 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
 def test_yolo_sam2_inference_endpoint_lists_project_context(settings, mocker):
     settings.BIOWORK_MLFLOW_TRACKING_URI = 'https://mlflow.example'
     settings.BIOWORK_MLFLOW_EXPERIMENT_NAME = 'biowork-yolo-training'
+    settings.BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE = '/data/server/yolo_autotrain/project_{project_id}/runs'
+    settings.BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH = 'weights'
 
     project = ProjectFactory(label_config='<View></View>', title='pipeline project')
     storage = S3ImportStorageFactory(
@@ -180,6 +190,9 @@ def test_yolo_sam2_inference_endpoint_lists_project_context(settings, mocker):
     mlflow_response.raise_for_status.return_value = None
     mlflow_response.json.side_effect = [
         {'experiment': {'experiment_id': '7'}},
+        {'experiment': {'experiment_id': '8'}},
+        {'runs': []},
+        {'runs': []},
         {'runs': [run_payload]},
         {'runs': []},
     ]
@@ -195,8 +208,9 @@ def test_yolo_sam2_inference_endpoint_lists_project_context(settings, mocker):
     assert payload['dataset_storage']['key'] == f's3:{storage.id}'
     assert payload['dataset_storages'][0]['uri'] == f's3://datasets/biowork/projects/{project.id}'
     assert payload['model_runs'][0]['run_id'] == 'run-1'
-    assert payload['model_runs'][0]['model_uri'] == 'runs:/run-1/model'
+    assert payload['model_runs'][0]['model_uri'] == 'runs:/run-1/weights'
     assert payload['mlflow']['experiment_name'] == 'biowork-yolo-training'
+    assert payload['mlflow']['project_experiment_name'] == f'/data/server/yolo_autotrain/project_{project.id}/runs'
 
 
 @pytest.mark.django_db

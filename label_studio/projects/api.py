@@ -559,45 +559,78 @@ def _mlflow_request(method, path, **kwargs):
     return response.json()
 
 
-def _mlflow_experiment_id():
-    response = _mlflow_request(
-        'GET',
-        '/api/2.0/mlflow/experiments/get-by-name',
-        params={'experiment_name': settings.BIOWORK_MLFLOW_EXPERIMENT_NAME},
-    )
+def _mlflow_experiment_id(experiment_name):
+    if not experiment_name:
+        return None
+    try:
+        response = _mlflow_request(
+            'GET',
+            '/api/2.0/mlflow/experiments/get-by-name',
+            params={'experiment_name': experiment_name},
+        )
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == status.HTTP_404_NOT_FOUND:
+            return None
+        raise
     experiment = (response or {}).get('experiment')
     return experiment and experiment.get('experiment_id')
 
 
-def _search_project_mlflow_runs(project):
-    experiment_id = _mlflow_experiment_id()
-    if not experiment_id:
-        return []
+def _mlflow_project_experiment_name(project):
+    template = settings.BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE
+    if not template:
+        return None
+    try:
+        return template.format(
+            project_id=project.id,
+            organization_id=project.organization_id,
+            project_title=project.title,
+        )
+    except (KeyError, ValueError):
+        logger.warning('Invalid BIOWORK_MLFLOW_PROJECT_EXPERIMENT_NAME_TEMPLATE: %s', template)
+        return template
 
+
+def _mlflow_experiment_ids(project):
+    names = [
+        settings.BIOWORK_MLFLOW_EXPERIMENT_NAME,
+        _mlflow_project_experiment_name(project),
+    ]
+    experiment_ids = []
+    for name in names:
+        experiment_id = _mlflow_experiment_id(name)
+        if experiment_id and experiment_id not in experiment_ids:
+            experiment_ids.append(experiment_id)
+    return experiment_ids
+
+
+def _search_project_mlflow_runs(project):
     runs_by_id = {}
     filters = [
         f"tags.`biowork.project_id` = '{project.id}'",
         f"params.`project_id` = '{project.id}'",
     ]
-    for filter_string in filters:
-        response = _mlflow_request(
-            'POST',
-            '/api/2.0/mlflow/runs/search',
-            json={
-                'experiment_ids': [experiment_id],
-                'filter': filter_string,
-                'order_by': ['attributes.start_time DESC'],
-                'max_results': 100,
-            },
-        )
-        for run in (response or {}).get('runs', []):
-            info = run.get('info') or {}
-            run_id = info.get('run_id')
-            if not run_id:
-                continue
-            runs_by_id[run_id] = run
+    for experiment_id in _mlflow_experiment_ids(project):
+        for filter_string in filters:
+            response = _mlflow_request(
+                'POST',
+                '/api/2.0/mlflow/runs/search',
+                json={
+                    'experiment_ids': [experiment_id],
+                    'filter': filter_string,
+                    'order_by': ['attributes.start_time DESC'],
+                    'max_results': 100,
+                },
+            )
+            for run in (response or {}).get('runs', []):
+                info = run.get('info') or {}
+                run_id = info.get('run_id')
+                if not run_id:
+                    continue
+                runs_by_id[run_id] = run
 
-    return [payload for run in runs_by_id.values() if (payload := _mlflow_run_payload(run))]
+    runs = [payload for run in runs_by_id.values() if (payload := _mlflow_run_payload(run))]
+    return sorted(runs, key=lambda run: run.get('start_time') or 0, reverse=True)
 
 
 def _mlflow_run_payload(run):
@@ -682,6 +715,7 @@ class ProjectYoloSam2InferenceAPI(generics.GenericAPIView):
                 'mlflow': {
                     'tracking_uri_configured': bool(settings.BIOWORK_MLFLOW_TRACKING_URI),
                     'experiment_name': settings.BIOWORK_MLFLOW_EXPERIMENT_NAME,
+                    'project_experiment_name': _mlflow_project_experiment_name(project),
                     'model_artifact_path': settings.BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH,
                 },
             },
