@@ -1,8 +1,10 @@
 import json
 
 import pytest
+from ml.models import MLBackendPredictionJob
 from projects.models import Task
 from rest_framework import status
+from tasks.models import Prediction
 
 from label_studio.tests.utils import make_project, register_ml_backend_mock
 
@@ -24,6 +26,16 @@ def ml_backend_for_test_api(ml_backend):
 @pytest.fixture
 def mock_gethostbyname(mocker):
     mocker.patch('socket.gethostbyname', return_value='321.21.21.21')
+
+
+@pytest.fixture
+def run_background_jobs_inline(mocker):
+    def run_inline(job, *args, **kwargs):
+        kwargs.pop('queue_name', None)
+        kwargs.pop('job_timeout', None)
+        return job(*args, **kwargs)
+
+    mocker.patch('ml.api.start_job_async_or_sync', side_effect=run_inline)
 
 
 @pytest.mark.django_db
@@ -258,6 +270,7 @@ def test_security_write_only_payload(business_client, ml_backend_for_test_api, m
     )
     assert response.status_code == 200
     # check that password is not returned in PATCH response
+
     assert 'basic_auth_pass' not in response.json()
 
     # patch ML backend with password
@@ -280,6 +293,63 @@ def test_security_write_only_payload(business_client, ml_backend_for_test_api, m
 
     ml_backend = MLBackend.objects.get(id=ml_backend_id)
     assert ml_backend.basic_auth_pass == '<ANOTHER_SECRET>'
+
+
+@pytest.mark.django_db
+def test_project_prediction_endpoint_runs_selected_backend_over_all_tasks(
+    business_client,
+    ml_backend_for_test_api,
+    mock_gethostbyname,
+    run_background_jobs_inline,
+):
+    project = make_project(
+        config=dict(
+            is_published=True,
+            label_config=PROJECT_CONFIG,
+            title='test_project_prediction_endpoint',
+        ),
+        user=business_client.user,
+    )
+    tasks = [
+        Task.objects.create(project=project, data={'image_url': 'http://example.com/one.jpg'}),
+        Task.objects.create(project=project, data={'image_url': 'http://example.com/two.jpg'}),
+    ]
+
+    response = business_client.post(
+        '/api/ml/',
+        data={
+            'project': project.id,
+            'title': 'custom-yolo',
+            'url': 'https://ml_backend_for_test_api',
+        },
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    ml_backend_id = response.json()['id']
+
+    ml_backend_for_test_api.post(
+        'https://ml_backend_for_test_api/predict',
+        text=json.dumps(
+            {
+                'results': [
+                    {'result': [], 'score': 0.91, 'model_version': 'active-yolo'},
+                    {'result': [], 'score': 0.82, 'model_version': 'active-yolo'},
+                ]
+            }
+        ),
+    )
+
+    response = business_client.post(f'/api/ml/{ml_backend_id}/predict/project', data={'batch_size': 2})
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload['status'] == 'completed'
+    assert payload['result']['total_tasks'] == 2
+    assert payload['result']['created_predictions'] == 2
+    assert MLBackendPredictionJob.objects.filter(ml_backend_id=ml_backend_id, model_version='1.0.0').exists()
+    assert Prediction.objects.filter(project=project, model_version='active-yolo').count() == 2
+    assert set(Prediction.objects.filter(project=project).values_list('task_id', flat=True)) == {
+        task.id for task in tasks
+    }
 
 
 @pytest.mark.django_db

@@ -365,6 +365,45 @@ class MLBackend(models.Model):
             instances = prediction_ser.save()
         return instances
 
+    def predict_project_tasks(self, batch_size=100, overwrite=False):
+        from tasks.models import Prediction
+
+        model_version = self.update_state() or self.model_version
+        if self.not_ready:
+            raise ValueError(f'ML backend {self} is not ready: {self.error_message or self.state}')
+
+        tasks = self.project.tasks.order_by('id')
+        total_tasks = tasks.count()
+        deleted_predictions = 0
+        if overwrite and model_version:
+            deleted_predictions, _ = Prediction.objects.filter(
+                project=self.project,
+                model_version=model_version,
+            ).delete()
+
+        created_predictions = 0
+        skipped_tasks = 0
+        task_ids = tasks.values_list('id', flat=True).iterator(chunk_size=batch_size)
+        for batch in _batched(task_ids, batch_size):
+            batch_tasks = self.project.tasks.filter(id__in=batch).order_by('id')
+            batch_size_actual = batch_tasks.count()
+            result = self.predict_tasks(batch_tasks)
+            if isinstance(result, list):
+                created_predictions += len(result)
+                skipped_tasks += max(batch_size_actual - len(result), 0)
+            else:
+                skipped_tasks += batch_size_actual
+
+        return {
+            'project': self.project_id,
+            'ml_backend': self.id,
+            'model_version': model_version,
+            'total_tasks': total_tasks,
+            'created_predictions': created_predictions,
+            'skipped_tasks': skipped_tasks,
+            'deleted_predictions': deleted_predictions,
+        }
+
     def interactive_annotating(self, task, context=None, user=None):
         result = {}
         options = {}
@@ -439,6 +478,28 @@ class MLBackendPredictionJob(models.Model):
 
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+
+
+def _batched(values, size):
+    batch = []
+    for value in values:
+        batch.append(value)
+        if len(batch) >= size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def run_project_prediction_job(prediction_job_id, overwrite=False):
+    prediction_job = MLBackendPredictionJob.objects.select_related('ml_backend__project').get(pk=prediction_job_id)
+    result = prediction_job.ml_backend.predict_project_tasks(
+        batch_size=prediction_job.batch_size,
+        overwrite=overwrite,
+    )
+    prediction_job.model_version = result.get('model_version') or prediction_job.model_version
+    prediction_job.save(update_fields=['model_version', 'updated_at'])
+    return result
 
 
 class MLBackendTrainJob(models.Model):

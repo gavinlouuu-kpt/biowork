@@ -59,6 +59,7 @@ export const API_CONFIG = {
     deleteMLBackend: "DELETE:/ml/:pk",
     trainMLBackend: "POST:/ml/:pk/train",
     predictWithML: "POST:/ml/:pk/predict/test",
+    predictProjectWithML: "POST:/ml/:pk/predict/project",
     projectModelVersions: "/projects/:pk/model-versions",
     deletePredictions: "DELETE:/projects/:pk/model-versions",
     modelVersions: "/ml/:pk/versions",
@@ -96,7 +97,7 @@ export const API_CONFIG = {
     accessTokenUpdateSettings: "POST:/jwt/settings",
 
     // Billing
-    usageLimits: "GET:/billing/usage-limits",
+    usageLimits: "GET:/billing/usage-limits"
   },
-  alwaysExpectJSON: false,
+  alwaysExpectJSON: false
 };

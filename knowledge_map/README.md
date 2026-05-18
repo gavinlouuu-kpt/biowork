@@ -24,6 +24,8 @@ upstream Label Studio.
 - `rgb_mean_intensity.md` — `meta.mean_r/g/b` schema + sort behavior.
 - `toolbar_auto_annotation_toggle.md` — toolbar swap mechanics.
 - `ai_review_fast_mode.md` — fast static brush rendering for dense AI annotations.
+- `yolo_full_dataset_inference.md` — project settings action for running
+  selected YOLO backend predictions across every project task.
 - `ml_backend_topology.md` — dev/prod Docker topology for SAM2,
   FastSAM, and YOLO backend servers.
 
