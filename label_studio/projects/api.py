@@ -24,6 +24,7 @@ from django.utils.decorators import method_decorator
 from django_filters import CharFilter, FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
+from io_storages.s3.models import S3ImportStorage
 from label_studio_sdk.label_interface.interface import LabelInterface
 from ml.models import MLBackend
 from ml.serializers import MLBackendSerializer
@@ -496,17 +497,137 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
         return super(ProjectAPI, self).put(request, *args, **kwargs)
 
 
-def _default_inference_dataset_prefix(project):
-    template = settings.BIOWORK_INFERENCE_DATASET_PREFIX_TEMPLATE
-    try:
-        return template.format(
-            project_id=project.id,
-            project_title=project.title,
-            organization_id=project.organization_id,
+def _storage_label(storage_data):
+    title = storage_data.get('title') or f"{storage_data['type'].upper()} storage {storage_data['id']}"
+    path = storage_data.get('uri') or storage_data.get('dataset_prefix') or ''
+    return f'{title} ({path})' if path else title
+
+
+def _storage_payload(storage):
+    prefix = (storage.prefix or '').strip('/')
+    bucket = storage.bucket or ''
+    uri = f's3://{bucket}/{prefix}' if prefix else f's3://{bucket}'
+    data = {
+        'key': f's3:{storage.id}',
+        'type': 's3',
+        'id': storage.id,
+        'title': storage.title,
+        'bucket': bucket,
+        'prefix': prefix,
+        'dataset_prefix': prefix,
+        'uri': uri,
+        'endpoint_url': storage.s3_endpoint or '',
+    }
+    data['label'] = _storage_label(data)
+    return data
+
+
+def _project_inference_dataset_storages(project):
+    storages = []
+    for storage in S3ImportStorage.objects.filter(project=project).order_by('-created_at', '-id'):
+        storages.append(_storage_payload(storage))
+    return storages
+
+
+def _select_project_inference_storage(project, storage_key=None):
+    storages = _project_inference_dataset_storages(project)
+    if not storages:
+        return None, storages
+    if not storage_key:
+        return storages[0], storages
+
+    selected = next((storage for storage in storages if storage['key'] == storage_key), None)
+    if not selected:
+        raise ValueError('Selected cloud storage does not belong to this project.')
+    return selected, storages
+
+
+def _mlflow_api_url(path):
+    return f"{settings.BIOWORK_MLFLOW_TRACKING_URI.rstrip('/')}{path}"
+
+
+def _mlflow_request(method, path, **kwargs):
+    if not settings.BIOWORK_MLFLOW_TRACKING_URI:
+        return None
+    response = requests.request(
+        method,
+        _mlflow_api_url(path),
+        timeout=settings.BIOWORK_INFERENCE_REQUEST_TIMEOUT,
+        **kwargs,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def _mlflow_experiment_id():
+    response = _mlflow_request(
+        'GET',
+        '/api/2.0/mlflow/experiments/get-by-name',
+        params={'experiment_name': settings.BIOWORK_MLFLOW_EXPERIMENT_NAME},
+    )
+    experiment = (response or {}).get('experiment')
+    return experiment and experiment.get('experiment_id')
+
+
+def _search_project_mlflow_runs(project):
+    experiment_id = _mlflow_experiment_id()
+    if not experiment_id:
+        return []
+
+    runs_by_id = {}
+    filters = [
+        f"tags.`biowork.project_id` = '{project.id}'",
+        f"params.`project_id` = '{project.id}'",
+    ]
+    for filter_string in filters:
+        response = _mlflow_request(
+            'POST',
+            '/api/2.0/mlflow/runs/search',
+            json={
+                'experiment_ids': [experiment_id],
+                'filter': filter_string,
+                'order_by': ['attributes.start_time DESC'],
+                'max_results': 100,
+            },
         )
-    except (KeyError, ValueError):
-        logger.warning('Invalid BIOWORK_INFERENCE_DATASET_PREFIX_TEMPLATE: %s', template)
-        return template
+        for run in (response or {}).get('runs', []):
+            info = run.get('info') or {}
+            run_id = info.get('run_id')
+            if not run_id:
+                continue
+            runs_by_id[run_id] = run
+
+    return [payload for run in runs_by_id.values() if (payload := _mlflow_run_payload(run))]
+
+
+def _mlflow_run_payload(run):
+    info = run.get('info') or {}
+    data = run.get('data') or {}
+    params = {param.get('key'): param.get('value') for param in data.get('params', [])}
+    tags = {tag.get('key'): tag.get('value') for tag in data.get('tags', [])}
+    run_id = info.get('run_id')
+    if not run_id:
+        return None
+    artifact_path = settings.BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH.strip('/') or 'model'
+    model_uri = f'runs:/{run_id}/{artifact_path}'
+    label = params.get('model_version') or tags.get('mlflow.runName') or run_id
+    return {
+        'run_id': run_id,
+        'model_uri': model_uri,
+        'label': label,
+        'status': info.get('status'),
+        'start_time': info.get('start_time'),
+        'artifact_uri': info.get('artifact_uri'),
+        'model_version': params.get('model_version'),
+    }
+
+
+def _select_project_mlflow_run(project, run_id):
+    runs = _search_project_mlflow_runs(project)
+    selected = next((run for run in runs if run['run_id'] == run_id), None)
+    if not selected:
+        raise ValueError('Selected MLflow run does not belong to this project.')
+    return selected, runs
 
 
 def trigger_yolo_sam2_inference_pipeline(payload):
@@ -544,6 +665,29 @@ class ProjectYoloSam2InferenceAPI(generics.GenericAPIView):
     def get_queryset(self):
         return Project.objects.filter(organization=self.request.user.active_organization)
 
+    def get(self, request, *args, **kwargs):
+        project = self.get_object()
+        dataset_storage, dataset_storages = _select_project_inference_storage(project)
+        try:
+            model_runs = _search_project_mlflow_runs(project)
+        except requests.RequestException as exc:
+            logger.warning('Could not list project MLflow runs: %s', exc, exc_info=True)
+            model_runs = []
+
+        return Response(
+            {
+                'dataset_storage': dataset_storage,
+                'dataset_storages': dataset_storages,
+                'model_runs': model_runs,
+                'mlflow': {
+                    'tracking_uri_configured': bool(settings.BIOWORK_MLFLOW_TRACKING_URI),
+                    'experiment_name': settings.BIOWORK_MLFLOW_EXPERIMENT_NAME,
+                    'model_artifact_path': settings.BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def post(self, request, *args, **kwargs):
         project = self.get_object()
 
@@ -553,16 +697,35 @@ class ProjectYoloSam2InferenceAPI(generics.GenericAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        model_uri = (request.data.get('model_uri') or '').strip()
-        if not model_uri:
+        model_run_id = (request.data.get('model_run_id') or '').strip()
+        if not model_run_id:
             return Response(
-                {'model_uri': 'MLflow model URI is required.'},
+                {'model_run_id': 'Select an MLflow run from this project.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        dataset_prefix = (request.data.get('dataset_prefix') or '').strip()
-        if not dataset_prefix:
-            dataset_prefix = _default_inference_dataset_prefix(project)
+        try:
+            dataset_storage, _ = _select_project_inference_storage(
+                project,
+                storage_key=(request.data.get('dataset_storage_key') or '').strip(),
+            )
+        except ValueError as exc:
+            return Response({'dataset_storage_key': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if not dataset_storage:
+            return Response(
+                {
+                    'dataset_storage': (
+                        'Configure S3-compatible cloud import storage for this project before '
+                        'full-dataset inference.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            model_run, _ = _select_project_mlflow_run(project, model_run_id)
+        except (ValueError, requests.RequestException) as exc:
+            return Response({'model_run_id': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         parameters = request.data.get('parameters') or {}
         if not isinstance(parameters, dict):
@@ -586,8 +749,10 @@ class ProjectYoloSam2InferenceAPI(generics.GenericAPIView):
             'project_id': project.id,
             'project_title': project.title,
             'organization_id': project.organization_id,
-            'dataset_prefix': dataset_prefix,
-            'model_uri': model_uri,
+            'dataset_prefix': dataset_storage['dataset_prefix'],
+            'dataset_storage': dataset_storage,
+            'model_uri': model_run['model_uri'],
+            'model_run': model_run,
             'label_config': project.label_config,
             'parameters': parameters,
             'requested_by': {

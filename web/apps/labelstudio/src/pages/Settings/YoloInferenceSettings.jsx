@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Button } from "../../components";
 import { Description } from "../../components/Description/Description";
-import { Form, Input, Label, Toggle } from "../../components/Form";
+import { Form, Label, Select, Toggle } from "../../components/Form";
 import { Divider } from "../../components/Divider/Divider";
 import { Block, Elem } from "../../utils/bem";
 import { ModelVersionSelector } from "./AnnotationSettings/ModelVersionSelector";
@@ -23,14 +23,30 @@ export const YoloInferenceSettings = () => {
   const formRef = useRef();
   const [runningInference, setRunningInference] = useState(false);
   const [lastInferenceResult, setLastInferenceResult] = useState(null);
-  const [datasetPrefix, setDatasetPrefix] = useState("");
-  const [modelUri, setModelUri] = useState("");
+  const [loadingInferenceContext, setLoadingInferenceContext] = useState(false);
+  const [inferenceContext, setInferenceContext] = useState(null);
+  const [datasetStorageKey, setDatasetStorageKey] = useState("");
+  const [modelRunId, setModelRunId] = useState("");
+
+  const fetchInferenceContext = useCallback(async () => {
+    if (!project?.id) return;
+
+    setLoadingInferenceContext(true);
+    try {
+      const response = await api.callApi("projectYoloSam2InferenceContext", {
+        params: { pk: project.id }
+      });
+      setInferenceContext(response);
+      setDatasetStorageKey(response?.dataset_storage?.key ?? "");
+      setModelRunId(response?.model_runs?.[0]?.run_id ?? "");
+    } finally {
+      setLoadingInferenceContext(false);
+    }
+  }, [api, project?.id]);
 
   useEffect(() => {
-    if (project?.id) {
-      setDatasetPrefix(`biowork/projects/${project.id}`);
-    }
-  }, [project?.id]);
+    fetchInferenceContext();
+  }, [fetchInferenceContext]);
 
   const updateProject = useCallback(() => {
     fetchProject(project.id, true);
@@ -43,8 +59,34 @@ export const YoloInferenceSettings = () => {
     return `Current active inference model/predictions: ${project.model_version}`;
   }, [project?.model_version]);
 
+  const datasetStorageOptions = useMemo(() => {
+    return (inferenceContext?.dataset_storages ?? []).map(storage => ({
+      label: storage.label,
+      value: storage.key
+    }));
+  }, [inferenceContext?.dataset_storages]);
+
+  const modelRunOptions = useMemo(() => {
+    return (inferenceContext?.model_runs ?? []).map(run => ({
+      label: run.label ? `${run.label} (${run.run_id})` : run.run_id,
+      value: run.run_id
+    }));
+  }, [inferenceContext?.model_runs]);
+
+  const selectedStorage = useMemo(() => {
+    return (inferenceContext?.dataset_storages ?? []).find(
+      storage => storage.key === datasetStorageKey
+    );
+  }, [datasetStorageKey, inferenceContext?.dataset_storages]);
+
+  const selectedRun = useMemo(() => {
+    return (inferenceContext?.model_runs ?? []).find(
+      run => run.run_id === modelRunId
+    );
+  }, [inferenceContext?.model_runs, modelRunId]);
+
   const onRunFullDatasetInference = useCallback(async () => {
-    if (!modelUri.trim() || runningInference) return;
+    if (!datasetStorageKey || !modelRunId || runningInference) return;
 
     setRunningInference(true);
     setLastInferenceResult(null);
@@ -63,9 +105,9 @@ export const YoloInferenceSettings = () => {
       const response = await api.callApi("projectYoloSam2Inference", {
         params: { pk: project.id },
         body: {
-          dataset_prefix: datasetPrefix.trim(),
+          dataset_storage_key: datasetStorageKey,
           ml_backend_id: backend?.id,
-          model_uri: modelUri.trim()
+          model_run_id: modelRunId
         }
       });
 
@@ -92,8 +134,8 @@ export const YoloInferenceSettings = () => {
     }
   }, [
     api,
-    datasetPrefix,
-    modelUri,
+    datasetStorageKey,
+    modelRunId,
     project?.id,
     project?.model_version,
     runningInference,
@@ -153,33 +195,55 @@ export const YoloInferenceSettings = () => {
             <Form.Row columnCount={1}>
               <Label text="Full Dataset Inference" large />
               <Description style={{ marginTop: 0, maxWidth: 760 }}>
-                Trigger the project YOLO+SAM2 data processing pipeline with a
-                selected MLflow model. This is separate from Label Studio
-                prediction retrieval.
+                Trigger the project YOLO+SAM2 data processing pipeline using
+                this project's cloud storage and MLflow training runs. This is
+                separate from Label Studio prediction retrieval.
               </Description>
-              <Input
+              <Select
                 skip
-                name="inference_dataset_prefix"
-                label="Dataset Prefix"
-                description="RustFS dataset path used by the pipeline."
-                value={datasetPrefix}
-                onChange={event => setDatasetPrefix(event.target.value)}
+                name="inference_dataset_storage"
+                label="Cloud Storage Dataset"
+                disabled={
+                  !datasetStorageOptions.length || loadingInferenceContext
+                }
+                isInProgress={loadingInferenceContext}
+                options={datasetStorageOptions}
+                placeholder="No cloud storage configured"
+                value={datasetStorageKey}
+                onChange={setDatasetStorageKey}
               />
-              <Input
+              {selectedStorage && (
+                <Description style={{ marginTop: 0, maxWidth: 760 }}>
+                  Dataset source: {selectedStorage.uri}
+                </Description>
+              )}
+              <Select
                 skip
-                name="inference_model_uri"
-                label="MLflow Model URI"
-                description="Example: runs:/<run_id>/model"
-                placeholder="runs:/<run_id>/model"
-                value={modelUri}
-                onChange={event => setModelUri(event.target.value)}
+                name="inference_model_run"
+                label="Project MLflow Run"
+                disabled={!modelRunOptions.length || loadingInferenceContext}
+                isInProgress={loadingInferenceContext}
+                options={modelRunOptions}
+                placeholder="No project MLflow runs found"
+                value={modelRunId}
+                onChange={setModelRunId}
               />
+              {selectedRun && (
+                <Description style={{ marginTop: 0, maxWidth: 760 }}>
+                  Model URI: {selectedRun.model_uri}
+                </Description>
+              )}
               <div>
                 <Button
                   type="button"
                   look="primary"
                   waiting={runningInference}
-                  disabled={!modelUri.trim() || runningInference}
+                  disabled={
+                    !datasetStorageKey ||
+                    !modelRunId ||
+                    runningInference ||
+                    loadingInferenceContext
+                  }
                   onClick={onRunFullDatasetInference}
                 >
                   Run YOLO+SAM2 Pipeline

@@ -21,6 +21,7 @@ export const API_CONFIG = {
     createProject: "POST:/projects",
     deleteProject: "DELETE:/projects/:pk",
     projectResetCache: "POST:/projects/:pk/summary/reset",
+    projectYoloSam2InferenceContext: "GET:/projects/:pk/yolo-sam2-inference",
     projectYoloSam2Inference: "POST:/projects/:pk/yolo-sam2-inference",
 
     // Presigning

@@ -4,6 +4,7 @@ import pytest
 from django.test import TestCase
 from django.urls import reverse
 from django.utils.http import urlencode
+from io_storages.tests.factories import S3ImportStorageFactory
 from rest_framework import status
 from rest_framework.test import APIClient
 from tasks.models import Task
@@ -65,13 +66,50 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
 ):
     settings.BIOWORK_INFERENCE_PIPELINE_URL = 'https://pipeline.example/run'
     settings.BIOWORK_INFERENCE_PIPELINE_TOKEN = 'secret-token'
+    settings.BIOWORK_MLFLOW_TRACKING_URI = 'https://mlflow.example'
+    settings.BIOWORK_MLFLOW_EXPERIMENT_NAME = 'biowork-yolo-training'
+    settings.BIOWORK_MLFLOW_MODEL_ARTIFACT_PATH = 'model'
 
     project = ProjectFactory(
         label_config='<View><Image name="image" value="$image"/></View>',
         title='pipeline project',
     )
+    storage = S3ImportStorageFactory(
+        project=project,
+        title='RustFS dataset',
+        bucket='datasets',
+        prefix=f'biowork/projects/{project.id}',
+        s3_endpoint='https://rustfs.example',
+    )
     client = APIClient()
     client.force_authenticate(user=project.created_by)
+
+    run_payload = {
+        'info': {
+            'run_id': 'e58d20c1e77f4cd0894e91c82974f368',
+            'status': 'FINISHED',
+            'start_time': 123456789,
+            'artifact_uri': 's3://mlflow-artifacts/1/e58d20c1e77f4cd0894e91c82974f368/artifacts',
+        },
+        'data': {
+            'params': [
+                {'key': 'project_id', 'value': str(project.id)},
+                {'key': 'model_version', 'value': 'custom-yolo-2026-05-18'},
+            ],
+            'tags': [
+                {'key': 'biowork.project_id', 'value': str(project.id)},
+                {'key': 'mlflow.runName', 'value': 'project training run'},
+            ],
+        },
+    }
+    mlflow_response = mocker.Mock()
+    mlflow_response.raise_for_status.return_value = None
+    mlflow_response.json.side_effect = [
+        {'experiment': {'experiment_id': '7'}},
+        {'runs': [run_payload]},
+        {'runs': [run_payload]},
+    ]
+    mlflow_request_mock = mocker.patch('projects.api.requests.request', return_value=mlflow_response)
 
     response_mock = mocker.Mock()
     response_mock.status_code = status.HTTP_202_ACCEPTED
@@ -83,8 +121,8 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
         f'/api/projects/{project.id}/yolo-sam2-inference/',
         data=json.dumps(
             {
-                'dataset_prefix': 'datasets/custom-project',
-                'model_uri': 'runs:/e58d20c1e77f4cd0894e91c82974f368/model',
+                'dataset_storage_key': f's3:{storage.id}',
+                'model_run_id': 'e58d20c1e77f4cd0894e91c82974f368',
                 'parameters': {'confidence': 0.4},
             }
         ),
@@ -97,19 +135,72 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
     assert payload['pipeline_response']['status_code'] == status.HTTP_202_ACCEPTED
     assert payload['pipeline_response']['response'] == {'job_id': 'pipeline-1'}
 
+    assert mlflow_request_mock.call_count == 3
+    assert mlflow_request_mock.call_args_list[1].kwargs['json']['filter'] == (
+        f"tags.`biowork.project_id` = '{project.id}'"
+    )
+    assert mlflow_request_mock.call_args_list[2].kwargs['json']['filter'] == f"params.`project_id` = '{project.id}'"
+
     post_mock.assert_called_once()
     _, kwargs = post_mock.call_args
     assert kwargs['headers']['Authorization'] == 'Bearer secret-token'
     assert kwargs['json']['project_id'] == project.id
     assert kwargs['json']['project_title'] == 'pipeline project'
-    assert kwargs['json']['dataset_prefix'] == 'datasets/custom-project'
+    assert kwargs['json']['dataset_prefix'] == f'biowork/projects/{project.id}'
+    assert kwargs['json']['dataset_storage']['key'] == f's3:{storage.id}'
+    assert kwargs['json']['dataset_storage']['bucket'] == 'datasets'
+    assert kwargs['json']['dataset_storage']['endpoint_url'] == 'https://rustfs.example'
     assert kwargs['json']['model_uri'] == 'runs:/e58d20c1e77f4cd0894e91c82974f368/model'
+    assert kwargs['json']['model_run']['run_id'] == 'e58d20c1e77f4cd0894e91c82974f368'
     assert kwargs['json']['label_config'] == project.label_config
     assert kwargs['json']['parameters'] == {'confidence': 0.4}
 
 
 @pytest.mark.django_db
-def test_yolo_sam2_inference_endpoint_requires_model_uri(settings):
+def test_yolo_sam2_inference_endpoint_lists_project_context(settings, mocker):
+    settings.BIOWORK_MLFLOW_TRACKING_URI = 'https://mlflow.example'
+    settings.BIOWORK_MLFLOW_EXPERIMENT_NAME = 'biowork-yolo-training'
+
+    project = ProjectFactory(label_config='<View></View>', title='pipeline project')
+    storage = S3ImportStorageFactory(
+        project=project,
+        title='RustFS dataset',
+        bucket='datasets',
+        prefix=f'biowork/projects/{project.id}',
+        s3_endpoint='https://rustfs.example',
+    )
+    run_payload = {
+        'info': {'run_id': 'run-1', 'status': 'FINISHED', 'start_time': 123456789},
+        'data': {
+            'params': [{'key': 'project_id', 'value': str(project.id)}],
+            'tags': [{'key': 'biowork.project_id', 'value': str(project.id)}],
+        },
+    }
+    mlflow_response = mocker.Mock()
+    mlflow_response.raise_for_status.return_value = None
+    mlflow_response.json.side_effect = [
+        {'experiment': {'experiment_id': '7'}},
+        {'runs': [run_payload]},
+        {'runs': []},
+    ]
+    mocker.patch('projects.api.requests.request', return_value=mlflow_response)
+
+    client = APIClient()
+    client.force_authenticate(user=project.created_by)
+
+    response = client.get(f'/api/projects/{project.id}/yolo-sam2-inference/')
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload['dataset_storage']['key'] == f's3:{storage.id}'
+    assert payload['dataset_storages'][0]['uri'] == f's3://datasets/biowork/projects/{project.id}'
+    assert payload['model_runs'][0]['run_id'] == 'run-1'
+    assert payload['model_runs'][0]['model_uri'] == 'runs:/run-1/model'
+    assert payload['mlflow']['experiment_name'] == 'biowork-yolo-training'
+
+
+@pytest.mark.django_db
+def test_yolo_sam2_inference_endpoint_requires_model_run_id(settings):
     settings.BIOWORK_INFERENCE_PIPELINE_URL = 'https://pipeline.example/run'
     project = ProjectFactory(label_config='<View></View>', title='pipeline project')
     client = APIClient()
@@ -117,9 +208,9 @@ def test_yolo_sam2_inference_endpoint_requires_model_uri(settings):
 
     response = client.post(
         f'/api/projects/{project.id}/yolo-sam2-inference/',
-        data=json.dumps({'dataset_prefix': 'datasets/custom-project'}),
+        data=json.dumps({}),
         content_type='application/json',
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert 'model_uri' in response.json()
+    assert 'model_run_id' in response.json()

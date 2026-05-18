@@ -73,6 +73,8 @@ services:
       - NO_PROXY=localhost,127.0.0.1,host.docker.internal,db-dev,redis-dev,label-studio-nginx-dev,app-dev,sam2-backend,fastsam-backend,yolo-backend,tailscale-proxy
       - BIOWORK_INFERENCE_PIPELINE_URL=${BIOWORK_INFERENCE_PIPELINE_URL:-http://host.docker.internal:8096/runs}
       - BIOWORK_INFERENCE_REQUEST_TIMEOUT=${BIOWORK_INFERENCE_REQUEST_TIMEOUT:-30}
+      - BIOWORK_MLFLOW_TRACKING_URI=${BIOWORK_MLFLOW_TRACKING_URI:-http://host.docker.internal:5000}
+      - BIOWORK_MLFLOW_EXPERIMENT_NAME=${BIOWORK_MLFLOW_EXPERIMENT_NAME:-biowork-yolo-training}
       - AWS_SHARED_CREDENTIALS_FILE=/run/secrets/aws_credentials
       - AWS_CONFIG_FILE=/run/secrets/aws_config
       - AWS_PROFILE=default
@@ -136,6 +138,8 @@ services:
       - NO_PROXY=localhost,127.0.0.1,host.docker.internal,db-dev,redis-dev,label-studio-nginx-dev,app-dev,sam2-backend,fastsam-backend,yolo-backend,tailscale-proxy
       - BIOWORK_INFERENCE_PIPELINE_URL=${BIOWORK_INFERENCE_PIPELINE_URL:-http://host.docker.internal:8096/runs}
       - BIOWORK_INFERENCE_REQUEST_TIMEOUT=${BIOWORK_INFERENCE_REQUEST_TIMEOUT:-30}
+      - BIOWORK_MLFLOW_TRACKING_URI=${BIOWORK_MLFLOW_TRACKING_URI:-http://host.docker.internal:5000}
+      - BIOWORK_MLFLOW_EXPERIMENT_NAME=${BIOWORK_MLFLOW_EXPERIMENT_NAME:-biowork-yolo-training}
       - AWS_SHARED_CREDENTIALS_FILE=/run/secrets/aws_credentials
       - AWS_CONFIG_FILE=/run/secrets/aws_config
       - AWS_PROFILE=default
