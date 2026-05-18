@@ -3,6 +3,7 @@
 import logging
 import os
 import pathlib
+from urllib.parse import urljoin
 
 import drf_yasg.openapi as openapi
 import requests
@@ -689,6 +690,30 @@ def trigger_yolo_sam2_inference_pipeline(payload):
     }
 
 
+def _pipeline_run_status_url(run_id, status_url=None):
+    if status_url:
+        return urljoin(settings.BIOWORK_INFERENCE_PIPELINE_URL, status_url)
+    base_url = settings.BIOWORK_INFERENCE_PIPELINE_URL.rstrip('/')
+    service_base = base_url.split('/runs', 1)[0] if '/runs' in base_url else base_url
+    return f'{service_base}/runs/{run_id}'
+
+
+def fetch_yolo_sam2_inference_pipeline_status(run_id, status_url=None):
+    headers = {}
+    token = settings.BIOWORK_INFERENCE_PIPELINE_TOKEN
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+
+    response = requests.get(
+        _pipeline_run_status_url(run_id, status_url=status_url),
+        headers=headers,
+        timeout=settings.BIOWORK_INFERENCE_REQUEST_TIMEOUT,
+        verify=settings.VERIFY_SSL_CERTS,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 class ProjectYoloSam2InferenceAPI(generics.GenericAPIView):
     parser_classes = (JSONParser,)
     permission_required = all_permissions.projects_change
@@ -805,12 +830,7 @@ class ProjectYoloSam2InferenceAPI(generics.GenericAPIView):
         public_request = {key: value for key, value in payload.items() if key != 'label_config'}
 
         try:
-            result = start_job_async_or_sync(
-                trigger_yolo_sam2_inference_pipeline,
-                payload,
-                queue_name='default',
-                job_timeout=settings.RQ_LONG_JOB_TIMEOUT,
-            )
+            result = trigger_yolo_sam2_inference_pipeline(payload)
         except requests.RequestException as exc:
             logger.warning('YOLO+SAM2 inference pipeline request failed: %s', exc, exc_info=True)
             return Response(
@@ -822,24 +842,52 @@ class ProjectYoloSam2InferenceAPI(generics.GenericAPIView):
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        if hasattr(result, 'id'):
-            return Response(
-                {
-                    'status': 'queued',
-                    'job_id': result.id,
-                    'request': public_request,
-                },
-                status=status.HTTP_202_ACCEPTED,
-            )
+        pipeline_payload = result.get('response') if isinstance(result.get('response'), dict) else {}
+        run_id = pipeline_payload.get('run_id') or pipeline_payload.get('job_id')
+        response_status = pipeline_payload.get('status') or (
+            'queued' if result.get('status_code') == status.HTTP_202_ACCEPTED else 'triggered'
+        )
 
         return Response(
             {
-                'status': 'triggered',
+                'status': response_status,
+                'orchestrator': pipeline_payload.get('orchestrator'),
+                'run_id': run_id,
+                'job_id': run_id,
+                'dagster_status': pipeline_payload.get('dagster_status'),
+                'status_url': pipeline_payload.get('status_url'),
                 'pipeline_response': result,
                 'request': public_request,
             },
-            status=status.HTTP_200_OK,
+            status=status.HTTP_202_ACCEPTED if result.get('status_code') == status.HTTP_202_ACCEPTED else status.HTTP_200_OK,
         )
+
+
+class ProjectYoloSam2InferenceRunAPI(generics.GenericAPIView):
+    parser_classes = (JSONParser,)
+    permission_required = all_permissions.projects_change
+    queryset = Project.objects.all()
+    swagger_schema = None
+
+    def get_queryset(self):
+        return Project.objects.filter(organization=self.request.user.active_organization)
+
+    def get(self, request, *args, **kwargs):
+        self.get_object()
+        run_id = kwargs['run_id']
+        try:
+            payload = fetch_yolo_sam2_inference_pipeline_status(run_id)
+        except requests.RequestException as exc:
+            logger.warning('YOLO+SAM2 inference pipeline status request failed: %s', exc, exc_info=True)
+            return Response(
+                {
+                    'detail': 'YOLO+SAM2 inference pipeline status request failed.',
+                    'error': str(exc),
+                    'run_id': run_id,
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 @method_decorator(

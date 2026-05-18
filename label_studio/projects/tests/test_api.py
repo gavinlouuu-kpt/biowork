@@ -48,21 +48,10 @@ class TestProjectCountsListAPI(TestCase):
         self.assertEqual(actual, expected)
 
 
-@pytest.fixture
-def run_inference_jobs_inline(mocker):
-    def run_inline(job, *args, **kwargs):
-        kwargs.pop('queue_name', None)
-        kwargs.pop('job_timeout', None)
-        return job(*args, **kwargs)
-
-    mocker.patch('projects.api.start_job_async_or_sync', side_effect=run_inline)
-
-
 @pytest.mark.django_db
 def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
     settings,
     mocker,
-    run_inference_jobs_inline,
 ):
     settings.BIOWORK_INFERENCE_PIPELINE_URL = 'https://pipeline.example/run'
     settings.BIOWORK_INFERENCE_PIPELINE_TOKEN = 'secret-token'
@@ -117,7 +106,13 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
 
     response_mock = mocker.Mock()
     response_mock.status_code = status.HTTP_202_ACCEPTED
-    response_mock.json.return_value = {'job_id': 'pipeline-1'}
+    response_mock.json.return_value = {
+        'run_id': 'dagster-run-1',
+        'status': 'queued',
+        'orchestrator': 'dagster',
+        'dagster_status': 'QUEUED',
+        'status_url': '/runs/dagster-run-1',
+    }
     response_mock.raise_for_status.return_value = None
     post_mock = mocker.patch('projects.api.requests.post', return_value=response_mock)
 
@@ -133,11 +128,15 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
         content_type='application/json',
     )
 
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_202_ACCEPTED
     payload = response.json()
-    assert payload['status'] == 'triggered'
+    assert payload['status'] == 'queued'
+    assert payload['orchestrator'] == 'dagster'
+    assert payload['run_id'] == 'dagster-run-1'
+    assert payload['job_id'] == 'dagster-run-1'
+    assert payload['dagster_status'] == 'QUEUED'
     assert payload['pipeline_response']['status_code'] == status.HTTP_202_ACCEPTED
-    assert payload['pipeline_response']['response'] == {'job_id': 'pipeline-1'}
+    assert payload['pipeline_response']['response']['run_id'] == 'dagster-run-1'
 
     assert mlflow_request_mock.call_count == 6
     assert mlflow_request_mock.call_args_list[0].kwargs['params']['experiment_name'] == 'biowork-yolo-training'
@@ -162,6 +161,35 @@ def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
     assert kwargs['json']['model_run']['run_id'] == 'e58d20c1e77f4cd0894e91c82974f368'
     assert kwargs['json']['label_config'] == project.label_config
     assert kwargs['json']['parameters'] == {'confidence': 0.4}
+
+
+@pytest.mark.django_db
+def test_yolo_sam2_inference_run_status_proxies_orchestrator(settings, mocker):
+    settings.BIOWORK_INFERENCE_PIPELINE_URL = 'https://orchestrator.example/runs/full-dataset-inference'
+    settings.BIOWORK_INFERENCE_PIPELINE_TOKEN = 'secret-token'
+
+    project = ProjectFactory(label_config='<View></View>', title='pipeline project')
+    client = APIClient()
+    client.force_authenticate(user=project.created_by)
+
+    response_mock = mocker.Mock()
+    response_mock.json.return_value = {
+        'run_id': 'dagster-run-1',
+        'status': 'running',
+        'dagster_status': 'STARTED',
+        'orchestrator': 'dagster',
+    }
+    response_mock.raise_for_status.return_value = None
+    get_mock = mocker.patch('projects.api.requests.get', return_value=response_mock)
+
+    response = client.get(f'/api/projects/{project.id}/yolo-sam2-inference/runs/dagster-run-1/')
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()['status'] == 'running'
+    get_mock.assert_called_once()
+    _, kwargs = get_mock.call_args
+    assert get_mock.call_args.args[0] == 'https://orchestrator.example/runs/dagster-run-1'
+    assert kwargs['headers']['Authorization'] == 'Bearer secret-token'
 
 
 @pytest.mark.django_db

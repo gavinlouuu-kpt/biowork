@@ -23,6 +23,7 @@ export const YoloInferenceSettings = () => {
   const formRef = useRef();
   const [runningInference, setRunningInference] = useState(false);
   const [lastInferenceResult, setLastInferenceResult] = useState(null);
+  const [inferenceRunStatus, setInferenceRunStatus] = useState(null);
   const [loadingInferenceContext, setLoadingInferenceContext] = useState(false);
   const [inferenceContext, setInferenceContext] = useState(null);
   const [datasetStorageKey, setDatasetStorageKey] = useState("");
@@ -47,6 +48,40 @@ export const YoloInferenceSettings = () => {
   useEffect(() => {
     fetchInferenceContext();
   }, [fetchInferenceContext]);
+
+  useEffect(() => {
+    const runId = lastInferenceResult?.run_id ?? lastInferenceResult?.job_id;
+    if (!project?.id || !runId) return;
+
+    let cancelled = false;
+    let intervalId;
+    const terminalStatuses = new Set(["completed", "failed", "canceled"]);
+
+    const fetchRunStatus = async () => {
+      try {
+        const response = await api.callApi("projectYoloSam2InferenceRun", {
+          params: { pk: project.id, runId }
+        });
+        if (cancelled) return;
+        setInferenceRunStatus(response);
+        if (terminalStatuses.has(response?.status)) {
+          clearInterval(intervalId);
+        }
+      } catch {
+        if (!cancelled) {
+          clearInterval(intervalId);
+        }
+      }
+    };
+
+    fetchRunStatus();
+    intervalId = setInterval(fetchRunStatus, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [api, lastInferenceResult?.job_id, lastInferenceResult?.run_id, project?.id]);
 
   const updateProject = useCallback(() => {
     fetchProject(project.id, true);
@@ -90,6 +125,7 @@ export const YoloInferenceSettings = () => {
 
     setRunningInference(true);
     setLastInferenceResult(null);
+    setInferenceRunStatus(null);
     try {
       let backend;
 
@@ -251,8 +287,11 @@ export const YoloInferenceSettings = () => {
               </div>
               {lastInferenceResult && (
                 <Description style={{ marginTop: 12, maxWidth: 760 }}>
-                  {lastInferenceResult.status === "queued"
-                    ? `Queued pipeline job ${lastInferenceResult.job_id}.`
+                  {(inferenceRunStatus?.status ?? lastInferenceResult.status) ===
+                  "queued"
+                    ? `Queued Dagster run ${lastInferenceResult.run_id ?? lastInferenceResult.job_id}.`
+                    : inferenceRunStatus?.status
+                      ? `Dagster run ${inferenceRunStatus.run_id} is ${inferenceRunStatus.status}.`
                     : `Pipeline responded with HTTP ${lastInferenceResult
                         .pipeline_response?.status_code ?? "OK"}.`}
                 </Description>

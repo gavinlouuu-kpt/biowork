@@ -20,14 +20,22 @@ path, and it does not call `/api/ml/<backend_id>/predict/project`.
 4. The UI calls `POST /api/projects/<project_id>/yolo-sam2-inference/`.
 5. Biowork derives the dataset prefix/storage payload and MLflow model URI
    server-side, for example `runs:/<run_id>/weights`.
-6. Biowork posts that payload to `BIOWORK_INFERENCE_PIPELINE_URL`, optionally
-   with `BIOWORK_INFERENCE_PIPELINE_TOKEN` as a bearer token.
-7. The pipeline repo owns the YOLO+SAM2 processing, RustFS reads/writes, MLflow
+6. Biowork posts that payload to the `biowork-orchestration` trigger endpoint
+   configured by `BIOWORK_INFERENCE_PIPELINE_URL`, optionally with
+   `BIOWORK_INFERENCE_PIPELINE_TOKEN` as a bearer token.
+7. `biowork-orchestration` launches a Dagster run and returns a Dagster run ID
+   plus status URL.
+8. Biowork polls
+   `GET /api/projects/<project_id>/yolo-sam2-inference/runs/<run_id>/` to show
+   the queued/running/completed/failed state.
+9. The pipeline repo owns the YOLO+SAM2 processing, RustFS reads/writes, MLflow
    model loading, and any generated outputs.
 
 ## Configuration
 
-- `BIOWORK_INFERENCE_PIPELINE_URL` must point to the pipeline trigger endpoint.
+- `BIOWORK_INFERENCE_PIPELINE_URL` must point to the orchestration trigger
+  endpoint, for example
+  `http://host.docker.internal:8096/runs/full-dataset-inference`.
 - `BIOWORK_INFERENCE_PIPELINE_TOKEN` is optional and is sent as bearer auth.
 - `BIOWORK_INFERENCE_REQUEST_TIMEOUT` defaults to 30 seconds.
 - `BIOWORK_MLFLOW_TRACKING_URI` points Biowork at the product MLflow service.
@@ -40,8 +48,10 @@ path, and it does not call `/api/ml/<backend_id>/predict/project`.
 
 ## Boundaries
 
-Biowork owns the project UI, trigger API, S3-compatible project storage
-selection, and project-scoped MLflow run selection. Users do not enter arbitrary
-dataset prefixes or MLflow URIs for this workflow. `rustfs_yolo_sam2_inference`
-owns the Kedro batch inference implementation that combines YOLO and SAM2 over
-the dataset. Label Studio ML backend prediction retrieval remains separate.
+Biowork owns the project UI, trigger API facade, S3-compatible project storage
+selection, project-scoped MLflow run selection, and status display.
+`biowork-orchestration` owns Dagster jobs, run queueing, status, retries, and
+workflow history. Users do not enter arbitrary dataset prefixes or MLflow URIs
+for this workflow. `rustfs_yolo_sam2_inference` owns the Kedro batch inference
+implementation that combines YOLO and SAM2 over the dataset. Label Studio ML
+backend prediction retrieval remains separate.
