@@ -1,6 +1,10 @@
+import json
+
+import pytest
 from django.test import TestCase
 from django.urls import reverse
 from django.utils.http import urlencode
+from rest_framework import status
 from rest_framework.test import APIClient
 from tasks.models import Task
 
@@ -41,3 +45,81 @@ class TestProjectCountsListAPI(TestCase):
         ]
         actual = sorted(response.json()['results'], key=lambda d: d['id'])
         self.assertEqual(actual, expected)
+
+
+@pytest.fixture
+def run_inference_jobs_inline(mocker):
+    def run_inline(job, *args, **kwargs):
+        kwargs.pop('queue_name', None)
+        kwargs.pop('job_timeout', None)
+        return job(*args, **kwargs)
+
+    mocker.patch('projects.api.start_job_async_or_sync', side_effect=run_inline)
+
+
+@pytest.mark.django_db
+def test_yolo_sam2_inference_endpoint_triggers_external_pipeline(
+    settings,
+    mocker,
+    run_inference_jobs_inline,
+):
+    settings.BIOWORK_INFERENCE_PIPELINE_URL = 'https://pipeline.example/run'
+    settings.BIOWORK_INFERENCE_PIPELINE_TOKEN = 'secret-token'
+
+    project = ProjectFactory(
+        label_config='<View><Image name="image" value="$image"/></View>',
+        title='pipeline project',
+    )
+    client = APIClient()
+    client.force_authenticate(user=project.created_by)
+
+    response_mock = mocker.Mock()
+    response_mock.status_code = status.HTTP_202_ACCEPTED
+    response_mock.json.return_value = {'job_id': 'pipeline-1'}
+    response_mock.raise_for_status.return_value = None
+    post_mock = mocker.patch('projects.api.requests.post', return_value=response_mock)
+
+    response = client.post(
+        f'/api/projects/{project.id}/yolo-sam2-inference/',
+        data=json.dumps(
+            {
+                'dataset_prefix': 'datasets/custom-project',
+                'model_uri': 'runs:/e58d20c1e77f4cd0894e91c82974f368/model',
+                'parameters': {'confidence': 0.4},
+            }
+        ),
+        content_type='application/json',
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload['status'] == 'triggered'
+    assert payload['pipeline_response']['status_code'] == status.HTTP_202_ACCEPTED
+    assert payload['pipeline_response']['response'] == {'job_id': 'pipeline-1'}
+
+    post_mock.assert_called_once()
+    _, kwargs = post_mock.call_args
+    assert kwargs['headers']['Authorization'] == 'Bearer secret-token'
+    assert kwargs['json']['project_id'] == project.id
+    assert kwargs['json']['project_title'] == 'pipeline project'
+    assert kwargs['json']['dataset_prefix'] == 'datasets/custom-project'
+    assert kwargs['json']['model_uri'] == 'runs:/e58d20c1e77f4cd0894e91c82974f368/model'
+    assert kwargs['json']['label_config'] == project.label_config
+    assert kwargs['json']['parameters'] == {'confidence': 0.4}
+
+
+@pytest.mark.django_db
+def test_yolo_sam2_inference_endpoint_requires_model_uri(settings):
+    settings.BIOWORK_INFERENCE_PIPELINE_URL = 'https://pipeline.example/run'
+    project = ProjectFactory(label_config='<View></View>', title='pipeline project')
+    client = APIClient()
+    client.force_authenticate(user=project.created_by)
+
+    response = client.post(
+        f'/api/projects/{project.id}/yolo-sam2-inference/',
+        data=json.dumps({'dataset_prefix': 'datasets/custom-project'}),
+        content_type='application/json',
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert 'model_uri' in response.json()

@@ -21,6 +21,7 @@ export const API_CONFIG = {
     createProject: "POST:/projects",
     deleteProject: "DELETE:/projects/:pk",
     projectResetCache: "POST:/projects/:pk/summary/reset",
+    projectYoloSam2Inference: "POST:/projects/:pk/yolo-sam2-inference",
 
     // Presigning
     presignUrlForTask: "/../tasks/:taskID/presign",
@@ -59,7 +60,6 @@ export const API_CONFIG = {
     deleteMLBackend: "DELETE:/ml/:pk",
     trainMLBackend: "POST:/ml/:pk/train",
     predictWithML: "POST:/ml/:pk/predict/test",
-    predictProjectWithML: "POST:/ml/:pk/predict/project",
     projectModelVersions: "/projects/:pk/model-versions",
     deletePredictions: "DELETE:/projects/:pk/model-versions",
     modelVersions: "/ml/:pk/versions",

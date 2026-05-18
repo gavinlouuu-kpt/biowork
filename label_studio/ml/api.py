@@ -5,12 +5,11 @@ import logging
 import drf_yasg.openapi as openapi
 from core.feature_flags import flag_set
 from core.permissions import ViewClassPermission, all_permissions
-from core.redis import start_job_async_or_sync
 from django.conf import settings
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import no_body, swagger_auto_schema
-from ml.models import MLBackend, MLBackendPredictionJob, run_project_prediction_job
+from ml.models import MLBackend
 from ml.serializers import MLBackendSerializer, MLInteractiveAnnotatingRequest
 from projects.models import Project, Task
 from rest_framework import generics, status
@@ -313,60 +312,6 @@ class MLBackendPredictTestAPI(APIView):
                 status=status.HTTP_501_NOT_IMPLEMENTED,
                 data={'error': 'Not implemented - you must provide random=true query parameter'},
             )
-
-
-class MLBackendPredictProjectAPI(APIView):
-    serializer_class = MLBackendSerializer
-    permission_required = all_permissions.projects_change
-
-    def post(self, request, *args, **kwargs):
-        ml_backend = generics.get_object_or_404(MLBackend, pk=self.kwargs['pk'])
-        self.check_object_permissions(self.request, ml_backend)
-
-        try:
-            batch_size = int(request.data.get('batch_size') or 100)
-        except (TypeError, ValueError):
-            return Response(
-                status=status.HTTP_400_BAD_REQUEST,
-                data={'detail': 'batch_size must be an integer'},
-            )
-        overwrite = bool(request.data.get('overwrite', False))
-        if batch_size < 1:
-            return Response(
-                status=status.HTTP_400_BAD_REQUEST,
-                data={'detail': 'batch_size must be greater than 0'},
-            )
-
-        prediction_job = MLBackendPredictionJob.objects.create(
-            job_id='',
-            ml_backend=ml_backend,
-            model_version=ml_backend.model_version,
-            batch_size=batch_size,
-        )
-        result = start_job_async_or_sync(
-            run_project_prediction_job,
-            prediction_job.id,
-            overwrite=overwrite,
-            queue_name='default',
-            job_timeout=getattr(settings, 'RQ_LONG_JOB_TIMEOUT', None),
-        )
-
-        response_data = {
-            'prediction_job': prediction_job.id,
-            'project': ml_backend.project_id,
-            'ml_backend': ml_backend.id,
-            'model_version': prediction_job.model_version,
-            'total_tasks': ml_backend.project.tasks.count(),
-        }
-        if hasattr(result, 'id'):
-            prediction_job.job_id = result.id
-            prediction_job.save(update_fields=['job_id', 'updated_at'])
-            response_data.update({'status': 'queued', 'job': result.id})
-            return Response(status=status.HTTP_202_ACCEPTED, data=response_data)
-
-        prediction_job.refresh_from_db()
-        response_data.update({'status': 'completed', 'result': result, 'model_version': prediction_job.model_version})
-        return Response(status=status.HTTP_200_OK, data=response_data)
 
 
 @method_decorator(

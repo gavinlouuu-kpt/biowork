@@ -5,6 +5,8 @@ import os
 import pathlib
 
 import drf_yasg.openapi as openapi
+import requests
+from billing.utils import validate_project_creation
 from core.filters import ListFilter
 from core.label_config import config_essential_data_has_changed
 from core.mixins import GetParentObjectMixin
@@ -23,6 +25,7 @@ from django_filters import CharFilter, FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from label_studio_sdk.label_interface.interface import LabelInterface
+from ml.models import MLBackend
 from ml.serializers import MLBackendSerializer
 from projects.functions.next_task import get_next_task
 from projects.functions.stream_history import get_label_stream_history
@@ -57,7 +60,6 @@ from tasks.serializers import (
 from webhooks.models import WebhookAction
 from webhooks.utils import api_webhook, api_webhook_for_delete, emit_webhooks_for_instance
 
-from billing.utils import validate_project_creation
 from label_studio.core.utils.common import load_func
 
 logger = logging.getLogger(__name__)
@@ -492,6 +494,153 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
     @api_webhook(WebhookAction.PROJECT_UPDATED)
     def put(self, request, *args, **kwargs):
         return super(ProjectAPI, self).put(request, *args, **kwargs)
+
+
+def _default_inference_dataset_prefix(project):
+    template = settings.BIOWORK_INFERENCE_DATASET_PREFIX_TEMPLATE
+    try:
+        return template.format(
+            project_id=project.id,
+            project_title=project.title,
+            organization_id=project.organization_id,
+        )
+    except (KeyError, ValueError):
+        logger.warning('Invalid BIOWORK_INFERENCE_DATASET_PREFIX_TEMPLATE: %s', template)
+        return template
+
+
+def trigger_yolo_sam2_inference_pipeline(payload):
+    headers = {'Content-Type': 'application/json'}
+    token = settings.BIOWORK_INFERENCE_PIPELINE_TOKEN
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+
+    response = requests.post(
+        settings.BIOWORK_INFERENCE_PIPELINE_URL,
+        json=payload,
+        headers=headers,
+        timeout=settings.BIOWORK_INFERENCE_REQUEST_TIMEOUT,
+        verify=settings.VERIFY_SSL_CERTS,
+    )
+    response.raise_for_status()
+
+    try:
+        pipeline_response = response.json()
+    except ValueError:
+        pipeline_response = {'text': response.text}
+
+    return {
+        'status_code': response.status_code,
+        'response': pipeline_response,
+    }
+
+
+class ProjectYoloSam2InferenceAPI(generics.GenericAPIView):
+    parser_classes = (JSONParser,)
+    permission_required = all_permissions.projects_change
+    queryset = Project.objects.all()
+    swagger_schema = None
+
+    def get_queryset(self):
+        return Project.objects.filter(organization=self.request.user.active_organization)
+
+    def post(self, request, *args, **kwargs):
+        project = self.get_object()
+
+        if not settings.BIOWORK_INFERENCE_PIPELINE_URL:
+            return Response(
+                {'detail': 'BIOWORK_INFERENCE_PIPELINE_URL is not configured.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        model_uri = (request.data.get('model_uri') or '').strip()
+        if not model_uri:
+            return Response(
+                {'model_uri': 'MLflow model URI is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dataset_prefix = (request.data.get('dataset_prefix') or '').strip()
+        if not dataset_prefix:
+            dataset_prefix = _default_inference_dataset_prefix(project)
+
+        parameters = request.data.get('parameters') or {}
+        if not isinstance(parameters, dict):
+            return Response(
+                {'parameters': 'Parameters must be an object.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ml_backend = None
+        ml_backend_id = request.data.get('ml_backend_id')
+        if ml_backend_id:
+            try:
+                ml_backend = MLBackend.objects.get(id=ml_backend_id, project=project)
+            except (MLBackend.DoesNotExist, ValueError):
+                return Response(
+                    {'ml_backend_id': 'ML backend does not belong to this project.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        payload = {
+            'project_id': project.id,
+            'project_title': project.title,
+            'organization_id': project.organization_id,
+            'dataset_prefix': dataset_prefix,
+            'model_uri': model_uri,
+            'label_config': project.label_config,
+            'parameters': parameters,
+            'requested_by': {
+                'id': request.user.id,
+                'email': request.user.email,
+            },
+        }
+
+        if ml_backend:
+            payload['ml_backend'] = {
+                'id': ml_backend.id,
+                'title': ml_backend.title,
+                'model_version': ml_backend.model_version,
+            }
+
+        public_request = {key: value for key, value in payload.items() if key != 'label_config'}
+
+        try:
+            result = start_job_async_or_sync(
+                trigger_yolo_sam2_inference_pipeline,
+                payload,
+                queue_name='default',
+                job_timeout=settings.RQ_LONG_JOB_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            logger.warning('YOLO+SAM2 inference pipeline request failed: %s', exc, exc_info=True)
+            return Response(
+                {
+                    'detail': 'YOLO+SAM2 inference pipeline request failed.',
+                    'error': str(exc),
+                    'request': public_request,
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if hasattr(result, 'id'):
+            return Response(
+                {
+                    'status': 'queued',
+                    'job_id': result.id,
+                    'request': public_request,
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        return Response(
+            {
+                'status': 'triggered',
+                'pipeline_response': result,
+                'request': public_request,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 @method_decorator(
