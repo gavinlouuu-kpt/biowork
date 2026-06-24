@@ -1,5 +1,5 @@
 import { Fragment, useContext } from "react";
-import { Circle } from "react-konva";
+import { Circle, Line } from "react-konva";
 import { getRoot, types } from "mobx-state-tree";
 
 import Registry from "../core/Registry";
@@ -201,10 +201,11 @@ const HtxKeyPointView = ({ item, setShapeRef }) => {
     sameStrokeWidthForSelected: true,
   });
 
+  const isNegativePrompt = item.dynamic && item.negative;
   const props = {
     opacity: 1,
-    fill: regionStyles.fillColor,
-    stroke: regionStyles.strokeColor,
+    fill: isNegativePrompt ? "#fff" : regionStyles.fillColor,
+    stroke: isNegativePrompt ? "#d92d20" : regionStyles.strokeColor,
     strokeWidth: Math.max(1, regionStyles.strokeWidth),
     strokeScaleEnabled: false,
     shadowBlur: 0,
@@ -215,6 +216,9 @@ const HtxKeyPointView = ({ item, setShapeRef }) => {
   if (!item.parent) return null;
   if (!item.inViewPort) return null;
 
+  const radius = Math.max(item.canvasWidth, 2) / item.parent?.zoomScale;
+  const crossRadius = Math.max(radius * 0.65, 3 / item.parent?.zoomScale);
+
   return (
     <Fragment>
       <Circle
@@ -222,7 +226,7 @@ const HtxKeyPointView = ({ item, setShapeRef }) => {
         y={item.canvasY}
         ref={(el) => setShapeRef(el)}
         // keypoint should always be the same visual size
-        radius={Math.max(item.canvasWidth, 2) / item.parent?.zoomScale}
+        radius={radius}
         // fixes performance, but opactity+borders might look not so good
         perfectDrawEnabled={false}
         // for some reason this scaling doesn't work, so moved this to radius
@@ -281,7 +285,37 @@ const HtxKeyPointView = ({ item, setShapeRef }) => {
         draggable={!item.isReadOnly()}
         listening={!suggestion}
       />
-      <LabelOnKP item={item} color={regionStyles.strokeColor} />
+      {isNegativePrompt && (
+        <Fragment>
+          <Line
+            points={[
+              item.canvasX - crossRadius,
+              item.canvasY - crossRadius,
+              item.canvasX + crossRadius,
+              item.canvasY + crossRadius,
+            ]}
+            stroke="#d92d20"
+            strokeWidth={Math.max(2, props.strokeWidth)}
+            strokeScaleEnabled={false}
+            listening={false}
+            perfectDrawEnabled={false}
+          />
+          <Line
+            points={[
+              item.canvasX - crossRadius,
+              item.canvasY + crossRadius,
+              item.canvasX + crossRadius,
+              item.canvasY - crossRadius,
+            ]}
+            stroke="#d92d20"
+            strokeWidth={Math.max(2, props.strokeWidth)}
+            strokeScaleEnabled={false}
+            listening={false}
+            perfectDrawEnabled={false}
+          />
+        </Fragment>
+      )}
+      <LabelOnKP item={item} color={isNegativePrompt ? "#d92d20" : regionStyles.strokeColor} />
     </Fragment>
   );
 };

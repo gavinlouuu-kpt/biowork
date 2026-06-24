@@ -4,6 +4,7 @@ import { isDefined } from "../utils/utilities";
 import { AnnotationMixin } from "./AnnotationMixin";
 import { ReadOnlyRegionMixin } from "./ReadOnlyMixin";
 import { RELATIVE_STAGE_HEIGHT, RELATIVE_STAGE_WIDTH } from "../components/ImageView/Image";
+import { isConnectedDynamicRegion } from "./dynamicPromptRegions";
 
 const RegionsMixin = types
   .model({
@@ -76,18 +77,12 @@ const RegionsMixin = types
 
     getConnectedDynamicRegions(excludeSelf) {
       const { regions = [] } = getRoot(self).annotationStore?.selected || {};
-      const { type, labelName } = self;
 
       const result = regions.filter((region) => {
         if (excludeSelf && region === self) return false;
         const canBePartOfNotification = self.supportSuggestions ? self.dynamic : true;
 
-        return (
-          canBePartOfNotification &&
-          region.type === type &&
-          region.labelName === labelName &&
-          region.results?.[0]?.to_name === self.results?.[0]?.to_name
-        );
+        return canBePartOfNotification && isConnectedDynamicRegion(self, region);
       });
 
       return result;
